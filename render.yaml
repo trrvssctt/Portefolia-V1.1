@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: frontend-nfc
+    env: static
+    plan: free
+    staticPublishPath: dist
+    buildCommand: npm run build
+    envVars:
+      - key: VITE_API_BASE
+        scope: env
+        # Set this in the Render dashboard to https://backennfc.onrender.com
+        value: ""

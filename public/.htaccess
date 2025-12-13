@@ -1,0 +1,49 @@
+# .htaccess for LWS public_html
+# - Rewrite frontend routes to index.html for a React SPA
+# - Proxy /api/* requests to the external backend (Render)
+#   If mod_proxy is not available on the hosting, a fallback 302 redirect is provided.
+# Adjust the backend host below if it changes.
+
+# Backend URL (Render)
+SetEnvIf Request_URI "^/api/" PROXY_TO_BACKEND=true
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # --- Proxy /api/* to backend (requires mod_proxy and mod_proxy_http) ---
+  # If mod_proxy is enabled on your LWS account, this will forward API requests
+  # to the Render backend while keeping the same origin for the browser.
+  RewriteCond %{REQUEST_URI} ^/api/
+  RewriteRule ^api/(.*)$ https://backend-v-card.onrender.com/api/$1 [P,L]
+
+  # --- Fallback: if proxy isn't available, redirect API requests to backend ---
+  # This will cause browser requests to go directly to the backend URL, so CORS
+  # must be enabled on the backend for the frontend domain (https://portefolia.tech).
+  RewriteCond %{REQUEST_URI} ^/api/
+  RewriteRule ^api/(.*)$ https://backend-v-card.onrender.com/api/$1 [R=302,L]
+
+  # Serve existing files and directories normally
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # All other requests (client-side routes) should be served by index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Optional: improve caching for static assets
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/html "access plus 0 seconds"
+  ExpiresByType text/css "access plus 1 week"
+  ExpiresByType application/javascript "access plus 1 week"
+  ExpiresByType image/* "access plus 1 month"
+</IfModule>
+
+# Recommended: allow embedding by your domain only (optional)
+# Header always set X-Frame-Options "SAMEORIGIN"
+
+# If you need to enable CORS for fonts or other static assets, uncomment below
+# <IfModule mod_headers.c>
+#   Header set Access-Control-Allow-Origin "https://portefolia.tech"
+# </IfModule>
