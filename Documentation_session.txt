@@ -1,0 +1,69 @@
+Audit Technique - Sessions & Tokens
+
+Contexte
+- Objectif: ajouter gestion de sessions, refresh tokens, durée de session configurable, et sessions multi-devices.
+- Codebase: backend Node.js (Express), MySQL via `mysql2` pool.
+
+Modifications appliquées
+1) Nouveau modèle `sessionModel` (backend/src/models/sessionModel.js)
+   - Table `sessions` gérant les sessions par `utilisateur_id`.
+   - Colonnes: id, utilisateur_id, refresh_token, device_info, ip, user_agent, revoked, expires_at, last_used_at, created_at.
+   - Fonctions: init, createSession, findByRefreshToken, revokeSessionById, revokeByRefreshToken, revokeAllForUser, listSessionsForUser, touchSession, generateRefreshToken.
+
+2) Auth controller étendu (backend/src/controllers/authController.js)
+   - Issue short-lived access tokens (configurable via `ACCESS_TOKEN_EXPIRES`, default `15m`).
+   - Generate and persist refresh tokens (default expiry controlled by `REFRESH_TOKEN_EXPIRES_DAYS`, default 30 days).
+   - New endpoints:
+     - `POST /api/auth/refresh` : échange un `refreshToken` valide contre un nouvel access token.
+     - `POST /api/auth/logout` : révoque un refresh token ou, avec `{ all: true }`, révoque toutes les sessions de l'utilisateur connecté.
+   - Login flow now returns `{ accessToken, refreshToken, expiresIn }`.
+
+3) Routes auth mises à jour (backend/src/routes/authRoutes.js)
+   - Ajout des routes `/refresh` et `/logout`.
+
+4) Initialisation automatique (backend/src/index.js)
+   - `sessionModel.init()` appelé au démarrage pour créer la table `sessions` si elle n'existe pas.
+
+Décisions & sécurité
+- Refresh tokens: générés via `crypto.randomBytes(48)` et stockés en base (plain text). Pour production, envisagez de stocker un hachage (SHA-256) de la valeur et de valider en comparant les hachages afin d'éviter fuite de tokens en clair.
+- Rotation de refresh tokens: non implémentée dans cette itération. La rotation améliore la sécurité (révoquer l'ancien et en émettre un nouveau à chaque refresh). Peut être ajoutée facilement dans `auth.refresh` en créant une nouvelle session et en révoquant l'ancienne.
+- Durée de session: contrôlable via la variable d'environnement `REFRESH_TOKEN_EXPIRES_DAYS`.
+- Durée d'accès: contrôlable via `ACCESS_TOKEN_EXPIRES` (ex: `15m`, `1h`).
+- Sessions multi-devices: la table `sessions` permet plusieurs lignes par `utilisateur_id`. Fournir une UI pour lister/révoquer les sessions (ex: `GET /api/admin/sessions`) est une amélioration future.
+
+Correctifs appliqués
+- Ajout de la gestion des tokens pour l'authentification moderne: séparation access/refresh.
+- Ajout d'API pour rafraîchir les tokens et pour déconnecter (révoquer sessions).
+- Initialisation de la table `sessions` au démarrage pour éviter erreurs SQL.
+
+Utilisation & Endpoints
+- POST /api/auth/login
+  - Body: `{ "email": "...", "password": "...", "device_info": "Optional device string" }`
+  - Réponse: `{ accessToken, refreshToken, expiresIn }`
+
+- POST /api/auth/refresh
+  - Body: `{ "refreshToken": "..." }`
+  - Réponse: `{ accessToken, expiresIn }`
+
+- POST /api/auth/logout
+  - Body: `{ "refreshToken": "..." }` to revoke one session
+  - Or: `{ "all": true }` (must be authenticated) to revoke all sessions for current user
+
+Notes de déploiement
+- Ajouter/mettre à jour les variables d'environnement (exemple):
+  - `JWT_SECRET`: secret pour signer JWT
+  - `ACCESS_TOKEN_EXPIRES` (ex: `15m`)
+  - `REFRESH_TOKEN_EXPIRES_DAYS` (ex: `30`)
+- Appliquer les migrations / redémarrer le serveur. Le modèle `sessionModel` crée automatiquement la table au démarrage si nécessaire.
+
+Améliorations recommandées
+- Stocker un hachage des refresh tokens plutôt que le token en clair.
+- Implémenter rotation de refresh token (issue d'un nouveau refresh token à chaque refresh).
+- Ajouter endpoints pour: lister les sessions d'un utilisateur et révoquer individuellement depuis l'UI.
+- Ajouter limites de sessions par utilisateur (ex: 10 devices max) et politique d'expulsion (kill oldest).
+
+Fichiers ajoutés/modifiés
+- Added: `backend/src/models/sessionModel.js`
+- Modified: `backend/src/controllers/authController.js`, `backend/src/routes/authRoutes.js`, `backend/src/index.js`
+
+Fin de document.

@@ -1,0 +1,197 @@
+Rapport de session - Portefolia (consolidé)
+Date : 2026-01-04
+
+1. Conversation Overview
+- Objectifs principaux :
+  - Fournir aux administrateurs des listes de paiements : "terminés", "en attente" et "à venir" (basé sur les abonnements), et permettre la consultation de l'historique de paiements par utilisateur (preuves d'image, CA total).
+  - Implémenter le flux d'abonnement (checkout token + confirmation), persister `payment_reference` et `end_date`, activer l'utilisateur à la confirmation du paiement.
+  - Ajouter une page profil utilisateur avec upload d'avatar (`POST /api/uploads/avatar`) et gestion des abonnements.
+  - Générer des factures PDF (Puppeteer) avec fallback HTML si Puppeteer indisponible.
+
+2. Actions réalisées (résumé technique)
+- Backend (Node.js + Express, MySQL) :
+  - Ajout / modification de contrôleurs et routes pour : abonnements, paiements, admin.
+  - Ajout d'un endpoint administrateur pour "à venir" : `GET /api/admin/paiements/upcoming` (calculé depuis `abonnements`).
+  - Ajout d'endpoints pour obtenir les paiements d'un utilisateur : `GET /api/abonnements/me/paiements`, `GET /api/users/:id/paiements`.
+  - Correction d'un crash serveur dû à une exportation manquante (`listAbonnementsUpcoming`) dans `adminController`.
+  - Alias d'upload pour avatar ajouté : `POST /api/uploads/avatar`.
+  - Intégration (ou préparation) de Puppeteer pour la génération PDF ; nécessite redémarrage du backend pour prise en charge.
+
+- Frontend (React + TypeScript, Vite) :
+  - Page admin paiements `src/pages/admin/Paiements.tsx` : ajout du filtre "À venir", requête vers `/api/admin/paiements/upcoming`.
+  - Composant `UserPaiementHistorique` créé/intégré : permet à l'admin d'ouvrir l'historique de paiements d'un utilisateur (affiche `image_paiement`, totaux, etc.).
+  - Page profil / upload avatar et formulaire portfolio mis à jour pour inclure `domaines`.
+
+3. Modifications de fichiers clés (non exhaustif)
+- Backend :
+  - `backend/src/controllers/paiementController.js` : ajout de `upcoming()` et export.
+  - `backend/src/routes/paiementRoutes.js` : `GET /upcoming` ajouté.
+  - `backend/src/controllers/abonnementController.js` : ajout de `getUserPayments` (user-facing).
+  - `backend/src/controllers/userController.js` et `backend/src/routes/userRoutes.js` : endpoints pour `me/paiements` et `:id/paiements`.
+  - `backend/src/controllers/adminController.js` : export corrigé pour `listAbonnementsUpcoming`.
+
+- Frontend :
+  - `src/pages/admin/Paiements.tsx` : ajout de l'option "À venir", intégration de `UserPaiementHistorique`.
+  - `src/components/admin/UserPaiementHistorique.tsx` : composant pour afficher les paiements par utilisateur.
+
+4. Observations et bugs rencontrés
+- Crash serveur au démarrage : erreur "Route.get() requires a callback function but got a [object Undefined]" provoquée par une fonction non exportée dans `adminController` — corrigé.
+- 404 sur `POST /api/uploads/avatar` côté frontend : lien d'alias ajouté côté backend.
+- Puppeteer installé mais backend doit être redémarré pour que la génération PDF fonctionne correctement.
+- Recommandation : appliquer les migrations SQL nécessaires (colonnes `invoice_id`, `motif_remboursement`, `abonnement_id`, `domaines`) puis redémarrer.
+
+5. Tests à effectuer après redémarrage du backend
+- Valider le flux d'abonnement complet :
+  - `POST /api/abonnements/checkout` -> recevoir token de checkout
+  - Confirmer paiement -> `abonnement` créé/mettre `payment_reference` et `end_date` -> activation utilisateur
+- Vérifier endpoints :
+  - `GET /api/admin/paiements?status=paid|pending&user_id=...`
+  - `GET /api/admin/paiements/upcoming`
+  - `GET /api/abonnements/me/paiements`
+  - `GET /api/users/:id/paiements`
+  - `POST /api/uploads/avatar`
+  - Endpoints facture PDF : `/api/admin/invoices/:id/pdf` (fallback HTML si nécessaire)
+
+6. Sécurité & authentification
+- Implémentation d'un flux Access/Refresh token :
+  - Modèle de refresh tokens : `backend/src/models/refreshTokenModel.js` (hash SHA-256 stocké).
+  - Endpoints : `POST /api/auth/refresh`, `POST /api/auth/logout`.
+  - Cookies `HttpOnly`, `SameSite=lax`, `secure` en production.
+  - Rotation et révocation des refresh tokens implémentées.
+
+Options disponibles :
+- Je peux redémarrer le backend et exécuter les vérifications d'API ;
+- Je peux ajouter l'endpoint et l'UI admin pour révoquer sessions ;
+- Je peux créer la migration SQL pour les colonnes manquantes.
+
+
+Résumé des actions réalisées
+---------------------------
+- Audit technique de la gestion des sessions et tokens (JWT).
+- Ajout d'un flux Access / Refresh token sécurisé côté backend.
+- Création du modèle de stockage des refresh tokens : `backend/src/models/refreshTokenModel.js`.
+- Mise à jour de l'authentification backend : `backend/src/controllers/authController.js` (login, register, refresh, logout).
+- Ajout d'endpoints : `POST /api/auth/refresh`, `POST /api/auth/logout` et exposition dans `backend/src/routes/authRoutes.js`.
+- Activation du parsing des cookies côté serveur via `cookie-parser` (dépendance ajoutée dans `backend/package.json` et middlewares dans `backend/src/index.js`).
+- Stockage des refresh tokens (hachage SHA-256) et fonctions de révocation/cleanup (`deleteExpired`).
+- Initialisation automatique du modèle refresh token au démarrage du serveur (`refreshTokenModel.init()` dans `backend/src/index.js`).
+
+Modifications frontend
+----------------------
+- Mise à jour de `src/utils/authUtils.ts` pour : envoyer `credentials: 'include'`, gérer `accessToken` (ou `token`) retourné, ajouter `refreshAccessToken()` et `signOutUser()`.
+- Mise à jour de `src/components/auth/AuthProvider.tsx` pour : tenter un refresh automatique si aucun token local, et utiliser `signOutUser()` pour une déconnexion serveur.
+- Mise à jour de `src/pages/Auth.tsx` (adaptation aux nouvelles réponses backend) — alignement sur accessToken + cookie.
+
+Infrastructure locale et tests
+Rapport de session - Portefolia (session locale)
+Date : 2026-01-04
+
+Résumé des actions réalisées
+---------------------------
+- Audit technique de la gestion des sessions et tokens (JWT).
+- Ajout d'un flux Access / Refresh token sécurisé côté backend.
+- Création du modèle de stockage des refresh tokens : `backend/src/models/refreshTokenModel.js`.
+- Mise à jour de l'authentification backend : `backend/src/controllers/authController.js` (login, register, refresh, logout).
+- Ajout d'endpoints : `POST /api/auth/refresh`, `POST /api/auth/logout` et exposition dans `backend/src/routes/authRoutes.js`.
+- Activation du parsing des cookies côté serveur via `cookie-parser` (dépendance ajoutée dans `backend/package.json` et middlewares dans `backend/src/index.js`).
+- Stockage des refresh tokens (hachage SHA-256) et fonctions de révocation/cleanup (`deleteExpired`).
+- Initialisation automatique du modèle refresh token au démarrage du serveur (`refreshTokenModel.init()` dans `backend/src/index.js`).
+
+Modifications frontend
+----------------------
+- Mise à jour de `src/utils/authUtils.ts` pour : envoyer `credentials: 'include'`, gérer `accessToken` (ou `token`) retourné, ajouter `refreshAccessToken()` et `signOutUser()`.
+- Mise à jour de `src/components/auth/AuthProvider.tsx` pour : tenter un refresh automatique si aucun token local, et utiliser `signOutUser()` pour une déconnexion serveur.
+- Mise à jour de `src/pages/Auth.tsx` (adaptation aux nouvelles réponses backend) — alignement sur accessToken + cookie.
+
+Infrastructure locale et tests
+------------------------------
+- Ajustement CORS par défaut pour autoriser le dev server Vite (`localhost:5173`) dans `backend/src/index.js`.
+- Tentative de démarrage du backend ; constat d'erreurs de connexion au MySQL distant.
+- Provisionnement d'une instance MySQL locale via Docker (`portefolia-mysql`) mappée sur `3307` pour tests locaux.
+
+Observations de sécurité & décisions
+-----------------------------------
+- Les refresh tokens sont générés via `crypto` et stockés côté serveur. Par sécurité, les tokens sont hachés lors du stockage (implémentation actuelle utilise SHA-256 dans `refreshTokenModel`).
+- Les cookies de refresh sont `HttpOnly`, `SameSite=lax`, `secure` en production.
+- Access tokens courts par défaut (`ACCESS_TOKEN_EXPIRES=15m`) ; refresh token expiry configurable via `REFRESH_TOKEN_EXPIRES_DAYS`.
+- Rotation de refresh tokens implémentée (sur refresh l'ancien token est révoqué et un nouveau est émis).
+
+Fichiers ajoutés / modifiés
+---------------------------
+- Ajoutés :
+  - `backend/src/models/refreshTokenModel.js`
+  - `report.txt` (ce document)
+- Modifiés :
+  - `backend/src/controllers/authController.js`
+  - `backend/src/controllers/userController.js`
+  - `backend/src/routes/authRoutes.js`
+  - `backend/src/index.js`
+  - `backend/package.json`
+  - `src/utils/authUtils.ts`
+  - `src/components/auth/AuthProvider.tsx`
+  - `src/pages/Auth.tsx` (adaptations côté UI)
+
+
+Notes / limitations
+-------------------
+- Cette session a appliqué des changements directement dans le code. Avant mise en production, revoir les secrets, les politiques CORS, et réaliser une revue de sécurité (stockage des tokens, HTTPS obligatoire).
+- Si vous préférez stocker uniquement des hachages de refresh tokens (recommandé), on peut modifier rapidement `refreshTokenModel` pour ne conserver que des hachages.
+
+
+-----
+Ajout — Rapport de session (2026-01-04)
+Résumé des actions récentes:
+- Création / mise à jour de l'utilisateur admin `seydou@portefolia.com` via le script d'upsert.
+- Démarrage et vérification du backend : connexion MySQL OK, serveur sur le port 3000, connexion admin/login réussie (JWT obtenu) et `GET /api/auth/admin/me` retourne `role: super_admin`.
+- Adaptations frontend pour supporter les tokens admin : modifications de `src/utils/authUtils.ts`, `src/components/auth/AuthProvider.tsx` (ajout de `reloadProfile()`), et `src/pages/admin/AdminLogin.tsx` (décodage JWT, appel à `reloadProfile()` et redirection vers /admin/dashboard).
+- Ajout d'une page dashboard admin (`src/pages/admin/Dashboard_admin.tsx`) et exposition d'un endpoint admin pour les plans (`GET /api/admin/plans`).
+- Correction CORS côté backend pour autoriser l'en-tête `Cache-Control` et autres entêtes de préflight.
+- Corrections mineures : import manquant `Label` dans `Portfolios.tsx` et création de la documentation `Structure_Administration.MD`.
+
+Vérifications effectuées:
+- Script d'upsert admin exécuté (retour : admin id mis à jour).
+- Requêtes `POST /api/auth/admin/login` et `GET /api/auth/admin/me` testées avec succès.
+
+---
+Ajout — Résumé des actions réalisées pendant cette session (2026-01-04)
+- Normalisation des statuts de paiement et corrections d'affichage dans `src/pages/HistoriqueUserPaiement.tsx` (normalisation des valeurs status, rendu responsive mobile/tableau).
+- Correction d'erreurs JSX/parse (vite react-swc) et repositionnement du `BrowserRouter` pour que `useNavigate()` fonctionne dans `AuthProvider` (`src/App.tsx`, `src/components/auth/AuthProvider.tsx`).
+- Mise à jour du flux de déconnexion pour rediriger suivant le rôle (admin -> admin login, utilisateur -> /auth) dans `src/components/auth/AuthProvider.tsx`.
+- Frontend: envoi du champ `domaines` (enum) depuis `src/components/dashboard/PortfolioForm.tsx` (mapping `domain` -> `TECH|AGRO|DROIT|MEDECINE`) et formatage des `liens_sociaux`.
+- Backend: acceptation et validation du champ `domaines` dans `backend/src/controllers/portfolioController.js` (ajout de `mapDomaines()` et validation lors de create/update), et journaux de debug ajoutés pour diagnostiquer les 400.
+- Ajout de logs de debug côté client (`console.debug`) et serveur (`console.log`) pour capturer le payload de création de portfolio et la raison des 400.
+- Recommandation fournie : ajouter la colonne SQL `domaines ENUM('TECH','AGRO','DROIT','MEDECINE')` et redémarrer le backend pour corriger les 400 sur `POST /api/portfolios`.
+
+
+---
+Ajout — Résumé des actions réalisées pendant cette session (2026-01-04 — ajout)
+- Normalisation des statuts de paiement côté backend et mappage vers l'enum SQL pour éviter les erreurs lors de la mise à jour des paiements.
+- Création et persistance d'une facture (`invoice_id`) lors de la confirmation d'un paiement ; tentative d'envoi d'email de facture (logs diagnostiques ajoutés pour suivi).
+- Persistance du `motif_remboursement` et création/envoi d'une facture de remboursement lors d'un remboursement.
+- Support des paiements liés soit à une `commande_id` soit à une `abonnement_id` ; adaptation du flux d'upgrade pour créer un `abonnement` puis un `paiement` lié.
+- Correction côté backend de la requête user pour éviter les erreurs de collation (`getMyPayments`) en remplaçant `IN (SELECT...)` par `EXISTS` et en forçant `COLLATE utf8mb4_unicode_ci`.
+- Ajout d'une page utilisateur `HistoriqueUserPaiement.tsx` et lien depuis le `Dashboard` pour consulter l'historique des paiements.
+- Correction des NaN et robustification des calculs/KPI dans `src/pages/admin/Stats.tsx`.
+- Génération serveur de `url_slug` pour les portfolios après insertion (slug unique basé sur titre+id) et mise à jour du frontend pour utiliser `url_slug` au partage.
+- Ajout de logs diagnostiques dans `portfolioController.create` et `paiementController.updateStatus` pour faciliter le débogage des 400/500 et des envois d'email.
+- Recommandation : appliquer les migrations SQL nécessaires (colonnes `invoice_id`, `motif_remboursement`, `abonnement_id`, `domaines` si utilisé), redémarrer le backend, puis reproduire le `POST /api/portfolios` pour valider le correctif et collecter les logs si l'erreur persiste.
+
+---
+
+Ajout — Rapport de session (2026-01-04)
+
+Actions réalisées durant cette session :
+- Backend : mise à jour de `backend/src/controllers/portfolioController.js` et `backend/src/controllers/adminController.js` pour fournir `views_count` (depuis la table `visites`), attacher les informations de plan du propriétaire (`owner_plan`) via `planModel.listUserPlans`, et exposer des statistiques agrégées (`totalViews`, `avgViews`, distribution par plan/domaine/utilisateur, topPerforming). Ajout du support `include=stats` et du tri via le param `sort`.
+- Frontend : modifications de `src/pages/admin/Portfolios.tsx` — consommation de `stats` si présent, calcul local de secours, affichage du badge de plan pour chaque portfolio, affichage du plan du propriétaire dans la liste et le détail, ajout du tri par `owner` et `plan`, et renforcement du calcul des statistiques (total, public/privé/supprimé, moyenne des vues). Ajout d'une vérification super-admin avant de permettre la bascule de visibilité et envoi de `is_public` en `1/0` sur les PUT.
+- Intégrations et UI : préparation des données pour les graphiques (distribution par plans, top domaines, top utilisateurs, tendance visites) et adaptation des filtres (plans/domains/users). Correction de comportements et robustification des parsers JWT côté client pour détecter les super-admins.
+
+
+
+Ajout — Rapport de session (2026-01-04)
+
+Actions réalisées durant cette session :
+- Backend : mise à jour de `backend/src/controllers/portfolioController.js` et `backend/src/controllers/adminController.js` pour fournir `views_count` (depuis la table `visites`), attacher les informations de plan du propriétaire (`owner_plan`) via `planModel.listUserPlans`, et exposer des statistiques agrégées (`totalViews`, `avgViews`, distribution par plan/domaine/utilisateur, topPerforming). Ajout du support `include=stats` et du tri via le param `sort`.
+- Frontend : modifications de `src/pages/admin/Portfolios.tsx` — consommation de `stats` si présent, calcul local de secours, affichage du badge de plan pour chaque portfolio, affichage du plan du propriétaire dans la liste et le détail, ajout du tri par `owner` et `plan`, et renforcement du calcul des statistiques (total, public/privé/supprimé, moyenne des vues). Ajout d'une vérification super-admin avant de permettre la bascule de visibilité et envoi de `is_public` en `1/0` sur les PUT.
+- Intégrations et UI : préparation des données pour les graphiques (distribution par plans, top domaines, top utilisateurs, tendance visites) et adaptation des filtres (plans/domains/users). Correction de comportements et robustification des parsers JWT côté client pour détecter les super-admins.
+
+

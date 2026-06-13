@@ -6,7 +6,7 @@ services:
     staticPublishPath: dist
     buildCommand: npm run build
     envVars:
-      - key: VITE_API_BASE
+      - key: VITE_API_URL
         scope: env
-        # Set this in the Render dashboard to https://backennfc.onrender.com
+        # Set this in the Render dashboard to https://backennfc.onrender.com/api
         value: ""
