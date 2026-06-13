@@ -4,8 +4,8 @@ const planController = require('../controllers/planController');
 const auth = require('../middlewares/authMiddleware');
 const adminAuth = require('../middlewares/adminAuth');
 
-// Public: list plans
-router.get('/', planController.listPlans);
+// Public: list active/visible plans only
+router.get('/', planController.listPublicPlans);
 // Authenticated: get current user's subscriptions
 router.get('/me', auth, planController.getUserPlans);
 // Public: get plan by id or slug

@@ -2,33 +2,86 @@ const planModel = require('../models/planModel');
 const commandeModel = require('../models/commandeModel');
 const paiementModel = require('../models/paiementModel');
 const checkoutModel = require('../models/checkoutModel');
+const abonnementModel = require('../models/abonnementModel');
+const businessAccountModel = require('../models/businessAccountModel');
+const userModel = require('../models/userModel');
 
 function genOrderNumber() {
-  return 'CHK-' + Date.now() + '-' + Math.random().toString(36).substr(2,6).toUpperCase();
+  return 'CHK-' + Date.now() + '-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+}
+
+// Remises selon la durée choisie
+const DURATION_DISCOUNTS = { 1: 0, 3: 15, 12: 20 };
+
+function addMonths(date, months) {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + months);
+  return d;
 }
 
 async function createCheckout(req, res) {
   try {
     const userId = req.userId;
-    const { plan_id } = req.body;
+    const { plan_id, duration_months: rawDuration } = req.body;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
     if (!plan_id) return res.status(400).json({ error: 'plan_id required' });
+
+    const duration_months = DURATION_DISCOUNTS.hasOwnProperty(Number(rawDuration)) ? Number(rawDuration) : 1;
+    const discountPercent = DURATION_DISCOUNTS[duration_months];
 
     const plan = await planModel.getPlanById(plan_id);
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
 
-    const numero = genOrderNumber();
-    const montant = Number(plan.price_cents || 0) / 100; // montant en unités monétaires
-    // create a commande to track this purchase
-    const commande = await commandeModel.createCommande({ utilisateur_id: userId, numero_commande: numero, montant_total: montant });
+    const isYearlyPlan = (plan.billing_interval || '').toLowerCase() === 'yearly';
+    const unitMonthly = isYearlyPlan
+      ? Number(plan.price_cents || 0) / 100 / 12
+      : Number(plan.price_cents || 0) / 100;
+    const baseAmount = unitMonthly * duration_months;
+    const montant = Math.round(baseAmount * (1 - discountPercent / 100));
 
-    // create a paiement row with pending status
-    const paiement = await paiementModel.createPaiement({ commande_id: commande.id, montant: montant, statut: 'pending', metadata: { plan_id, purpose: 'upgrade' } });
+    // Calcul de la prochaine date de facturation selon le end_date actuel de l'utilisateur
+    const { pool } = require('../db');
+    const [activePlans] = await pool.query(
+      'SELECT end_date FROM user_plans WHERE utilisateur_id = ? AND status = ? ORDER BY end_date DESC LIMIT 1',
+      [userId, 'active']
+    );
+    const currentEndDate = activePlans[0]?.end_date;
+    const baseDate = (currentEndDate && new Date(currentEndDate) > new Date())
+      ? new Date(currentEndDate) : new Date();
+    const newEndDate = addMonths(baseDate, duration_months);
 
-    // create checkout token
-    const checkout = await checkoutModel.createCheckout({ utilisateur_id: userId, plan_id, commande_id: commande.id, paiement_id: paiement.id, metadata: { plan } });
+    const checkoutMeta = {
+      plan,
+      duration_months,
+      discount_percent: discountPercent,
+      base_amount: baseAmount,
+      current_end_date: currentEndDate || null,
+      new_end_date: newEndDate,
+    };
 
-    return res.status(201).json({ checkout: { id: checkout.id, token: checkout.token }, checkout_url: `${process.env.FRONTEND_BASE || 'http://localhost:8080'}/checkout?token=${checkout.token}` });
+    const abonnement = await abonnementModel.createAbonnement({
+      utilisateur_id: userId, plan_id, montant, currency: plan.currency || 'XOF',
+      statut: 'pending', metadata: checkoutMeta,
+    });
+
+    const paiement = await paiementModel.createPaiement({
+      abonnement_id: abonnement.id, montant, statut: 'pending',
+      metadata: { plan_id, purpose: 'reabonnement', duration_months, discount_percent: discountPercent },
+    });
+
+    const checkout = await checkoutModel.createCheckout({
+      utilisateur_id: userId, plan_id, abonnement_id: abonnement.id,
+      paiement_id: paiement.id, metadata: checkoutMeta,
+    });
+
+    return res.status(201).json({
+      checkout: { id: checkout.id, token: checkout.token },
+      checkout_url: `${process.env.FRONTEND_BASE || 'http://localhost:8080'}/checkout?token=${checkout.token}`,
+      duration_months,
+      discount_percent: discountPercent,
+      montant,
+      new_end_date: newEndDate,
+    });
   } catch (err) {
     console.error('createCheckout error:', err);
     return res.status(500).json({ error: 'Server error' });
@@ -42,43 +95,322 @@ async function getCheckout(req, res) {
     const checkout = await checkoutModel.findByToken(token);
     if (!checkout) return res.status(404).json({ error: 'Not found' });
 
-    // fetch related data
     const plan = await planModel.getPlanById(checkout.plan_id);
     const paiement = await paiementModel.findById(checkout.paiement_id);
-    return res.json({ checkout, plan, paiement });
+
+    // Toujours retourner metadata comme objet
+    const meta = typeof checkout.metadata === 'string'
+      ? JSON.parse(checkout.metadata || '{}')
+      : (checkout.metadata || {});
+
+    return res.json({ checkout: { ...checkout, metadata: meta }, plan, paiement });
   } catch (err) {
     console.error('getCheckout error:', err);
     return res.status(500).json({ error: 'Server error' });
   }
 }
 
-// Confirm payment for checkout: mark paiement confirmed and subscribe user to plan
+// Lightweight status endpoint for frontend polling — returns only what's needed
+async function getCheckoutStatus(req, res) {
+  try {
+    const token = req.params.token;
+    if (!token) return res.status(400).json({ error: 'token required' });
+    const checkout = await checkoutModel.findByToken(token);
+    if (!checkout) return res.status(404).json({ error: 'Not found' });
+    const plan = await planModel.getPlanById(checkout.plan_id);
+    return res.json({
+      status: checkout.status,
+      plan_name: plan ? plan.name : null,
+      plan_id: checkout.plan_id,
+    });
+  } catch (err) {
+    console.error('getCheckoutStatus error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// Submit Wave payment reference — marks checkout as pending_admin review (does NOT activate account)
 async function confirmCheckout(req, res) {
   try {
     const token = req.params.token;
-    const { reference_transaction } = req.body;
+    const { reference_transaction, payment_method } = req.body;
     const checkout = await checkoutModel.findByToken(token);
     if (!checkout) return res.status(404).json({ error: 'Not found' });
 
-    // Only the same user can confirm (for now); in real setup, this should be done via provider webhook
+    // Only the same user can submit their reference
     if (req.userId && Number(req.userId) !== Number(checkout.utilisateur_id)) return res.status(403).json({ error: 'Forbidden' });
 
-    // mark paiement as paid
-    await paiementModel.updateStatus(checkout.paiement_id, 'confirmed');
-    // update checkout status
-    await checkoutModel.updateStatus(checkout.id, 'confirmed');
+    if (!reference_transaction || !reference_transaction.trim()) {
+      return res.status(400).json({ error: 'La référence de transaction Wave est requise.' });
+    }
 
-    // Subscribe user to plan
-    await planModel.subscribeUser({ utilisateur_id: checkout.utilisateur_id, plan_id: checkout.plan_id, status: 'active', payment_reference: reference_transaction || null });
+    // Mark paiement and checkout as pending_admin (NOT confirmed — admin must validate)
+    await paiementModel.updateStatus(checkout.paiement_id, 'pending_admin');
+    await checkoutModel.updateStatus(checkout.id, 'pending_admin');
 
-    // update commande status
-    await commandeModel.updateStatus(checkout.commande_id, 'En_traitement');
+    // Désactiver le compte si l'utilisateur n'a pas encore de plan payant actif
+    // (nouveau souscripteur ou passage free → payant). Les renouvellements ne bloquent pas.
+    try {
+      const { pool: dbPool } = require('../db');
+      const [activePaid] = await dbPool.query(
+        `SELECT up.id FROM user_plans up
+         JOIN plans pl ON pl.id = up.plan_id
+         WHERE up.utilisateur_id = ? AND up.status = 'active' AND pl.price_cents > 0 LIMIT 1`,
+        [checkout.utilisateur_id]
+      );
+      if (!activePaid || !activePaid.length) {
+        await dbPool.query('UPDATE utilisateurs SET is_active = 0 WHERE id = ?', [checkout.utilisateur_id]);
+      }
+    } catch (e) { console.warn('confirmCheckout: could not deactivate user:', e?.message); }
 
-    return res.json({ ok: true });
+    // Save the Wave reference and payment method on the paiement row
+    try {
+      const db = require('../db');
+      await db.query(
+        'UPDATE paiements SET moyen_paiement = ?, reference_transaction = ? WHERE id = ?',
+        ['wave', reference_transaction.trim(), checkout.paiement_id]
+      );
+    } catch (e) { console.warn('Could not save Wave reference:', e && e.message); }
+
+    // Notify admin that a Wave reference is waiting for review
+    try {
+      const sendEmail = require('../utils/sendEmail');
+      const adminEmail = process.env.ADMIN_EMAIL;
+      if (adminEmail) {
+        const user = await userModel.findById(checkout.utilisateur_id);
+        await sendEmail({
+          to: adminEmail,
+          subject: 'Nouvelle référence Wave à valider',
+          html: `<p>Un utilisateur vient de soumettre une référence Wave en attente de validation.</p>
+                 <p><strong>Utilisateur :</strong> ${user?.email}</p>
+                 <p><strong>Référence Wave :</strong> ${reference_transaction}</p>
+                 <p><strong>Checkout token :</strong> ${token}</p>
+                 <p>Connectez-vous à l'administration pour valider ce paiement.</p>`,
+        });
+      }
+    } catch (e) { /* ignore email errors */ }
+
+    return res.json({
+      ok: true,
+      pending: true,
+      message: 'Référence enregistrée. Votre compte sera activé après validation par notre équipe sous 24h.',
+    });
   } catch (err) {
     console.error('confirmCheckout error:', err);
     return res.status(500).json({ error: 'Server error' });
   }
 }
 
-module.exports = { createCheckout, getCheckout, confirmCheckout };
+// Admin: approve a Wave payment — activates the user account
+async function approveWavePayment(req, res) {
+  try {
+    const { id } = req.params; // checkout id
+    const { pool } = require('../db');
+    const [rows] = await pool.query('SELECT * FROM checkouts WHERE id = ?', [id]);
+    const checkout = rows[0];
+    if (!checkout) return res.status(404).json({ error: 'Checkout non trouvé' });
+
+    if (checkout.status === 'confirmed') {
+      return res.status(400).json({ error: 'Ce paiement est déjà confirmé.' });
+    }
+
+    // Mark confirmed
+    await paiementModel.updateStatus(checkout.paiement_id, 'confirmed');
+    await checkoutModel.updateStatus(checkout.id, 'confirmed');
+
+    // Lire la durée depuis le metadata du checkout
+    const meta = typeof checkout.metadata === 'string'
+      ? JSON.parse(checkout.metadata || '{}')
+      : (checkout.metadata || {});
+    const durationMonths = Number(meta.duration_months) || 1;
+
+    // Trouver le end_date actif de l'utilisateur pour l'étendre
+    const [activePlans] = await pool.query(
+      'SELECT end_date FROM user_plans WHERE utilisateur_id = ? AND status = ? ORDER BY end_date DESC LIMIT 1',
+      [checkout.utilisateur_id, 'active']
+    );
+    const currentEndDate = activePlans[0]?.end_date;
+    const baseDate = (currentEndDate && new Date(currentEndDate) > new Date())
+      ? new Date(currentEndDate) : new Date();
+    const newEndDate = addMonths(baseDate, durationMonths);
+
+    // Annuler / libérer l'ancien abonnement (actif ou suspendu) avant d'en créer un nouveau
+    try {
+      await pool.query(
+        "UPDATE user_plans SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE utilisateur_id = ? AND status IN ('active','suspended')",
+        [checkout.utilisateur_id]
+      );
+    } catch (e) { console.warn('cancel old sub error:', e && e.message); }
+
+    if (checkout.plan_id) {
+      try {
+        await planModel.subscribeUser({
+          utilisateur_id: checkout.utilisateur_id,
+          plan_id: checkout.plan_id,
+          status: 'active',
+          payment_reference: `WAVE-ADMIN-APPROVED-${checkout.id}`,
+          start_date: new Date(),
+          end_date: newEndDate,
+        });
+      } catch (e) { console.warn('subscribeUser error in approveWavePayment:', e && e.message); }
+    }
+    if (checkout.abonnement_id) {
+      try {
+        await abonnementModel.updatePaymentDetails(checkout.abonnement_id, {
+          payment_reference: `WAVE-ADMIN-APPROVED-${checkout.id}`,
+          end_date: newEndDate,
+          statut: 'active',
+        });
+      } catch (e) { console.warn('abonnement update error in approveWavePayment:', e && e.message); }
+    }
+
+    // Activate the user account and set correct role
+    try { await userModel.setActive(checkout.utilisateur_id, true); } catch (e) { console.warn('setActive error:', e && e.message); }
+    // Set BUSINESS_ADMIN role, create business account, and réactiver les membres suspendus
+    if (checkout.plan_id) {
+      try {
+        const plan = await planModel.getPlanById(checkout.plan_id);
+        const isBusinessPlan = plan && (
+          (plan.slug || '').toLowerCase().includes('business') ||
+          (plan.metadata && plan.metadata.plan_type === 'business')
+        );
+        if (isBusinessPlan) {
+          await userModel.setRole(checkout.utilisateur_id, 'BUSINESS_ADMIN');
+          const existing = await businessAccountModel.findAccountByAdminId(checkout.utilisateur_id);
+          if (!existing) {
+            const u = await userModel.findById(checkout.utilisateur_id);
+            await businessAccountModel.createAccount({
+              admin_user_id: checkout.utilisateur_id,
+              company_name: u?.prenom || u?.email || 'Mon Entreprise',
+              plan_id: checkout.plan_id,
+            });
+          } else {
+            // Réactiver les membres Business qui avaient été suspendus
+            try {
+              const [suspendedMembers] = await pool.query(`
+                SELECT bm.id, bm.user_id FROM business_members bm
+                WHERE bm.business_account_id = ? AND bm.status = 'suspended' AND bm.user_id IS NOT NULL
+              `, [existing.id]);
+              for (const m of suspendedMembers) {
+                await pool.query('UPDATE utilisateurs SET is_active = 1 WHERE id = ?', [m.user_id]);
+                await pool.query("UPDATE business_members SET status = 'active' WHERE id = ?", [m.id]);
+              }
+              if (suspendedMembers.length) {
+                console.log(`approveWavePayment: réactivé ${suspendedMembers.length} membre(s) Business`);
+              }
+            } catch (e) { console.warn('Reactivate members error:', e && e.message); }
+          }
+        }
+      } catch (e) { console.warn('Business setup error in approveWavePayment:', e && e.message); }
+    }
+
+    // Email d'activation envoyé par la comptabilité avec le lien de connexion
+    try {
+      const sendEmail = require('../utils/sendEmail');
+      const user = await userModel.findById(checkout.utilisateur_id);
+      if (user?.email) {
+        const loginUrl = `${process.env.FRONTEND_BASE || 'http://localhost:5173'}/auth`;
+        const prenom = user.prenom || user.nom || 'Client';
+        await sendEmail({
+          from: 'Comptabilité Portefolia <comptabilite@portefolia.tech>',
+          to: user.email,
+          subject: '✅ Paiement validé – Votre compte Portefolia est actif',
+          html: `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);">
+
+        <tr><td style="background:linear-gradient(135deg,#059669,#0d9488);padding:32px 40px;text-align:center;">
+          <p style="color:#fff;font-size:28px;font-weight:900;margin:0;letter-spacing:-0.5px;">Portefolia</p>
+          <p style="color:rgba(255,255,255,.8);font-size:13px;margin:6px 0 0;">comptabilite@portefolia.tech</p>
+        </td></tr>
+
+        <tr><td style="padding:40px;">
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;margin-bottom:28px;">
+            <p style="font-size:15px;font-weight:700;color:#15803d;margin:0 0 4px;">✅ Paiement confirmé</p>
+            <p style="font-size:13px;color:#16a34a;margin:0;">Votre abonnement est maintenant actif.</p>
+          </div>
+
+          <p style="font-size:16px;color:#111827;margin:0 0 12px;">Bonjour <strong>${prenom}</strong>,</p>
+          <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 28px;">
+            Notre équipe a validé votre paiement Wave. Votre compte Portefolia est désormais <strong>actif</strong>.
+            Vous pouvez vous connecter dès maintenant via le lien ci-dessous.
+          </p>
+
+          <p style="text-align:center;margin:0 0 12px;">
+            <a href="${loginUrl}" style="display:inline-block;background:#059669;color:#fff;font-size:16px;font-weight:700;padding:16px 48px;border-radius:10px;text-decoration:none;letter-spacing:0.3px;">
+              Se connecter à mon compte
+            </a>
+          </p>
+          <p style="text-align:center;font-size:12px;color:#94a3b8;margin:0 0 32px;">
+            ${loginUrl}
+          </p>
+
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 24px;">
+          <p style="font-size:13px;color:#64748b;line-height:1.7;margin:0;">
+            Si vous n'avez pas fait cette demande, contactez-nous en répondant à cet email.<br>
+            Compte : ${user.email}
+          </p>
+        </td></tr>
+
+        <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center;">
+          <p style="font-size:12px;color:#94a3b8;margin:0;">© ${new Date().getFullYear()} Portefolia · comptabilite@portefolia.tech</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
+        });
+      }
+    } catch (e) { /* ignore email errors */ }
+
+    return res.json({ ok: true, message: 'Paiement Wave validé. Compte utilisateur activé.' });
+  } catch (err) {
+    console.error('approveWavePayment error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// Admin: list Wave payments pending admin review
+async function getWavePendingPayments(req, res) {
+  try {
+    const { pool } = require('../db');
+    const [rows] = await pool.query(`
+      SELECT
+        c.id AS checkout_id,
+        c.token,
+        c.utilisateur_id,
+        c.plan_id,
+        c.statut AS checkout_statut,
+        c.created_at,
+        p.id AS paiement_id,
+        p.montant,
+        p.reference_transaction,
+        p.moyen_paiement,
+        p.statut AS paiement_statut,
+        u.email,
+        u.nom,
+        u.prenom,
+        u.is_active,
+        pl.name AS plan_name
+      FROM checkouts c
+      LEFT JOIN paiements p ON p.id = c.paiement_id
+      LEFT JOIN utilisateurs u ON u.id = c.utilisateur_id
+      LEFT JOIN plans pl ON pl.id = c.plan_id
+      WHERE (c.status = 'pending_admin' OR p.statut = 'pending_admin')
+        AND p.moyen_paiement = 'wave'
+      ORDER BY c.created_at DESC
+    `);
+    return res.json({ payments: rows });
+  } catch (err) {
+    console.error('getWavePendingPayments error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+module.exports = { createCheckout, getCheckout, getCheckoutStatus, confirmCheckout, approveWavePayment, getWavePendingPayments };

@@ -19,6 +19,7 @@ async function init() {
       banner_image_url TEXT,
       banner_color VARCHAR(50),
       profile_image_url TEXT,
+      domain VARCHAR(150),
   -- social/contact fields
   location VARCHAR(150),
   phone VARCHAR(50),
@@ -39,6 +40,7 @@ async function init() {
     await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS banner_color VARCHAR(50)");
     await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS profile_image_url TEXT");
     await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS cv_url TEXT");
+    await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS domain VARCHAR(150)");
     // social/contact fields
     await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS location VARCHAR(150)");
     await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS phone VARCHAR(50)");
@@ -46,6 +48,9 @@ async function init() {
     await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS linkedin_url VARCHAR(255)");
     await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS github_url VARCHAR(255)");
     await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS twitter_url VARCHAR(255)");
+    // template relation fields
+    await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS selected_template_id INT NULL");
+    await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS template_settings JSON NULL");
   } catch (err) {
     // Ignore if ALTER NOT SUPPORTED on older MySQL; table created above will contain columns for new DBs
     console.warn('portfolioModel.init: ALTER TABLE optional columns may not be supported on this MySQL version:', err.message);
@@ -66,6 +71,7 @@ async function createPortfolio(data) {
     banner_image_url: data.banner_image_url !== undefined ? data.banner_image_url : (data.banner || data.banner_image || null),
     banner_color: data.banner_color !== undefined ? data.banner_color : (data.bannerColor || null),
     profile_image_url: data.profile_image_url !== undefined ? data.profile_image_url : (data.profile_image || null),
+    domain: data.domain !== undefined ? data.domain : (data.domaine || null),
     cv_url: data.cv_url !== undefined ? data.cv_url : (data.resume_url || null),
     location: data.location || null,
     phone: data.phone || null,
@@ -88,7 +94,8 @@ async function updatePortfolio(id, data) {
   if (data.title !== undefined || data.titre !== undefined) payload.titre = data.title || data.titre;
   if (data.bio !== undefined || data.description !== undefined) payload.description = data.bio || data.description;
   if (data.slug !== undefined || data.url_slug !== undefined) payload.url_slug = data.slug || data.url_slug;
-  if (data.is_public !== undefined || data.est_public !== undefined) payload.est_public = data.is_public || data.est_public;
+  if (data.domain !== undefined || data.domaine !== undefined) payload.domain = data.domain || data.domaine;
+  if (data.is_public !== undefined || data.est_public !== undefined) payload.est_public = (data.is_public !== undefined) ? data.is_public : data.est_public;
   if (data.theme_color !== undefined || data.theme !== undefined) payload.theme = data.theme_color || data.theme;
   // social/contact fields
   if (data.location !== undefined) payload.location = data.location;
@@ -97,7 +104,12 @@ async function updatePortfolio(id, data) {
   if (data.linkedin_url !== undefined) payload.linkedin_url = data.linkedin_url;
   if (data.github_url !== undefined) payload.github_url = data.github_url;
   if (data.twitter_url !== undefined) payload.twitter_url = data.twitter_url;
-  // SUPPRIMÉ : if pour banner_*, profile_image_url, cv_url
+  // Image/media fields
+  if (data.banner_type !== undefined) payload.banner_type = data.banner_type;
+  if (data.banner_image_url !== undefined || data.banner !== undefined) payload.banner_image_url = data.banner_image_url || data.banner;
+  if (data.banner_color !== undefined) payload.banner_color = data.banner_color;
+  if (data.profile_image_url !== undefined || data.profile_image !== undefined) payload.profile_image_url = data.profile_image_url || data.profile_image;
+  if (data.cv_url !== undefined || data.resume_url !== undefined) payload.cv_url = data.cv_url || data.resume_url;
   if (Object.keys(payload).length === 0) return await findById(id);
   const sets = Object.keys(payload).map(k => `${k} = ?`).join(', ');
   const values = [...Object.values(payload), id];
@@ -138,15 +150,34 @@ async function findById(id) {
 }
 
 async function findByUser(userId) {
-  const [rows] = await pool.query('SELECT * FROM portfolios WHERE utilisateur_id = ? ORDER BY date_creation DESC', [userId]);
-  return rows;
+  const [rows] = await pool.query(`
+    SELECT p.*, COALESCE(v.views_count, 0) AS views_count
+    FROM portfolios p
+    LEFT JOIN (
+      SELECT portfolio_id, COUNT(*) AS views_count
+      FROM visites
+      GROUP BY portfolio_id
+    ) v ON v.portfolio_id = p.id
+    WHERE p.utilisateur_id = ?
+      AND (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')
+    ORDER BY p.date_creation DESC
+  `, [userId]);
+  return rows.map(p => ({
+    ...p,
+    slug: p.url_slug || null,
+    title: p.titre || null,
+    bio: p.description || null,
+    theme_color: p.theme || null,
+    is_public: p.est_public !== undefined ? p.est_public : p.is_public,
+  }));
 }
 
 async function findBySlug(slug) {
-  const [rows] = await pool.query('SELECT * FROM portfolios WHERE url_slug = ? AND est_public = TRUE LIMIT 1', [slug]);
+  const notDeleted = "(deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')";
+  const [rows] = await pool.query(`SELECT * FROM portfolios WHERE url_slug = ? AND est_public = TRUE AND ${notDeleted} LIMIT 1`, [slug]);
   let p = (rows && rows.length > 0) ? rows[0] : null;
   if (!p) {
-    const [r2] = await pool.query('SELECT * FROM portfolios WHERE url_slug = ? LIMIT 1', [slug]);
+    const [r2] = await pool.query(`SELECT * FROM portfolios WHERE url_slug = ? AND ${notDeleted} LIMIT 1`, [slug]);
     p = (r2 && r2.length > 0) ? r2[0] : null;
   }
   if (!p) return null;

@@ -10,6 +10,8 @@ module.exports = function (req, res, next) {
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     req.userId = payload.sub;
+    // attach full payload for downstream middlewares/controllers
+    req.userPayload = payload;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid token' });
