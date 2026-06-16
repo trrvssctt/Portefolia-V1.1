@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => ({
     }
   },
   plugins: [
-    react(),
+    react(),https://drive.google.com/file/d/1S_7cEyE0yQbBN39ODioIMooXEzIDZeKh/view?usp=drivesdk
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),

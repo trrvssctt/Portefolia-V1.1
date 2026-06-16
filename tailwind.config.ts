@@ -24,6 +24,11 @@ export default {
 				ring: 'hsl(var(--ring))',
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
+				brand: {
+					DEFAULT: '#2E7D32',
+					light: '#43A047',
+					dark: '#1B5E20'
+				},
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
 					foreground: 'hsl(var(--primary-foreground))'
@@ -61,12 +66,32 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				portefolia: {
+					primary:   '#2E7D32',
+					secondary: '#43A047',
+					light:     '#A5D6A7',
+					xlight:    '#E8F5E9',
+					dark:      '#1B5E20',
+					text:      '#1A1A2E',
+					muted:     '#5C5C5C',
+					orange:    '#E65100',
+					red:       '#C62828',
+					blue:      '#1565C0',
 				}
 			},
+			fontFamily: {
+				sans: ['Inter', 'sans-serif'],
+			},
 			borderRadius: {
-				lg: 'var(--radius)',
-				md: 'calc(var(--radius) - 2px)',
-				sm: 'calc(var(--radius) - 4px)'
+				lg: '12px',
+				md: '8px',
+				sm: '6px',
+				card: '12px',
+				btn:  '8px',
+			},
+			boxShadow: {
+				card: '0 2px 12px rgba(0,0,0,0.08)',
 			},
 			keyframes: {
 				'accordion-down': {
