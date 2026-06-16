@@ -1,0 +1,28 @@
+Ajout — Rapport de session (2026-01-04)
+
+Actions réalisées durant cette session :
+- Backend : mise à jour de `backend/src/controllers/portfolioController.js` et `backend/src/controllers/adminController.js` pour fournir `views_count` (depuis la table `visites`), attacher les informations de plan du propriétaire (`owner_plan`) via `planModel.listUserPlans`, et exposer des statistiques agrégées (`totalViews`, `avgViews`, distribution par plan/domaine/utilisateur, topPerforming). Ajout du support `include=stats` et du tri via le param `sort`.
+- Frontend : modifications de `src/pages/admin/Portfolios.tsx` — consommation de `stats` si présent, calcul local de secours, affichage du badge de plan pour chaque portfolio, affichage du plan du propriétaire dans la liste et le détail, ajout du tri par `owner` et `plan`, et renforcement du calcul des statistiques (total, public/privé/supprimé, moyenne des vues). Ajout d'une vérification super-admin avant de permettre la bascule de visibilité et envoi de `is_public` en `1/0` sur les PUT.
+- Intégrations et UI : préparation des données pour les graphiques (distribution par plans, top domaines, top utilisateurs, tendance visites) et adaptation des filtres (plans/domains/users). Correction de comportements et robustification des parsers JWT côté client pour détecter les super-admins.
+
+Vérifications recommandées après ces changements :
+- Redémarrer le backend (appliquer les migrations SQL si nécessaire).
+- Appeler : `GET /api/admin/portfolios?limit=1000&include=stats` et vérifier que la réponse contient `portfolios` et `stats` (avec `byPlan`, `byDomain`, `byUser`, `totalViews`, `avgViews`).
+- Ouvrir l'UI admin Portfolios, cliquer sur "Actualiser" et vérifier que les graphiques et badges de plan se remplissent correctement, et que la bascule visibilité n'est possible que pour les super-admins.
+
+Fin de l'addendum.
+
+
+Ajout — Rapport de session (2026-01-04)
+
+Actions réalisées durant cette session :
+- Backend : mise à jour de `backend/src/controllers/portfolioController.js` et `backend/src/controllers/adminController.js` pour fournir `views_count` (depuis la table `visites`), attacher les informations de plan du propriétaire (`owner_plan`) via `planModel.listUserPlans`, et exposer des statistiques agrégées (`totalViews`, `avgViews`, distribution par plan/domaine/utilisateur, topPerforming). Ajout du support `include=stats` et du tri via le param `sort`.
+- Frontend : modifications de `src/pages/admin/Portfolios.tsx` — consommation de `stats` si présent, calcul local de secours, affichage du badge de plan pour chaque portfolio, affichage du plan du propriétaire dans la liste et le détail, ajout du tri par `owner` et `plan`, et renforcement du calcul des statistiques (total, public/privé/supprimé, moyenne des vues). Ajout d'une vérification super-admin avant de permettre la bascule de visibilité et envoi de `is_public` en `1/0` sur les PUT.
+- Intégrations et UI : préparation des données pour les graphiques (distribution par plans, top domaines, top utilisateurs, tendance visites) et adaptation des filtres (plans/domains/users). Correction de comportements et robustification des parsers JWT côté client pour détecter les super-admins.
+
+Vérifications recommandées après ces changements :
+- Redémarrer le backend (appliquer les migrations SQL si nécessaire).
+- Appeler : `GET /api/admin/portfolios?limit=1000&include=stats` et vérifier que la réponse contient `portfolios` et `stats` (avec `byPlan`, `byDomain`, `byUser`, `totalViews`, `avgViews`).
+- Ouvrir l'UI admin Portfolios, cliquer sur "Actualiser" et vérifier que les graphiques et badges de plan se remplissent correctement, et que la bascule visibilité n'est possible que pour les super-admins.
+
+Fin de l'addendum.

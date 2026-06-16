@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr" data-display="serif">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Portefolia — Refonte</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          serif: ['Inter', 'system-ui', 'sans-serif'],
+          mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        },
+        colors: {
+          ink: '#18181B',
+          muted: '#71717A',
+          line: '#E7E7EA',
+        },
+      },
+    },
+  };
+</script>
+
+<style>
+  :root {
+    /* Charte Portefolia */
+    --accent: #2E7D32;          /* primaire */
+    --accent-2: #43A047;        /* secondaire */
+    --accent-600: #1B5E20;      /* primaire foncé */
+    --accent-tint: color-mix(in srgb, var(--accent) 9%, #fff);
+    --ink-nav: #1B5E20;
+    --biz-nav: #15161D;
+    --canvas: #F7F8F8;
+    --admin-grad: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%);
+    --shadow-card: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  html { font-size: 16px; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    color: #18181B;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Display headings — Inter, tight */
+  .font-serif { font-weight: 800 !important; letter-spacing: -0.03em; }
+  html[data-display="sans"] .font-serif {
+    font-weight: 800 !important;
+    letter-spacing: -0.03em !important;
+  }
+  ::selection { background: var(--accent-tint); }
+  /* Thin scrollbars */
+  * { scrollbar-width: thin; scrollbar-color: #D4D4D8 transparent; }
+  input:focus { box-shadow: 0 0 0 3px var(--accent-tint); }
+  /* Modal entrance */
+  @keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes modalRise { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .modal-overlay { animation: modalFade 0.18s ease-out; }
+  .modal-card { animation: modalRise 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
+  @keyframes slideInRight { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
+  @media (prefers-reduced-motion: reduce) { .modal-overlay, .modal-card { animation: none; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="data.js"></script>
+<script src="templates.js"></script>
+<script src="admin-data.js"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="icons.jsx"></script>
+<script type="text/babel" src="shell.jsx"></script>
+<script type="text/babel" src="TemplateGallery.jsx"></script>
+<script type="text/babel" src="modals.jsx"></script>
+<script type="text/babel" src="MarketingShell.jsx"></script>
+<script type="text/babel" src="SupportPages.jsx"></script>
+<script type="text/babel" src="EntreprisePages.jsx"></script>
+<script type="text/babel" src="Landing.jsx"></script>
+<script type="text/babel" src="Formules.jsx"></script>
+<script type="text/babel" src="Portfolios.jsx"></script>
+<script type="text/babel" src="NFC.jsx"></script>
+<script type="text/babel" src="Profil.jsx"></script>
+<script type="text/babel" src="Analytics.jsx"></script>
+<script type="text/babel" src="Business.jsx"></script>
+<script type="text/babel" src="AdminShell.jsx"></script>
+<script type="text/babel" src="AdminDashboard.jsx"></script>
+<script type="text/babel" src="AdminClients.jsx"></script>
+<script type="text/babel" src="AdminOps.jsx"></script>
+<script type="text/babel" src="Portfolio.jsx"></script>
+<script type="text/babel" src="Dashboard.jsx"></script>
+<script type="text/babel" src="screens.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>

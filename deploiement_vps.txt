@@ -1,0 +1,462 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║           GUIDE DE DÉPLOIEMENT PORTEFOLIA — VPS + LWS + NGINX              ║
+║           Rédigé le 16 juin 2026                                             ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+APPLICATIONS EXISTANTES SUR LE VPS (à ne pas perturber)
+────────────────────────────────────────────────────────
+  /opt/containerd/      → Docker runtime
+  /opt/gestockpro/      → application web (port inconnu)
+  /opt/homeassistant/   → Home Assistant (port 8123 typique)
+  /opt/mon-portefolio/  → portfolio existant (port 3000 typique)
+  /opt/n8n/             → n8n automation (port 5678 typique)
+  /opt/ollama/          → Ollama LLM (port 11434 typique)
+  /opt/realtech/        → application web (port inconnu)
+
+PORT ATTRIBUÉ À PORTEFOLIA BACKEND : 3001  ✓ CONFIRMÉ LIBRE
+(Vérifié le 16 juin 2026 via ss -tlnp sur le VPS)
+
+═══════════════════════════════════════════════════════════════════════════════
+ÉTAPE 0 — PORTS UTILISÉS (INVENTAIRE RÉEL — 16 JUIN 2026)
+═══════════════════════════════════════════════════════════════════════════════
+
+  Port 22    → SSH (sshd)
+  Port 80    → Nginx (HTTP)
+  Port 443   → Nginx (HTTPS)
+  Port 2000  → Nginx (app via Nginx)
+  Port 1000  → Node.js  /opt/crech...
+  Port 3000  → Node.js  /opt/gesto...  (gestockpro)
+  Port 4000  → Node.js  /opt/realt...  (realtech)
+  Port 5000  → Node.js  (app inconnue)
+  Port 9000  → Node.js  /opt/btp-a...
+  Port 5678  → docker-proxy (n8n)
+  Port 9999  → docker-proxy
+  Port 11434 → Ollama  (127.0.0.1 seulement)
+
+  PORT LIBRE RETENU : 3001  → backend Portefolia
+
+═══════════════════════════════════════════════════════════════════════════════
+ÉTAPE 1 — CRÉER LE DOSSIER ET CLONER LE DÉPÔT
+═══════════════════════════════════════════════════════════════════════════════
+
+  # 1.1 Créer le répertoire
+  mkdir -p /opt/portefolia
+  cd /opt/portefolia
+
+  # 1.2 Cloner le dépôt GitHub
+  git clone https://github.com/trrvssctt/Portefolia-V1.1.git .
+
+  # 1.3 Vérifier la structure
+  ls -la
+  # Attendu : backend/  src/  package.json  vite.config.ts  etc.
+
+═══════════════════════════════════════════════════════════════════════════════
+ÉTAPE 2 — CONFIGURER LE .ENV DU BACKEND
+═══════════════════════════════════════════════════════════════════════════════
+
+  # 2.1 Créer le fichier .env backend (NE JAMAIS le committer dans Git)
+  nano /opt/portefolia/backend/.env
+
+  # Coller le contenu suivant et adapter les valeurs :
+  ─────────────────────────────────────────────────────────────
+  PORT=3001
+
+  # Base de données (AlwaysData — identique à votre config locale)
+  DB_HOST=mysql-gestionapp.alwaysdata.net
+  DB_PORT=3306
+  DB_USER=385922
+  DB_PASSWORD=Dianka16
+  DB_NAME=gestionapp_carrer_card
+
+  # JWT
+  JWT_SECRET=sedgfefeueiz22eizodideifu11ey162hfdgddedde
+
+  # URLs production
+  APP_URL=https://portefolia.tech
+  FRONTEND_BASE=https://portefolia.tech
+  EMAIL_ASSET_BASE=https://portefolia.tech
+
+  # CORS : votre domaine production (et localhost pour debug SSH si besoin)
+  CORS_ORIGIN=https://portefolia.tech,http://localhost:3001
+
+  # Email SMTP (LWS)
+  EMAIL_PROVIDER=smtp
+  SMTP_HOST=mail.portefolia.tech
+  SMTP_PORT=465
+  SMTP_SECURE=true
+  SMTP_USER=contact@portefolia.tech
+  SMTP_PASS=vR8-JSNk*m9N-5-
+  EMAIL_FROM="Portefolia <contact@portefolia.tech>"
+  SMTP_TLS_REJECT_UNAUTHORIZED=true
+
+  # Cloudinary
+  CLOUDINARY_CLOUD_NAME=dq7avew9h
+  CLOUDINARY_API_KEY=269445354174876
+  CLOUDINARY_API_SECRET=Qvl3ZGMLFCjKTXhbRX59Ot6fvTM
+  CLOUDINARY_UPLOAD_FOLDER=portfolios
+
+  # Stripe
+  STRIPE_SECRET_KEY=sk_live_VOTRE_CLE_LIVE_ICI
+  STRIPE_PUBLISHABLE_KEY=pk_live_VOTRE_CLE_LIVE_ICI
+  STRIPE_WEBHOOK_SECRET=whsec_VOTRE_SECRET_WEBHOOK
+
+  # Emails admin
+  ADMIN_EMAIL=admin@portefolia.tech
+  ADMIN_ALERT_EMAIL=contact@portefolia.tech
+  COMPTA_EMAIL=comptabilite@portefolia.tech
+  VITE_WAVE_MERCHANT_NUMBER=+221 78 131 13 71
+  ─────────────────────────────────────────────────────────────
+
+  # Sauvegarder : Ctrl+O, Entrée, Ctrl+X
+
+═══════════════════════════════════════════════════════════════════════════════
+ÉTAPE 3 — INSTALLER LES DÉPENDANCES DU BACKEND
+═══════════════════════════════════════════════════════════════════════════════
+
+  # 3.1 Vérifier la version de Node.js (minimum 18)
+  node --version
+  # Si < 18 : installer nvm et Node 20
+  #   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+  #   source ~/.bashrc
+  #   nvm install 20 && nvm use 20 && nvm alias default 20
+
+  # 3.2 Installer les dépendances backend
+  cd /opt/portefolia/backend
+  npm install --production
+
+  # 3.3 Tester le démarrage backend (Ctrl+C pour arrêter après le test)
+  node src/index.js
+  # Attendu : "Server started on port 3001"
+
+═══════════════════════════════════════════════════════════════════════════════
+ÉTAPE 4 — GÉRER LE BACKEND AVEC PM2
+═══════════════════════════════════════════════════════════════════════════════
+
+  # 4.1 Installer PM2 globalement (si pas déjà installé)
+  npm install -g pm2
+
+  # 4.2 Créer le fichier de configuration PM2
+  cat > /opt/portefolia/ecosystem.config.cjs << 'EOF'
+  module.exports = {
+    apps: [{
+      name: 'portefolia-backend',
+      script: './backend/src/index.js',
+      cwd: '/opt/portefolia',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '512M',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3001
+      },
+      error_file: '/var/log/pm2/portefolia-error.log',
+      out_file:   '/var/log/pm2/portefolia-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss'
+    }]
+  };
+  EOF
+
+  # 4.3 Créer le dossier de logs
+  mkdir -p /var/log/pm2
+
+  # 4.4 Démarrer le backend avec PM2
+  cd /opt/portefolia
+  pm2 start ecosystem.config.cjs
+
+  # 4.5 Vérifier que le backend tourne
+  pm2 status
+  pm2 logs portefolia-backend --lines 20
+
+  # 4.6 Enregistrer PM2 pour redémarrage automatique au boot
+  pm2 save
+  pm2 startup
+  # Exécuter la commande affichée par pm2 startup (ex: sudo env PATH=...)
+
+═══════════════════════════════════════════════════════════════════════════════
+ÉTAPE 5 — CRÉER LE .ENV FRONTEND ET BUILDER LE FRONTEND
+═══════════════════════════════════════════════════════════════════════════════
+
+  # 5.1 Créer le .env pour le build Vite (IMPORTANT : ces vars sont injectées
+  #     à la compilation, pas à l'exécution)
+  cat > /opt/portefolia/.env.production << 'EOF'
+  VITE_API_BASE=
+  EOF
+  # Note : laisser VITE_API_BASE vide → les appels /api/* seront relatifs à
+  # l'origine (https://portefolia.tech/api/...) et Nginx les proxiera vers
+  # localhost:3001.
+
+  # 5.2 Installer les dépendances frontend
+  cd /opt/portefolia
+  npm install
+
+  # 5.3 Builder le frontend pour la production
+  npm run build
+  # Résultat dans /opt/portefolia/dist/
+
+  # 5.4 Vérifier le dossier dist
+  ls /opt/portefolia/dist/
+  # Attendu : index.html  assets/  ...
+
+═══════════════════════════════════════════════════════════════════════════════
+ÉTAPE 6 — CONFIGURER NGINX
+═══════════════════════════════════════════════════════════════════════════════
+
+  # 6.1 Vérifier les sites Nginx existants (pour ne pas les toucher)
+  ls /etc/nginx/sites-enabled/
+  cat /etc/nginx/nginx.conf | grep include
+
+  # 6.2 Créer le bloc Nginx pour Portefolia
+  nano /etc/nginx/sites-available/portefolia
+
+  ─────────────────────────────────────────────────────────────
+  # /etc/nginx/sites-available/portefolia
+
+  server {
+      listen 80;
+      server_name portefolia.tech www.portefolia.tech;
+
+      # Redirection HTTP → HTTPS (activée après Certbot, voir étape 7)
+      return 301 https://$host$request_uri;
+  }
+
+  server {
+      listen 443 ssl http2;
+      server_name portefolia.tech www.portefolia.tech;
+
+      # ── SSL (sera rempli automatiquement par Certbot) ──────────────────
+      ssl_certificate     /etc/letsencrypt/live/portefolia.tech/fullchain.pem;
+      ssl_certificate_key /etc/letsencrypt/live/portefolia.tech/privkey.pem;
+      include /etc/letsencrypt/options-ssl-nginx.conf;
+      ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+      # ── Frontend statique ───────────────────────────────────────────────
+      root /opt/portefolia/dist;
+      index index.html;
+
+      # SPA : toutes les routes non-API vers index.html
+      location / {
+          try_files $uri $uri/ /index.html;
+      }
+
+      # ── Proxy API vers le backend Node.js ──────────────────────────────
+      location /api/ {
+          proxy_pass         http://127.0.0.1:3001;
+          proxy_http_version 1.1;
+          proxy_set_header   Upgrade $http_upgrade;
+          proxy_set_header   Connection 'upgrade';
+          proxy_set_header   Host $host;
+          proxy_set_header   X-Real-IP $remote_addr;
+          proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header   X-Forwarded-Proto $scheme;
+          proxy_cache_bypass $http_upgrade;
+          proxy_read_timeout 120s;
+          proxy_connect_timeout 10s;
+          # Limite upload pour photos/CV (20 MB)
+          client_max_body_size 20M;
+      }
+
+      # ── Sécurité ────────────────────────────────────────────────────────
+      add_header X-Frame-Options SAMEORIGIN;
+      add_header X-Content-Type-Options nosniff;
+      add_header Referrer-Policy strict-origin-when-cross-origin;
+
+      # ── Compression ─────────────────────────────────────────────────────
+      gzip on;
+      gzip_types text/plain text/css application/json application/javascript
+                 text/xml application/xml image/svg+xml;
+
+      # ── Logs ────────────────────────────────────────────────────────────
+      access_log /var/log/nginx/portefolia.access.log;
+      error_log  /var/log/nginx/portefolia.error.log;
+  }
+  ─────────────────────────────────────────────────────────────
+
+  # 6.3 Activer le site (symlink dans sites-enabled)
+  ln -s /etc/nginx/sites-available/portefolia /etc/nginx/sites-enabled/portefolia
+
+  # 6.4 Tester la config Nginx (CRITIQUE : ne pas recharger si erreur)
+  nginx -t
+  # Attendu : "syntax is ok" et "test is successful"
+
+  # 6.5 AVANT le SSL : tester en HTTP d'abord
+  #     Commenter temporairement la ligne "return 301 https://..." dans le bloc
+  #     port 80 et mettre à la place :
+  #
+  #       root /opt/portefolia/dist;
+  #       index index.html;
+  #       location / { try_files $uri $uri/ /index.html; }
+  #       location /api/ { proxy_pass http://127.0.0.1:3001; ... }
+  #
+  #     Puis :
+  nginx -t && systemctl reload nginx
+
+═══════════════════════════════════════════════════════════════════════════════
+ÉTAPE 7 — CERTIFICAT SSL AVEC LET'S ENCRYPT (CERTBOT)
+═══════════════════════════════════════════════════════════════════════════════
+
+  # 7.1 Installer Certbot (si pas présent)
+  apt update && apt install -y certbot python3-certbot-nginx
+
+  # 7.2 Obtenir le certificat (le DNS doit déjà pointer vers le VPS)
+  certbot --nginx -d portefolia.tech -d www.portefolia.tech \
+          --email contact@portefolia.tech \
+          --agree-tos \
+          --no-eff-email
+
+  # Certbot modifie automatiquement le bloc Nginx pour activer HTTPS
+  # et configure la redirection HTTP → HTTPS
+
+  # 7.3 Vérifier le renouvellement automatique
+  certbot renew --dry-run
+
+  # 7.4 Recharger Nginx après Certbot
+  nginx -t && systemctl reload nginx
+
+═══════════════════════════════════════════════════════════════════════════════
+ÉTAPE 8 — DNS : CONFIGURER LE DOMAINE CHEZ LWS
+═══════════════════════════════════════════════════════════════════════════════
+
+  Dans votre espace client LWS → Domaines → DNS Manager de portefolia.tech :
+
+  Supprimer ou remplacer les enregistrements A existants qui pointent vers
+  l'hébergement mutualisé LWS, et créer :
+
+  ┌──────────┬──────┬────────────────────────┬────────────────────────────┐
+  │ Nom      │ Type │ Valeur                 │ TTL                        │
+  ├──────────┼──────┼────────────────────────┼────────────────────────────┤
+  │ @        │ A    │ <IP_DE_VOTRE_VPS>      │ 3600                       │
+  │ www      │ A    │ <IP_DE_VOTRE_VPS>      │ 3600  (ou CNAME vers @)    │
+  │ mail     │ MX   │ conserver les MX LWS   │ (ne pas toucher les MX)   │
+  └──────────┴──────┴────────────────────────┴────────────────────────────┘
+
+  IMPORTANT : Ne touchez PAS aux enregistrements MX, SPF, DKIM — ils sont
+  nécessaires pour que vos emails SMTP LWS continuent de fonctionner.
+
+  Récupérez l'IP de votre VPS :
+    ip addr show eth0 | grep "inet "  (ou hostname -I)
+
+  La propagation DNS peut prendre 1 à 48h.
+  Vérifier avec : nslookup portefolia.tech
+
+═══════════════════════════════════════════════════════════════════════════════
+ÉTAPE 9 — WEBHOOKS STRIPE EN PRODUCTION
+═══════════════════════════════════════════════════════════════════════════════
+
+  Dans le dashboard Stripe → Developers → Webhooks :
+  Créer un endpoint : https://portefolia.tech/api/stripe/webhook
+
+  Événements à écouter :
+    - checkout.session.completed
+    - customer.subscription.updated
+    - customer.subscription.deleted
+    - invoice.payment_succeeded
+    - invoice.payment_failed
+
+  Copier le "Signing secret" et le mettre dans backend/.env :
+    STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxx
+
+  Puis redémarrer le backend :
+    pm2 restart portefolia-backend
+
+═══════════════════════════════════════════════════════════════════════════════
+ÉTAPE 10 — VÉRIFICATIONS FINALES
+═══════════════════════════════════════════════════════════════════════════════
+
+  # Backend actif
+  pm2 status
+  curl -s http://localhost:3001/api/health | head -50
+  # (ou une route simple du backend)
+
+  # Nginx répond
+  curl -I https://portefolia.tech
+
+  # Proxy API fonctionne depuis Nginx
+  curl -s https://portefolia.tech/api/plans
+
+  # Logs en cas d'erreur
+  pm2 logs portefolia-backend --lines 50
+  tail -50 /var/log/nginx/portefolia.error.log
+
+═══════════════════════════════════════════════════════════════════════════════
+ÉTAPE 11 — PROCÉDURE DE MISE À JOUR (déploiements suivants)
+═══════════════════════════════════════════════════════════════════════════════
+
+  cd /opt/portefolia
+
+  # 1. Récupérer les nouvelles modifications
+  git pull origin main   # (ou le nom de votre branche)
+
+  # 2. Mettre à jour les dépendances backend si package.json a changé
+  cd backend && npm install --production && cd ..
+
+  # 3. Rebuild le frontend
+  npm install
+  npm run build
+
+  # 4. Redémarrer le backend
+  pm2 restart portefolia-backend
+
+  # 5. Vérifier
+  pm2 status
+  pm2 logs portefolia-backend --lines 20
+
+═══════════════════════════════════════════════════════════════════════════════
+RÉSUMÉ DES PORTS
+═══════════════════════════════════════════════════════════════════════════════
+
+  Nginx        → 80, 443, 2000         (NE PAS TOUCHER les blocs existants)
+  Portefolia   → backend : 3001        (proxié par Nginx sur /api/)
+  gestockpro   → 3000  /opt/gesto...  (NE PAS TOUCHER)
+  realtech     → 4000  /opt/realt...  (NE PAS TOUCHER)
+  /opt/btp-a   → 9000                 (NE PAS TOUCHER)
+  /opt/crech   → 1000                 (NE PAS TOUCHER)
+  node inconnu → 5000                 (NE PAS TOUCHER)
+  n8n          → 5678  docker         (NE PAS TOUCHER)
+  docker-proxy → 9999                 (NE PAS TOUCHER)
+  Ollama       → 11434 127.0.0.1 only (NE PAS TOUCHER)
+
+═══════════════════════════════════════════════════════════════════════════════
+ARBORESCENCE FINALE SUR LE VPS
+═══════════════════════════════════════════════════════════════════════════════
+
+  /opt/portefolia/
+  ├── backend/
+  │   ├── src/
+  │   │   └── index.js          ← point d'entrée Node.js
+  │   ├── .env                  ← variables d'env production (non committées)
+  │   └── package.json
+  ├── src/                      ← source React (non servi en prod)
+  ├── dist/                     ← build Vite → servi par Nginx
+  │   ├── index.html
+  │   └── assets/
+  ├── ecosystem.config.cjs       ← config PM2
+  ├── .env.production           ← VITE_API_BASE= (vide = relatif)
+  └── package.json
+
+  /etc/nginx/sites-available/portefolia    ← config Nginx
+  /etc/nginx/sites-enabled/portefolia      ← symlink vers l'above
+  /var/log/nginx/portefolia.access.log
+  /var/log/nginx/portefolia.error.log
+  /var/log/pm2/portefolia-out.log
+  /var/log/pm2/portefolia-error.log
+
+═══════════════════════════════════════════════════════════════════════════════
+COMMANDES UTILES AU QUOTIDIEN
+═══════════════════════════════════════════════════════════════════════════════
+
+  pm2 status                              → état des processus
+  pm2 logs portefolia-backend             → logs en temps réel
+  pm2 restart portefolia-backend          → redémarrer le backend
+  pm2 reload portefolia-backend           → redémarrer sans coupure (0-downtime)
+
+  nginx -t                                → tester la config avant rechargement
+  systemctl reload nginx                  → recharger Nginx sans coupure
+  systemctl status nginx                  → état de Nginx
+
+  certbot renew                           → renouveler le certificat SSL
+  ss -tlnp | grep LISTEN                  → ports en écoute
+
+  # Voir les logs Nginx en temps réel
+  tail -f /var/log/nginx/portefolia.error.log
+  tail -f /var/log/nginx/portefolia.access.log
