@@ -35,7 +35,11 @@ const Portfolio = () => {
   const loadPortfolio = async () => {
     try {
       // Load portfolio from backend public endpoint
+<<<<<<< HEAD
       const res = await fetch(`${API_BASE}/api/p/${slug}`);
+=======
+      const res = await fetch(`${API_BASE}/p/${slug}`);
+>>>>>>> 475c22479d16e3eeb9ee016f028cf1b8259518ae
       if (!res.ok) {
         setError('Portfolio non trouvé ou privé');
         setLoading(false);
