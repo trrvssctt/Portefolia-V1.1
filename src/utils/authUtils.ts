@@ -104,11 +104,12 @@ export const signInAdmin = async (email: string, password: string) => {
   }
 };
 
-export const signUpUser = async (email: string, password: string, firstName: string, lastName: string, options?: { plan_id?: number | string, plan_slug?: string }) => {
+export const signUpUser = async (email: string, password: string, firstName: string, lastName: string, options?: { plan_id?: number | string, plan_slug?: string, duration_months?: number }) => {
   try {
     const body: any = { nom: lastName || ' ', prenom: firstName || ' ', email, password };
     if (options && options.plan_id) body.plan_id = options.plan_id;
     if (options && options.plan_slug) body.plan_slug = options.plan_slug;
+    if (options && options.duration_months) body.duration_months = options.duration_months;
     const res = await fetch(`${API_BASE}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

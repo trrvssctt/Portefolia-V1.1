@@ -36,6 +36,7 @@ import TemplateAppProxy from "./pages/TemplateAppProxy";
 import Admin from "./pages/Admin";
 import AdminLayout from "./components/admin/AdminLayout";
 import TokenLogin from "./pages/auth/TokenLogin";
+import VerifyEmail from "./pages/auth/VerifyEmail";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminUsers from "./pages/admin/Users";
 import AdminPortfolios from "./pages/admin/Portfolios";
@@ -56,6 +57,11 @@ import DetailsUsers from "./pages/admin/DetailsUsers";
 import UserAdmin from "./pages/admin/UserAdmin";
 import ProfilsUserPage from "./pages/Profils_user";
 import AccountSettings from "./pages/AccountSettings";
+import APropos from "./pages/APropos";
+import Carrieres from "./pages/Carrieres";
+import Faq from "./pages/Faq";
+import Contact from "./pages/Contact";
+import Docs from "./pages/Docs";
 import HistoriqueUserPaiement from "./pages/HistoriqueUserPaiement";
 import PaymentSuccess from "./pages/payment/PaymentSuccess";
 import PaymentError from "./pages/payment/PaymentError";
@@ -120,12 +126,13 @@ function App() {
                     <Route path="/" element={<Landing />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/auth/token/:token" element={<TokenLogin />} />
+                    <Route path="/verify-email" element={<VerifyEmail />} />
                     <Route path="/pending-validation" element={<PendingValidation />} />
                     <Route path="/renouveler" element={<RenewSubscription />} />
                     <Route path="/compte-suspendu" element={<AccountSuspended />} />
                     <Route path="/dashboard" element={<RequirePayment><RequireSubscription><Dashboard /></RequireSubscription></RequirePayment>} />
                     <Route path="/dashboard/portfolios" element={<RequirePayment><RequireSubscription><Portfolios /></RequireSubscription></RequirePayment>} />
-                    <Route path="/dashboard/nfc-cards" element={<RequirePayment><RequireSubscription><NFCCards /></RequireSubscription></RequirePayment>} />
+                    <Route path="/dashboard/nfc-cards" element={<NFCCards />} />
                     <Route path="/nfc-types" element={<NFCCardTypes />} />
                     <Route path="/upgrade" element={<UpgradePlan />} />
                     <Route path="/reabonnement" element={<Reabonnement />} />
@@ -169,6 +176,11 @@ function App() {
                     <Route path="/portfolio/:slug" element={<Portfolio />} />
                     <Route path="/blog" element={<Blog />} />
                     <Route path="/blog/:slug" element={<Article />} />
+                    <Route path="/apropos" element={<APropos />} />
+                    <Route path="/carrieres" element={<Carrieres />} />
+                    <Route path="/faq" element={<Faq />} />
+                    <Route path="/contact" element={<Contact />} />
+                    <Route path="/docs" element={<Docs />} />
                     {/* Business plan routes */}
                     <Route path="/business/join" element={<BusinessJoin />} />
                     <Route path="/business/dashboard" element={<BusinessDashboard />} />
@@ -178,6 +190,7 @@ function App() {
                     <Route path="/business/portfolios" element={<BusinessPortfolios />} />
                     <Route path="/business/analytics" element={<BusinessAnalytics />} />
                     <Route path="/business/payments" element={<BusinessPayments />} />
+                    <Route path="/business/profile" element={<ProfilsUserPage />} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>

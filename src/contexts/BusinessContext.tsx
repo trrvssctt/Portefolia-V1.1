@@ -12,6 +12,10 @@ interface BusinessAccount {
   secondary_color: string;
   accent_color: string;
   font_family: string;
+  website_url: string | null;
+  description: string | null;
+  address: string | null;
+  phone: string | null;
 }
 
 interface BusinessMember {

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -17,8 +19,8 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 123 46% 34%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -34,9 +36,9 @@ All colors MUST be HSL.
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 123 46% 34%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -53,6 +55,34 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* ── Portefolia design tokens ── */
+    --color-primary:   #2E7D32;
+    --color-secondary: #43A047;
+    --color-light:     #A5D6A7;
+    --color-xlight:    #E8F5E9;
+    --color-dark:      #1B5E20;
+    --color-text:      #1A1A2E;
+    --color-muted:     #5C5C5C;
+    --color-orange:    #E65100;
+    --color-red:       #C62828;
+    --color-blue:      #1565C0;
+    --shadow-card:     0 2px 12px rgba(0,0,0,0.08);
+    --radius-card:     12px;
+    --radius-btn:      8px;
+
+    /* Charte Portefolia — variables brand */
+    --brand: 123 46% 34%;        /* #2E7D32 */
+    --brand-light: 122 41% 45%;  /* #43A047 */
+    --brand-dark: 124 55% 24%;   /* #1B5E20 */
+    --admin-grad: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%);
+
+    /* Variables systèmes utilisées dans les composants shell */
+    --accent: #2E7D32;
+    --accent-600: #1B5E20;
+    --accent-tint: #E8F5E9;
+    --ink-nav: #1A1A2E;
+    --line: #E5E7EB;
   }
 
   .dark {
@@ -101,5 +131,15 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  .admin-header-gradient {
+    background: var(--admin-grad);
+  }
+  .shadow-card {
+    box-shadow: var(--shadow-card);
   }
 }
