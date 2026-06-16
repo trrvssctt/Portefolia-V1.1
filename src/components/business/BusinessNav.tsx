@@ -107,7 +107,7 @@ const BusinessNav: React.FC<BusinessNavProps> = ({ onSignOut }) => {
                 {(user as any)?.email || '—'}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate('/dashboard/profile')}>
+              <DropdownMenuItem onClick={() => navigate('/business/profile')}>
                 <User className="mr-2 h-4 w-4" /> Mon profil
               </DropdownMenuItem>
               {isBusinessAdmin && (

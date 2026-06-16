@@ -19,8 +19,8 @@ function VariationBadge({ value }: { value: number }) {
 function CompactCard({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="flex flex-col gap-2 p-3"
-      style={{ backgroundColor: '#F9FAFB', borderRadius: 8 }}
+      className="bg-white flex flex-col gap-3 p-5"
+      style={{ borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}
     >
       {children}
     </div>
@@ -28,12 +28,16 @@ function CompactCard({ children }: { children: React.ReactNode }) {
 }
 
 function CardIcon({ children }: { children: React.ReactNode }) {
-  return <span className="text-gray-400">{children}</span>;
+  return (
+    <span className="w-9 h-9 rounded-xl bg-zinc-100 text-zinc-500 flex items-center justify-center shrink-0">
+      {children}
+    </span>
+  );
 }
 
 function CardValue({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[18px] font-bold text-gray-800 leading-none">{children}</p>
+    <p className="text-[26px] font-extrabold text-gray-900 leading-none tabular-nums">{children}</p>
   );
 }
 
@@ -46,12 +50,12 @@ function CardSub({ children }: { children: React.ReactNode }) {
 function SkeletonCard() {
   return (
     <div
-      className="animate-pulse p-3 flex flex-col gap-2"
-      style={{ backgroundColor: '#F9FAFB', borderRadius: 8 }}
+      className="animate-pulse bg-white p-5 flex flex-col gap-3"
+      style={{ borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}
     >
-      <div className="h-5 w-5 rounded bg-gray-200" />
-      <div className="h-5 w-16 rounded bg-gray-200" />
-      <div className="h-3 w-24 rounded bg-gray-100" />
+      <div className="h-9 w-9 rounded-xl bg-gray-100" />
+      <div className="h-7 w-20 rounded bg-gray-200" />
+      <div className="h-3 w-28 rounded bg-gray-100" />
     </div>
   );
 }

@@ -477,12 +477,11 @@ export default function RevenueByFlux() {
       </div>
 
       <Tabs defaultValue="abonnement">
-        <TabsList className="w-full grid grid-cols-4 mb-5">
+        <TabsList className="w-full h-auto bg-transparent p-0 border-b border-gray-200 rounded-none mb-5 justify-start gap-0">
           {TABS.map(t => (
             <TabsTrigger
               key={t.value} value={t.value}
-              className="text-xs font-semibold data-[state=active]:text-white"
-              style={undefined}
+              className="text-xs font-semibold px-4 py-2.5 h-auto rounded-none border-b-2 border-transparent -mb-px bg-transparent shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-[#2E7D32] data-[state=active]:text-[#2E7D32] text-gray-500 hover:text-gray-800"
             >
               {t.label}
             </TabsTrigger>

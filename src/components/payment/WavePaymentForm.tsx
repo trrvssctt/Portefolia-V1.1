@@ -41,7 +41,7 @@ interface Props {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const formatXOF = (n: number) =>
-  n.toLocaleString('fr-FR') + ' FCFA';
+  n.toLocaleString('fr-FR') + ' F CFA';
 
 const STEP_LABELS = ['Durée', 'Paiement', 'Confirmation'];
 

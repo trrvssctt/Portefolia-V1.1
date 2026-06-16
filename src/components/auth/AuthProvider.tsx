@@ -157,7 +157,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return result;
   };
 
-  const signUp = async (email: string, password: string, firstName: string, lastName: string, options?: { plan_id?: number | string, plan_slug?: string }) => {
+  const signUp = async (email: string, password: string, firstName: string, lastName: string, options?: { plan_id?: number | string, plan_slug?: string, duration_months?: number }) => {
     const result = await signUpUser(email, password, firstName, lastName, options);
     if (!result.error && result.token) {
       const profileData = await loadProfile(result.token);

@@ -64,16 +64,24 @@ export const RequireSubscription = ({ children }: { children: React.ReactNode })
 /**
  * Protège les routes qui nécessitent un abonnement actif.
  * - Non connecté → /auth
- * - Connecté sans plan payé (ou plan gratuit) → /upgrade
  * - Compte désactivé → /upgrade
- * - Utilisateurs Business (BUSINESS_ADMIN / BUSINESS_MEMBER) → accès direct, leur espace est /business/*
- * - Sinon → rendu normal
+ * - Essai gratuit actif (subscription_status = ACTIVE) → accès autorisé pour 14 jours
+ * - Plan gratuit sans abonnement actif → /upgrade
+ * - Utilisateurs Business → leur espace /business/*
  */
 export const RequirePayment = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading: authLoading } = useAuth();
   const { currentPlan, isFreePlan, loading: planLoading } = usePlan();
 
-  if (authLoading || (user && planLoading)) {
+  const { data: subStatus, isLoading: subLoading } = useQuery<SubscriptionStatus>({
+    queryKey: ['subscription-status'],
+    queryFn: fetchSubscriptionStatus,
+    enabled: !!user && !!localStorage.getItem('token'),
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  if (authLoading || (user && (planLoading || subLoading))) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="w-8 h-8 border-4 border-[#28A745] border-t-transparent rounded-full animate-spin" />
@@ -99,7 +107,11 @@ export const RequirePayment = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/upgrade" replace />;
   }
 
-  // Pas de plan ou plan gratuit → page de choix d'abonnement
+  // Essai gratuit actif : subscription_status = ACTIVE même sur plan gratuit → accès autorisé
+  const status = subStatus?.status;
+  if (status === 'ACTIVE' || status === 'GRACE_PERIOD') return <>{children}</>;
+
+  // Pas de plan ou plan gratuit sans essai actif → page de choix d'abonnement
   if (!currentPlan || isFreePlan) {
     return <Navigate to="/upgrade" replace />;
   }

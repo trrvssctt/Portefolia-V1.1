@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, UserCheck, Briefcase, CreditCard,
   TrendingUp, Banknote, BarChart3, FileText, BookOpen,
   UserCog, LogOut, Waves, Receipt, Menu, X,
-  PanelLeftClose, PanelLeftOpen, DollarSign,
+  PanelLeftClose, PanelLeftOpen, DollarSign, Wifi,
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
@@ -57,6 +57,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Paiements',    to: '/admin/paiements',      icon: Banknote,        roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations' },
   { label: 'Factures',     to: '/admin/invoices',       icon: Receipt,         roles: ['super_admin', 'admin_technique'], group: 'Opérations' },
   { label: 'Formules',     to: '/admin/plans',          icon: CreditCard,      roles: ['super_admin', 'admin_technique'], group: 'Opérations' },
+  { label: 'Cartes NFC',  to: '/admin/cartes',         icon: Wifi,            roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations' },
   { label: 'Upgrades',     to: '/admin/upgrades',       icon: TrendingUp,      roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations', badgeKey: 'pending_upgrades' },
   { label: 'Finance',      to: '/admin/finance',        icon: DollarSign,      roles: ['super_admin', 'admin_technique'], group: 'Analytique' },
   { label: 'Stats',        to: '/admin/stats',          icon: BarChart3,       roles: ['super_admin', 'admin_technique'], group: 'Analytique' },
@@ -106,7 +107,7 @@ function useAdminBadges(): AdminBadges {
 function BadgePill({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="ml-auto min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-black px-1 rounded-full leading-none flex items-center justify-center shrink-0">
+    <span className="ml-auto min-w-[16px] h-[16px] bg-[#C62828] text-white text-[10px] font-black px-1 rounded-full leading-none flex items-center justify-center shrink-0">
       {count > 99 ? '99+' : count}
     </span>
   );
@@ -115,7 +116,7 @@ function BadgePill({ count }: { count: number }) {
 function BadgeDot({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="absolute -top-[5px] -right-[5px] min-w-[15px] h-[15px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none px-0.5">
+    <span className="absolute -top-[5px] -right-[5px] min-w-[16px] h-[16px] bg-[#C62828] text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none px-0.5">
       {count > 9 ? '9+' : count}
     </span>
   );
@@ -241,7 +242,7 @@ const AdminNav = ({ collapsed, onToggle, profile, onSignOut }: AdminNavProps) =>
               <img
                 src="/logo_portefolia.png"
                 alt="Portefolia"
-                className="h-8 w-auto object-contain shrink-0"
+                className="h-10 w-auto object-contain shrink-0"
                 onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
               />
               <span className="text-[11px] font-black text-[#2E7D32] uppercase tracking-widest truncate">Admin</span>
@@ -285,7 +286,7 @@ const AdminNav = ({ collapsed, onToggle, profile, onSignOut }: AdminNavProps) =>
                 <img
                   src="/logo_portefolia.png"
                   alt="Portefolia"
-                  className="h-8 w-auto object-contain"
+                  className="h-10 w-auto object-contain"
                   onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                 />
                 <span className="text-[11px] font-black text-[#2E7D32] uppercase tracking-widest">Admin</span>

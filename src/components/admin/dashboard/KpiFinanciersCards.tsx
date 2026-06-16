@@ -17,7 +17,7 @@ function churnColor(taux: number): string {
 function IconBox({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <div
-      className="flex items-center justify-center h-10 w-10 rounded-xl shrink-0"
+      className="flex items-center justify-center h-10 w-10 rounded-[8px] shrink-0"
       style={{ backgroundColor: color + '1F' }}
     >
       <span style={{ color }}>{children}</span>
@@ -38,7 +38,7 @@ function VariationBadge({ value }: { value: number | null }) {
 }
 
 function SubLine({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs text-gray-500 mt-0.5">{children}</p>;
+  return <p className="text-xs text-[#5C5C5C] mt-0.5">{children}</p>;
 }
 
 const cardBase: React.CSSProperties = {
@@ -52,15 +52,15 @@ function SkeletonCard() {
   return (
     <div
       className="bg-white animate-pulse p-5"
-      style={{ ...cardBase, borderLeft: '4px solid #E5E7EB', minHeight: 100 }}
+      style={{ ...cardBase, borderLeft: '4px solid #E8F5E9', minHeight: 100 }}
     >
       <div className="flex justify-between items-start mb-4">
-        <div className="h-10 w-10 rounded-xl bg-gray-200" />
-        <div className="h-5 w-16 rounded-full bg-gray-200" />
+        <div className="h-10 w-10 rounded-[8px] bg-[#E8F5E9]" />
+        <div className="h-5 w-16 rounded-full bg-[#E8F5E9]" />
       </div>
-      <div className="h-7 w-32 rounded bg-gray-200 mb-2" />
-      <div className="h-3.5 w-28 rounded bg-gray-100 mb-1.5" />
-      <div className="h-3.5 w-24 rounded bg-gray-100" />
+      <div className="h-7 w-32 rounded bg-[#E8F5E9] mb-2" />
+      <div className="h-3.5 w-28 rounded bg-[#F5F5F5] mb-1.5" />
+      <div className="h-3.5 w-24 rounded bg-[#F5F5F5]" />
     </div>
   );
 }
@@ -79,8 +79,8 @@ function CardMRR({ mrr, variation }: { mrr: KpiFinanciers['mrr']; variation: num
       </div>
 
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">MRR</p>
-        <p className="text-2xl font-black mt-0.5" style={{ color: COLOR_MRR }}>
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-[#9E9E9E]">MRR</p>
+        <p className="text-2xl font-medium mt-0.5" style={{ color: COLOR_MRR }}>
           {formatFCFA(mrr.valeur)}
         </p>
         <SubLine>{mrr.abonnes_actifs} abonné{mrr.abonnes_actifs > 1 ? 's' : ''} actif{mrr.abonnes_actifs > 1 ? 's' : ''}</SubLine>
@@ -111,12 +111,12 @@ function CardPipeline({ pipeline }: { pipeline: KpiFinanciers['pipeline'] }) {
       </div>
 
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-[#9E9E9E]">
           Pipeline en attente
         </p>
         <p
-          className="text-2xl font-black mt-0.5"
-          style={{ color: pipeline.nb > 0 ? COLOR_PIPELINE : '#374151' }}
+          className="text-2xl font-medium mt-0.5"
+          style={{ color: pipeline.nb > 0 ? COLOR_PIPELINE : '#1A1A2E' }}
         >
           {formatFCFA(pipeline.total)}
         </p>
@@ -128,7 +128,7 @@ function CardPipeline({ pipeline }: { pipeline: KpiFinanciers['pipeline'] }) {
       {pipeline.nb > 0 && (
         <button
           onClick={() => navigate('/admin/wave/validation')}
-          className="mt-auto text-[11px] font-bold px-3 py-1 rounded-lg self-start transition-opacity hover:opacity-80"
+          className="mt-auto text-[11px] font-bold px-3 py-1 rounded-[8px] self-start transition-opacity hover:opacity-80"
           style={{ backgroundColor: COLOR_PIPELINE + '18', color: COLOR_PIPELINE }}
         >
           Valider →
@@ -151,10 +151,10 @@ function CardCA({ revenus_mois }: { revenus_mois: KpiFinanciers['revenus_mois'] 
       </div>
 
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-[#9E9E9E]">
           CA ce mois
         </p>
-        <p className="text-2xl font-black mt-0.5" style={{ color: COLOR_CA }}>
+        <p className="text-2xl font-medium mt-0.5" style={{ color: COLOR_CA }}>
           {formatFCFA(revenus_mois.total)}
         </p>
         <SubLine>Paiements validés uniquement</SubLine>
@@ -174,8 +174,8 @@ function CardChurn({ churn }: { churn: KpiFinanciers['churn'] }) {
       </div>
 
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">Churn</p>
-        <p className="text-2xl font-black mt-0.5" style={{ color }}>
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-[#9E9E9E]">Churn</p>
+        <p className="text-2xl font-medium mt-0.5" style={{ color }}>
           {churn.taux.toFixed(1)}%
         </p>
         <SubLine>

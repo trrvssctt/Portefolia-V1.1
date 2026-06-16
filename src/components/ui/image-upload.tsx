@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,131 +22,81 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
 }) => {
   const [urlInput, setUrlInput] = useState(value);
   const [uploadMethod, setUploadMethod] = useState<'url' | 'upload'>('url');
+
+  useEffect(() => { setUrlInput(value); }, [value]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setIsUploading(true);
-      setUploadError(null);
-      setUploadSuccess(false);
-      
-      // If a Cloudinary upload URL is configured, upload the file and use the returned secure_url.
-      const cloudinaryUrl = import.meta.env.VITE_CLOUDINARY_UPLOAD_URL as string | undefined;
-      if (cloudinaryUrl) {
-        try {
-          const formData = new FormData();
-          formData.append('file', file);
-          // Allow passing an unsigned upload preset via env var
-          const preset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string | undefined;
-          if (preset) formData.append('upload_preset', preset);
-          const r = await fetch(cloudinaryUrl, { method: 'POST', body: formData });
-          let json: any = null;
-          try { json = await r.json(); } catch (e) { json = null; }
-          if (r.ok && (json && (json.secure_url || json.url))) {
-            onChange(json.secure_url || json.url);
-            setUploadSuccess(true);
-            setIsUploading(false);
-            setTimeout(() => setUploadSuccess(false), 2000);
-            return;
-          }
-          // record error for debugging
-          const msg = json && (json.error || json.message) ? (json.error || json.message) : `Upload failed (status ${r.status})`;
-          console.warn('Client-side cloudinary upload response:', r.status, msg, json);
-          setUploadError(String(msg));
-        } catch (err: any) {
-          console.warn('Client-side cloudinary upload failed, falling back to file->dataURL', err);
-          setUploadError(String(err && (err.message || err)));
-        }
-      }
+    if (!file) { setIsUploading(false); return; }
 
-      // If no client-side Cloudinary URL is configured, try server-side upload endpoint
-      const apiBase = import.meta.env.VITE_API_BASE || '';
-      const token = localStorage.getItem('token');
-      
-      if (apiBase) {
-        // First try: multipart/form-data upload
-        const fd = new FormData();
-        fd.append('file', file);
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadSuccess(false);
+
+    const token = localStorage.getItem('token');
+    // Use VITE_API_BASE if set, otherwise rely on the Vite /api proxy (relative path)
+    const apiBase = import.meta.env.VITE_API_BASE || '';
+    const endpoint = `${apiBase}/api/uploads/cloudinary`;
+
+    // Try multipart/form-data upload first
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: fd,
+      });
+      let j: any = null;
+      try { j = await res.json(); } catch { j = null; }
+      if (res.ok && j && (j.url || j.secure_url || j.raw?.secure_url)) {
+        onChange(j.url || j.secure_url || j.raw.secure_url);
+        setUploadSuccess(true);
+        setIsUploading(false);
+        setTimeout(() => setUploadSuccess(false), 2000);
+        return;
+      }
+      const errMsg = j?.error || j?.message || `Erreur serveur (${res.status})`;
+      console.warn('Server multipart upload failed:', res.status, errMsg, j);
+      // Try JSON data URL as fallback
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const dataUrl = e.target?.result as string;
         try {
-          const res = await fetch(`${apiBase}/api/uploads/cloudinary`, {
+          const r2 = await fetch(endpoint, {
             method: 'POST',
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-            body: fd,
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ dataUrl }),
           });
-          let j: any = null;
-          try { j = await res.json(); } catch (e) { j = null; }
-          if (res.ok && j && (j.url || j.secure_url || (j.raw && j.raw.secure_url))) {
-            const finalUrl = j.url || j.secure_url || (j.raw && j.raw.secure_url);
-            onChange(finalUrl);
+          let j2: any = null;
+          try { j2 = await r2.json(); } catch { j2 = null; }
+          if (r2.ok && j2 && (j2.url || j2.secure_url || j2.raw?.secure_url)) {
+            onChange(j2.url || j2.secure_url || j2.raw.secure_url);
             setUploadSuccess(true);
             setIsUploading(false);
             setTimeout(() => setUploadSuccess(false), 2000);
             return;
           }
-          const errMsg = j && (j.error || j.message) ? (j.error || j.message) : `Server upload failed (status ${res.status})`;
-          console.warn('Server multipart upload response:', res.status, errMsg, j);
-          setUploadError(String(errMsg));
+          const e2 = j2?.error || j2?.message || `Erreur serveur (${r2.status})`;
+          console.warn('Server JSON upload failed:', r2.status, e2, j2);
+          setUploadError(`Upload échoué : ${e2}`);
         } catch (err: any) {
-          console.warn('Server multipart upload failed, will fallback to data URL POST', err);
-          setUploadError(String(err && (err.message || err)));
+          console.warn('Server JSON upload error:', err);
+          setUploadError(`Upload échoué : ${err?.message || err}`);
+        } finally {
+          setIsUploading(false);
         }
-
-        // Second try: data URL conversion and JSON POST
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          const result = e.target?.result as string;
-          if (apiBase) {
-            try {
-              const r = await fetch(`${apiBase}/api/uploads/cloudinary`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({ dataUrl: result }),
-              });
-              let j: any = null;
-              try { j = await r.json(); } catch (e) { j = null; }
-              if (r.ok && j && (j.url || j.secure_url || (j.raw && j.raw.secure_url))) {
-                const finalUrl = j.url || j.secure_url || (j.raw && j.raw.secure_url);
-                onChange(finalUrl);
-                setUploadSuccess(true);
-                setIsUploading(false);
-                setTimeout(() => setUploadSuccess(false), 2000);
-                return;
-              }
-              const errMsg = j && (j.error || j.message) ? (j.error || j.message) : `Server JSON upload failed (status ${r.status})`;
-              console.warn('Server JSON upload response:', r.status, errMsg, j);
-              setUploadError(String(errMsg));
-            } catch (err: any) {
-              console.warn('Server JSON upload failed, falling back to data URI', err);
-              setUploadError(String(err && (err.message || err)));
-            }
-          }
-
-          // Fallback: use data URL directly
-          onChange(result);
-          setUploadSuccess(true);
-          setIsUploading(false);
-          setTimeout(() => setUploadSuccess(false), 2000);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        // No API base, just use data URL directly
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const result = e.target?.result as string;
-          onChange(result);
-          setUploadSuccess(true);
-          setIsUploading(false);
-          setTimeout(() => setUploadSuccess(false), 2000);
-        };
-        reader.readAsDataURL(file);
-      }
-    } else {
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.warn('Server upload error:', err);
+      setUploadError(`Upload échoué : ${err?.message || err}`);
       setIsUploading(false);
     }
   };
@@ -163,7 +113,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           <TabsTrigger value="url">URL</TabsTrigger>
           <TabsTrigger value="upload">Upload</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="url" className="space-y-2">
           <div className="flex gap-2">
             <Input
@@ -179,7 +129,7 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
             </Button>
           </div>
         </TabsContent>
-        
+
         <TabsContent value="upload" className="space-y-2">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
@@ -201,17 +151,16 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                 </div>
               )}
             </div>
-            {uploadSuccess && <div className="text-sm text-green-600">Upload terminé</div>}
+            {uploadSuccess && <div className="text-sm text-green-600">Upload terminé ✓</div>}
             {uploadError && <div className="text-sm text-red-600">Erreur: {uploadError}</div>}
           </div>
         </TabsContent>
       </Tabs>
-      
+
       {value && (
         <div className="mt-4">
           <Label>Aperçu</Label>
           <div className="mt-2 w-full h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-            {/* If the value is a PDF or data:application/pdf show a download link */}
             {String(value).startsWith('data:application/pdf') || String(value).toLowerCase().endsWith('.pdf') ? (
               <div className="flex items-center gap-2">
                 <FileText />

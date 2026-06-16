@@ -40,12 +40,10 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
       path: "/upgrade",
       icon: CreditCard,
     },
-    // Cartes NFC is only available for paid plans; filter at render time
     {
       title: "Cartes NFC",
       path: "/dashboard/nfc-cards",
       icon: CreditCard,
-      paidOnly: true,
     },
   ];
 
@@ -57,13 +55,13 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
   };
 
   return (
-    <nav className="bg-white shadow-sm border-b">
+    <nav className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center space-x-8">
             <div
-              className="text-2xl font-bold text-[#28A745] cursor-pointer"
+              className="text-2xl font-bold text-[#2E7D32] cursor-pointer"
               onClick={() => navigate('/')}
             >
                 <img src="/lovable-uploads/logo_portefolia_remove_bg.png" alt="Portefolia" className="h-12 w-auto object-contain" />
@@ -75,12 +73,12 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
                 const Icon = item.icon;
                 return (
                   <Button
-                    key={item.path}
+                    key={`desktop-${item.path}`}
                     variant={isActive(item.path) ? "default" : "ghost"}
                     onClick={() => navigate(item.path)}
                     className={`flex items-center space-x-2 ${
                       isActive(item.path) 
-                        ? "bg-[#28A745] hover:bg-green-600 text-white" 
+                        ? "bg-[#2E7D32] hover:bg-[#1B5E20] text-white" 
                         : "text-gray-600 hover:text-gray-900"
                     }`}
                   >
@@ -98,7 +96,7 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 rounded-lg px-2 py-2 min-h-[44px] hover:bg-gray-100 transition-colors outline-none">
                   <Avatar className="h-8 w-8 shrink-0">
-                    <AvatarFallback className="bg-[#28A745] text-white text-xs font-bold">
+                    <AvatarFallback className="bg-[#2E7D32] text-white text-xs font-bold">
                       {profile?.prenom?.[0]?.toUpperCase() || profile?.nom?.[0]?.toUpperCase() || <User size={14} />}
                     </AvatarFallback>
                   </Avatar>
@@ -159,20 +157,20 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
       </div>
 
       {/* Mobile Navigation */}
-      <div className="md:hidden border-t">
+      <div className="md:hidden border-t border-gray-100">
         <div className="px-4 py-2">
           <div className="flex space-x-1 overflow-x-auto">
             {navigationItems.filter(it => !(it.paidOnly && isFreePlan)).map((item) => {
               const Icon = item.icon;
               return (
                 <Button
-                  key={item.path}
+                  key={`mobile-${item.path}`}
                   variant={isActive(item.path) ? "default" : "ghost"}
                   size="sm"
                   onClick={() => navigate(item.path)}
                   className={`flex items-center space-x-1 whitespace-nowrap ${
                     isActive(item.path)
-                      ? "bg-[#28A745] hover:bg-green-600 text-white"
+                      ? "bg-[#2E7D32] hover:bg-[#1B5E20] text-white"
                       : "text-gray-600"
                   }`}
                 >

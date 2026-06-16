@@ -1,62 +1,90 @@
-const Footer = () => {
-  const currentYear = new Date().getFullYear();
+import { Link } from 'react-router-dom';
+import { LayoutGrid } from 'lucide-react';
 
-  return (
-    <footer className="border-t bg-white mt-auto">
-      <div className="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl py-6">
-        <div className="flex flex-col md:flex-row justify-between items-center">
-          <div className="mb-4 md:mb-0">
-            <div className="flex items-center gap-2">
-              <img 
-                src="/lovable-uploads/logo_portefolia_remove_bg.png" 
-                alt="Portefolia" 
-                className="h-6 w-auto"
-              />
-              <span className="text-sm font-medium text-gray-900">Portefolia Admin</span>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Panel d'administration • Version {import.meta.env.VITE_APP_VERSION || '1.0.0'}
-            </p>
-          </div>
+const COLS = [
+  {
+    title: 'Produit',
+    links: [
+      { label: 'Fonctionnalités', to: '/' },
+      { label: 'Tarifs',          to: '/upgrade' },
+      { label: 'Cartes NFC',      to: '/nfc-types' },
+    ],
+  },
+  {
+    title: 'Support',
+    links: [
+      { label: 'FAQ',           to: '/faq' },
+      { label: 'Contact',       to: '/contact' },
+      { label: 'Documentation', to: '/docs' },
+    ],
+  },
+  {
+    title: 'Entreprise',
+    links: [
+      { label: 'À propos',  to: '/apropos' },
+      { label: 'Blog',      to: '/blog' },
+      { label: 'Carrières', to: '/carrieres' },
+    ],
+  },
+];
 
-          <div className="text-center md:text-right">
-            <p className="text-sm text-gray-600">
-              © {currentYear} Portefolia.tech. Tous droits réservés.
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              <a 
-                href="mailto:support@portefolia.tech" 
-                className="hover:text-blue-600 transition-colors"
-              >
-                support@portefolia.tech
-              </a>
-              {' • '}
-              <a 
-                href="/admin/support" 
-                className="hover:text-blue-600 transition-colors"
-              >
-                Support technique
-              </a>
-              {' • '}
-              <a 
-                href="/admin/docs" 
-                className="hover:text-blue-600 transition-colors"
-              >
-                Documentation
-              </a>
-            </p>
-          </div>
+const Footer = () => (
+  <footer className="border-t border-[#E7E7EA] bg-white">
+    <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 grid sm:grid-cols-4 gap-8">
+
+      {/* Brand */}
+      <div>
+        <div className="flex items-center gap-2.5 mb-4">
+          <span
+            className="w-8 h-8 rounded-[9px] flex items-center justify-center text-white shrink-0"
+            style={{ background: 'linear-gradient(140deg, #2E7D32, #1B5E20)' }}
+          >
+            <LayoutGrid size={16} strokeWidth={2.2} />
+          </span>
+          <span className="text-[19px] font-bold tracking-tight text-[#18181B]">Portefolia</span>
         </div>
-
-        <div className="mt-6 pt-6 border-t text-center">
-          <p className="text-xs text-gray-500">
-            Dernière mise à jour: {new Date().toLocaleDateString('fr-FR')} | 
-            Serveur: {import.meta.env.VITE_API_BASE ? 'Production' : 'Développement'}
-          </p>
+        <p className="text-sm text-[#71717A] max-w-[200px] leading-relaxed">
+          La nouvelle génération de cartes de visite professionnelles.
+        </p>
+        <div className="flex gap-2 mt-4">
+          {['LinkedIn', 'Twitter', 'Instagram'].map(s => (
+            <span
+              key={s}
+              className="w-9 h-9 rounded-full border border-[#E7E7EA] flex items-center justify-center text-[11px] font-bold text-[#71717A] hover:text-[#18181B] hover:border-[#18181B]/30 transition-colors cursor-pointer"
+            >
+              {s[0]}
+            </span>
+          ))}
         </div>
       </div>
-    </footer>
-  );
-};
+
+      {/* Link columns */}
+      {COLS.map(col => (
+        <div key={col.title}>
+          <h4 className="text-sm font-semibold text-[#18181B] mb-3">{col.title}</h4>
+          <ul className="space-y-2">
+            {col.links.map(l => (
+              <li key={l.label}>
+                <Link
+                  to={l.to}
+                  className="text-sm text-[#71717A] hover:text-[#18181B] transition-colors"
+                >
+                  {l.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+
+    <div className="border-t border-[#E7E7EA]">
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 h-14 flex items-center justify-between text-xs text-[#71717A]">
+        <span>© {new Date().getFullYear()} Portefolia. Tous droits réservés.</span>
+        <span>Dakar, Sénégal</span>
+      </div>
+    </div>
+  </footer>
+);
 
 export default Footer;

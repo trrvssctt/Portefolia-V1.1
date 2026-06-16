@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import { FolderOpen, ExternalLink, Github } from "lucide-react";
 
 interface ProjectsSectionProps {
@@ -24,13 +23,7 @@ export const ProjectsSection = ({ projects, themeColor = '#28A745' }: ProjectsSe
   if (!projects.length) return null;
 
   return (
-    <motion.section
-      id="projets"
-      initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-60px' }}
-      transition={{ duration: 0.5 }}
-    >
+    <section id="projets">
       <div className="flex items-center gap-3 mb-6">
         <div className="p-2.5 rounded-xl" style={{ backgroundColor: `${themeColor}15` }}>
           <FolderOpen className="w-5 h-5" style={{ color: themeColor }} />
@@ -40,57 +33,35 @@ export const ProjectsSection = ({ projects, themeColor = '#28A745' }: ProjectsSe
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {projects.map((project, i) => (
-          <motion.div
-            key={project.id || i}
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.07, duration: 0.4 }}
-            whileHover={{ y: -4 }}
-            className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col"
-          >
-            {/* Image or placeholder */}
+          <div key={project.id || i}
+            className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col">
             {project.image ? (
               <div className="h-36 overflow-hidden">
-                <img
-                  src={project.image}
-                  alt={project.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+                <img src={project.image} alt={project.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               </div>
             ) : (
-              <div
-                className="h-36 flex items-center justify-center"
-                style={{ background: `linear-gradient(135deg, ${themeColor}15, ${themeColor}30)` }}
-              >
+              <div className="h-36 flex items-center justify-center"
+                style={{ background: `linear-gradient(135deg, ${themeColor}15, ${themeColor}30)` }}>
                 <FolderOpen className="w-12 h-12 opacity-30" style={{ color: themeColor }} />
               </div>
             )}
 
             <div className="p-4 flex flex-col flex-1">
-              {/* Title + links */}
               <div className="flex items-start justify-between gap-2 mb-2">
                 <h3 className="font-bold text-gray-900 text-base leading-snug">{project.title}</h3>
                 <div className="flex gap-1.5 shrink-0">
                   {project.project_url && (
-                    <a
-                      href={project.project_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <a href={project.project_url} target="_blank" rel="noopener noreferrer"
                       className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 transition-colors"
-                      title="Demo"
-                    >
+                      title="Demo">
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   )}
                   {project.github_url && (
-                    <a
-                      href={project.github_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <a href={project.github_url} target="_blank" rel="noopener noreferrer"
                       className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-900 hover:text-white text-gray-600 transition-colors"
-                      title="GitHub"
-                    >
+                      title="GitHub">
                       <Github className="w-3.5 h-3.5" />
                     </a>
                   )}
@@ -106,20 +77,17 @@ export const ProjectsSection = ({ projects, themeColor = '#28A745' }: ProjectsSe
               {project.technologies?.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   {project.technologies.map((tech: string, j: number) => (
-                    <span
-                      key={j}
-                      className="px-2 py-0.5 rounded-md text-xs font-semibold text-white"
-                      style={{ backgroundColor: techColor(tech) }}
-                    >
+                    <span key={j} className="px-2 py-0.5 rounded-md text-xs font-semibold text-white"
+                      style={{ backgroundColor: techColor(tech) }}>
                       {tech}
                     </span>
                   ))}
                 </div>
               )}
             </div>
-          </motion.div>
+          </div>
         ))}
       </div>
-    </motion.section>
+    </section>
   );
 };

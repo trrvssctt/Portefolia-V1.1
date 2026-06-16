@@ -37,11 +37,11 @@ function initiales(prenom: string, nom: string): string {
   return `${(prenom?.[0] ?? '').toUpperCase()}${(nom?.[0] ?? '').toUpperCase()}`;
 }
 
-function rowBg(status: ClientListItem['subscription_status'], statut_compte: string): string {
+function rowBg(status: ClientListItem['subscription_status'], statut_compte: string, index: number): string {
   if (statut_compte === 'BLOQUÉ') return '#F5F5F5';
-  if (status === 'PENDING_PAYMENT') return '#FFF8E1';
+  if (status === 'PENDING_PAYMENT') return '#FFFDE7';
   if (status === 'EXPIRED') return '#FFF5F5';
-  return '#FFFFFF';
+  return index % 2 === 1 ? '#E8F5E9' : '#FFFFFF';
 }
 
 function formatDateCourte(iso: string): string {
@@ -60,7 +60,7 @@ function KpiRow({ compteurs, isLoading }: KpiRowProps) {
     return (
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="animate-pulse rounded-lg p-4" style={{ backgroundColor: '#F9FAFB' }}>
+          <div key={i} className="animate-pulse rounded-lg p-4" style={{ backgroundColor: '#F5F5F5' }}>
             <div className="h-4 w-16 rounded bg-gray-200 mb-2" />
             <div className="h-7 w-12 rounded bg-gray-300" />
           </div>
@@ -71,7 +71,7 @@ function KpiRow({ compteurs, isLoading }: KpiRowProps) {
 
   return (
     <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-      <div className="rounded-lg p-4 flex flex-col gap-1" style={{ backgroundColor: '#F9FAFB' }}>
+      <div className="rounded-lg p-4 flex flex-col gap-1" style={{ backgroundColor: '#F5F5F5' }}>
         <div className="flex items-center gap-2 text-gray-500">
           <Users size={14} />
           <span className="text-xs font-medium">Total clients</span>
@@ -79,7 +79,7 @@ function KpiRow({ compteurs, isLoading }: KpiRowProps) {
         <p className="text-2xl font-bold text-gray-700">{compteurs.total.toLocaleString('fr-FR')}</p>
       </div>
 
-      <div className="rounded-lg p-4 flex flex-col gap-1" style={{ backgroundColor: '#F9FAFB' }}>
+      <div className="rounded-lg p-4 flex flex-col gap-1" style={{ backgroundColor: '#F5F5F5' }}>
         <div className="flex items-center gap-2 text-gray-500">
           <Users size={14} />
           <span className="text-xs font-medium">Actifs</span>
@@ -87,7 +87,7 @@ function KpiRow({ compteurs, isLoading }: KpiRowProps) {
         <p className="text-2xl font-bold" style={{ color: GREEN }}>{compteurs.actifs.toLocaleString('fr-FR')}</p>
       </div>
 
-      <div className="rounded-lg p-4 flex flex-col gap-1" style={{ backgroundColor: '#F9FAFB' }}>
+      <div className="rounded-lg p-4 flex flex-col gap-1" style={{ backgroundColor: '#F5F5F5' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-gray-500">
             <Clock size={14} />
@@ -105,7 +105,7 @@ function KpiRow({ compteurs, isLoading }: KpiRowProps) {
         <p className="text-2xl font-bold" style={{ color: ORANGE }}>{compteurs.en_attente.toLocaleString('fr-FR')}</p>
       </div>
 
-      <div className="rounded-lg p-4 flex flex-col gap-1" style={{ backgroundColor: '#F9FAFB' }}>
+      <div className="rounded-lg p-4 flex flex-col gap-1" style={{ backgroundColor: '#F5F5F5' }}>
         <div className="flex items-center gap-2 text-gray-500">
           <XCircle size={14} />
           <span className="text-xs font-medium">Expirés</span>
@@ -607,10 +607,10 @@ export default function ClientsListView({ onSelectClient, selectedClientId }: Pr
         ) : clients.length === 0 ? (
           <EmptyState onReset={resetFiltres} />
         ) : (
-          clients.map((client) => {
+          clients.map((client, index) => {
             const isSelected  = client.id === selectedClientId;
             const isBloque    = client.statut_compte === 'BLOQUÉ';
-            const bg          = rowBg(client.subscription_status, client.statut_compte);
+            const bg          = rowBg(client.subscription_status, client.statut_compte, index);
 
             return (
               <div

@@ -273,7 +273,7 @@ export default function RevenueGraphiques({ evolution, distribution, isLoading }
             {/* Légende verticale */}
             <ul className="mt-3 w-full space-y-1.5">
               {distribution.map((plan, i) => (
-                <li key={plan.name} className="flex items-center gap-1.5">
+                <li key={`${plan.name}-${i}`} className="flex items-center gap-1.5">
                   <span
                     className="inline-block h-2 w-2 rounded-full shrink-0"
                     style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}

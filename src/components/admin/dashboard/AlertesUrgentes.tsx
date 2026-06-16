@@ -24,20 +24,20 @@ function dateAujourdhui(): string {
 
 export function AlertesUrgentesSkeleton() {
   return (
-    <div className="bg-white rounded-xl animate-pulse" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)', borderLeft: '4px solid #E5E7EB' }}>
-      <div className="p-4 border-b border-gray-100 flex items-center gap-3">
-        <div className="h-5 w-5 rounded bg-gray-200" />
-        <div className="h-4 w-48 rounded bg-gray-200" />
-        <div className="ml-auto h-5 w-8 rounded-full bg-gray-200" />
+    <div className="bg-white rounded-[12px] animate-pulse" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)', borderLeft: '4px solid #E8F5E9' }}>
+      <div className="p-4 border-b border-[#E8F5E9] flex items-center gap-3">
+        <div className="h-5 w-5 rounded bg-[#E8F5E9]" />
+        <div className="h-4 w-48 rounded bg-[#E8F5E9]" />
+        <div className="ml-auto h-5 w-8 rounded-full bg-[#E8F5E9]" />
       </div>
       {[0, 1, 2].map((i) => (
-        <div key={i} className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '0.5px solid #F3F4F6' }}>
-          <div className="h-5 w-16 rounded-full bg-gray-200 shrink-0" />
+        <div key={i} className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid #E8F5E9' }}>
+          <div className="h-5 w-16 rounded-full bg-[#E8F5E9] shrink-0" />
           <div className="flex-1 space-y-1.5">
-            <div className="h-3 w-3/4 rounded bg-gray-200" />
-            <div className="h-2.5 w-1/2 rounded bg-gray-100" />
+            <div className="h-3 w-3/4 rounded bg-[#E8F5E9]" />
+            <div className="h-2.5 w-1/2 rounded bg-[#F5F5F5]" />
           </div>
-          <div className="h-3 w-20 rounded bg-gray-100 shrink-0" />
+          <div className="h-3 w-20 rounded bg-[#F5F5F5] shrink-0" />
         </div>
       ))}
     </div>
@@ -65,15 +65,15 @@ function LigneAlerte({ alerte, isLast }: { alerte: Alerte; isLast: boolean }) {
   const navigate = useNavigate();
   return (
     <div
-      className="flex items-center gap-3 px-4 py-3 hover:bg-black/[0.02] transition-colors cursor-default"
-      style={isLast ? undefined : { borderBottom: '0.5px solid #F3F4F6' }}
+      className="flex items-center gap-3 px-4 py-3 hover:bg-[#E8F5E9]/40 transition-colors cursor-default"
+      style={isLast ? undefined : { borderBottom: '1px solid #E8F5E9' }}
     >
       <BadgeNiveau niveau={alerte.niveau} />
 
       <div className="flex-1 min-w-0">
-        <p className="text-[12px] font-bold text-gray-800 leading-tight">{alerte.message}</p>
+        <p className="text-[12px] font-bold text-[#1A1A2E] leading-tight">{alerte.message}</p>
         {alerte.detail && (
-          <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{alerte.detail}</p>
+          <p className="text-[10px] text-[#5C5C5C] mt-0.5 leading-tight">{alerte.detail}</p>
         )}
       </div>
 
@@ -93,7 +93,7 @@ function LigneAlerte({ alerte, isLast }: { alerte: Alerte; isLast: boolean }) {
 function AlertesVide() {
   return (
     <div
-      className="bg-white rounded-xl flex items-center gap-3 px-5 py-4"
+      className="bg-white rounded-[12px] flex items-center gap-3 px-5 py-4"
       style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)', borderLeft: '4px solid #2E7D32' }}
     >
       <CheckCircle2 size={20} color="#2E7D32" className="shrink-0" />
@@ -117,7 +117,7 @@ export default function AlertesUrgentes({ alertes, isLoading, isError }: Props) 
 
   if (isError) {
     return (
-      <div className="bg-white rounded-xl px-5 py-3 text-[12px] text-gray-400" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)', borderLeft: '4px solid #E5E7EB' }}>
+      <div className="bg-white rounded-[12px] px-5 py-3 text-[12px] text-[#5C5C5C]" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)', borderLeft: '4px solid #E8F5E9' }}>
         Impossible de charger les alertes
       </div>
     );
@@ -132,7 +132,7 @@ export default function AlertesUrgentes({ alertes, isLoading, isError }: Props) 
 
   return (
     <div
-      className="bg-white rounded-xl overflow-hidden"
+      className="bg-white rounded-[12px] overflow-hidden"
       style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.08)', borderLeft: `4px solid ${palette.border}` }}
     >
       {/* Header */}

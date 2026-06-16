@@ -12,8 +12,8 @@ import { cn } from '@/lib/utils';
 // ── Configuration des flux ────────────────────────────────────────────────────
 
 const FLUX = [
-  { key: 'reabonnement', label: 'Réabonnement', stroke: '#1565C0', fill: '#E3F2FD' },
-  { key: 'abonnement',   label: 'Abonnement',   stroke: '#2E7D32', fill: '#E8F5E9' },
+  { key: 'reabonnement', label: 'Réabonnement', stroke: '#2E7D32', fill: '#E8F5E9' },
+  { key: 'abonnement',   label: 'Abonnement',   stroke: '#1565C0', fill: '#E3F2FD' },
   { key: 'upgrade',      label: 'Upgrade',      stroke: '#6A1B9A', fill: '#F3E5F5' },
   { key: 'nfc',          label: 'NFC',          stroke: '#00695C', fill: '#E0F2F1' },
 ] as const;
@@ -206,7 +206,7 @@ export default function RevenueChart({
                 className={cn(
                   'px-3 py-1.5 font-semibold transition-colors',
                   nbMois === p.value
-                    ? 'bg-gray-900 text-white'
+                    ? 'bg-[#2E7D32] text-white'
                     : 'bg-white text-gray-500 hover:bg-gray-50'
                 )}
               >
@@ -225,7 +225,7 @@ export default function RevenueChart({
                 className={cn(
                   'p-2 transition-colors',
                   view === mode
-                    ? 'bg-gray-900 text-white'
+                    ? 'bg-[#2E7D32] text-white'
                     : 'bg-white text-gray-400 hover:bg-gray-50'
                 )}
               >
