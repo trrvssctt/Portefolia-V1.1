@@ -21,11 +21,13 @@ function moisStr(date = new Date()) {
 async function getAlertes() {
   const alertes = [];
 
+  // Compte les paiements Wave en attente — tous les statuts "pending" possibles
   const [[pendingWave]] = await pool.query(
     `SELECT
        COUNT(*) AS total,
-       SUM(CASE WHEN TIMESTAMPDIFF(HOUR, created_at, NOW()) > 24 THEN 1 ELSE 0 END) AS urgents
-     FROM paiements WHERE statut = 'EN_ATTENTE'`
+       SUM(CASE WHEN TIMESTAMPDIFF(HOUR, a.created_at, NOW()) > 24 THEN 1 ELSE 0 END) AS urgents
+     FROM abonnements a
+     WHERE a.statut_v2 = 'PENDING_PAYMENT'`
   );
   if (Number(pendingWave.total) > 0) {
     alertes.push({
@@ -41,7 +43,7 @@ async function getAlertes() {
 
   const [[expirantAujourdhui]] = await pool.query(
     `SELECT COUNT(*) AS total FROM abonnements
-     WHERE statut = 'ACTIVE' AND DATE(date_echeance) = CURDATE()`
+     WHERE statut_v2 = 'ACTIVE' AND DATE(COALESCE(date_echeance, end_date)) = CURDATE()`
   );
   if (Number(expirantAujourdhui.total) > 0) {
     alertes.push({
@@ -72,8 +74,8 @@ async function getAlertes() {
 
   const [[expiresNonRenouveles]] = await pool.query(
     `SELECT COUNT(*) AS total FROM abonnements
-     WHERE statut = 'EXPIRED'
-       AND DATEDIFF(NOW(), date_echeance) BETWEEN 1 AND 7`
+     WHERE statut_v2 = 'EXPIRED'
+       AND DATEDIFF(NOW(), COALESCE(date_echeance, end_date)) BETWEEN 1 AND 7`
   );
   if (Number(expiresNonRenouveles.total) > 0) {
     alertes.push({
@@ -174,7 +176,7 @@ async function getDistributionPlans() {
        COUNT(a.id) AS nb_abonnes,
        ROUND(COUNT(a.id) * 100.0 / NULLIF(SUM(COUNT(a.id)) OVER(), 0), 1) AS pourcentage
      FROM plans p
-     LEFT JOIN abonnements a ON a.plan_id = p.id AND a.statut = 'ACTIVE'
+     LEFT JOIN abonnements a ON a.plan_id = p.id AND a.statut_v2 = 'ACTIVE'
      GROUP BY p.id, p.name
      ORDER BY nb_abonnes DESC`
   );

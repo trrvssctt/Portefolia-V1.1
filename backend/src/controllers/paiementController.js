@@ -6,6 +6,7 @@ const userModel = require('../models/userModel');
 const planModel = require('../models/planModel');
 const commandeModelLocal = require('../models/commandeModel');
 const sendEmail = require('../utils/sendEmail');
+const abonnementModel = require('../models/abonnementModel');
 
 // Normalize status strings (remove diacritics and lowercase)
 function normalizeStatusStr(s) {
@@ -143,6 +144,46 @@ async function updateStatus(req, res) {
         console.log(`[paiementController.updateStatus] normalized targetStatus=${targetStatus} -> dbStatus=${dbStatus}`);
         const updated = await paiementModel.updateStatus(id, dbStatus, dbStatus === 'Remboursé' ? refundReason : null);
         console.log('[paiementController.updateStatus] updated paiement:', updated && updated.id ? { id: updated.id, utilisateur_id: updated.utilisateur_id, montant: updated.montant || updated.montant_total, statut: updated.status || updated.statut } : updated);
+
+    // Si le paiement passe à RÉUSSI et qu'il a un abonnement_id lié →
+    // activer l'abonnement + user + user_plans exactement comme le flow Wave Validation
+    if (targetStatus === 'reussi' && updated && updated.abonnement_id) {
+      try {
+        const aboId = updated.abonnement_id;
+        const adminId = req.userId || null;
+
+        // Vérifier que l'abonnement est bien en attente (évite double-validation)
+        const [[abo]] = await pool.query(
+          "SELECT statut_v2, utilisateur_id, plan_id, date_debut, date_echeance FROM abonnements WHERE id = ? LIMIT 1",
+          [aboId]
+        );
+        if (abo && abo.statut_v2 === 'PENDING_PAYMENT') {
+          await abonnementModel.validateSubscription(aboId, adminId, `Validation manuelle depuis page Paiements (paiement #${id})`);
+
+          // Récupérer les dates fraîchement calculées
+          const [[fresh]] = await pool.query(
+            'SELECT date_debut, date_echeance FROM abonnements WHERE id = ? LIMIT 1',
+            [aboId]
+          );
+
+          // Synchroniser user_plans pour que le dashboard affiche le bon plan
+          if (abo.plan_id) {
+            await pool.query('DELETE FROM user_plans WHERE utilisateur_id = ?', [abo.utilisateur_id]);
+            await planModel.subscribeUser({
+              utilisateur_id:    abo.utilisateur_id,
+              plan_id:           abo.plan_id,
+              start_date:        fresh?.date_debut   ?? null,
+              end_date:          fresh?.date_echeance ?? null,
+              status:            'active',
+              payment_reference: updated.reference_transaction || null,
+            });
+          }
+          console.log(`[paiementController.updateStatus] abonnement #${aboId} activé via validation manuelle`);
+        }
+      } catch (aboErr) {
+        console.error('[paiementController.updateStatus] erreur activation abonnement:', aboErr.message);
+      }
+    }
 
     // If payment becomes successful ('reussi'), generate invoice and notify user
         if (targetStatus === 'reussi') {

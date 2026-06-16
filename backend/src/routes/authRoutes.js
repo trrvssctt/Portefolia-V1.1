@@ -28,6 +28,7 @@ router.post('/login', authLimiter, auth.login);
 router.post('/admin/sama_connection_page', adminAuthLimiter, auth.adminLogin);
 router.get('/admin/me', require('../middlewares/authMiddleware'), auth.adminMe);
 router.get('/verify', auth.verify);
+router.post('/resend-verification', authLimiter, auth.resendVerification);
 router.post('/refresh', auth.refresh);
 router.post('/logout', auth.logout);
 

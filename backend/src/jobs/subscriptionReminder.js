@@ -135,7 +135,7 @@ async function runReminderTask() {
           jours_restants:     daysAhead,
           date_echeance:      row.date_echeance,
           renouvellement_url: RENEWAL_URL,
-          montant_mensuel_fcfa: row.price_cents ? row.price_cents / 100 : null,
+          montant_mensuel_fcfa: row.price_cents ? row.price_cents : null,
         });
 
         await sendEmail({ to: row.email, subject, html });

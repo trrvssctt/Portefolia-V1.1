@@ -12,7 +12,9 @@
  */
 
 const FRONTEND   = process.env.FRONTEND_BASE || 'https://portefolia.tech';
-const LOGO_URL   = `${FRONTEND}/logo_portefolia.png`;
+// EMAIL_ASSET_BASE doit pointer vers le domaine public — jamais localhost
+const ASSET_BASE = process.env.EMAIL_ASSET_BASE || 'https://portefolia.tech';
+const LOGO_URL   = `${ASSET_BASE}/lovable-uploads/logo_portefolia_remove_bg.png`;
 const SUPPORT    = 'support@portefolia.tech';
 const YEAR       = new Date().getFullYear();
 
@@ -52,14 +54,16 @@ function wrap({ header, body, accentColor = '#2E7D32', subheader = '' }) {
 
         <!-- ── En-tête ───────────────────────────────────────── -->
         <tr>
-          <td style="background:${accentColor};padding:28px 40px;text-align:center;">
-            <img src="${LOGO_URL}" alt="Portefolia" width="40" height="40"
-                 style="display:inline-block;vertical-align:middle;border-radius:8px;margin-bottom:10px;"
+          <td style="background:${accentColor};padding:32px 40px 24px;text-align:center;">
+            <!--[if !mso]><!-->
+            <img src="${LOGO_URL}" alt="Portefolia" width="160" height="auto"
+                 style="display:block;margin:0 auto 4px;max-width:160px;width:160px;height:auto;"
                  onerror="this.style.display='none'">
-            <p style="margin:0;font-size:26px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">
-              Portefolia
-            </p>
-            ${subheader ? `<p style="margin:6px 0 0;font-size:13px;color:rgba(255,255,255,.80);">${subheader}</p>` : ''}
+            <!--<![endif]-->
+            <!--[if mso]>
+            <p style="margin:0 0 8px;font-size:28px;font-weight:900;color:#ffffff;">Portefolia</p>
+            <![endif]-->
+            ${subheader ? `<p style="margin:10px 0 0;font-size:13px;color:rgba(255,255,255,.80);">${subheader}</p>` : ''}
           </td>
         </tr>
 
@@ -408,6 +412,108 @@ function emailCompteExpire({ prenom, renouvellement_url }) {
   };
 }
 
+// ─── 6. Email de bienvenue + vérification ────────────────────────────────────
+
+/**
+ * @param {{ prenom, verify_url, plan_type }} data
+ * plan_type : 'free' | 'paid'
+ */
+function emailBienvenueVerification({ prenom, verify_url, plan_type = 'free' }) {
+  const isFree = plan_type === 'free';
+
+  const ctaLabel = isFree
+    ? 'Vérifier mon email et accéder au dashboard'
+    : 'Vérifier mon adresse email';
+
+  const nextStep = isFree
+    ? `<div style="background:#e8f5e9;border-left:4px solid #2E7D32;border-radius:0 8px 8px 0;padding:14px 18px;margin:24px 0 0;">
+         <p style="margin:0;font-size:14px;color:#1b5e20;line-height:1.6;">
+           <strong>Ce que ce lien fait :</strong> il vérifie votre email et vous connecte directement à votre dashboard.
+           Il est valable <strong>24 heures</strong> et à usage unique.
+         </p>
+       </div>`
+    : `<div style="background:#fffbeb;border-left:4px solid #d97706;border-radius:0 8px 8px 0;padding:14px 18px;margin:24px 0 0;">
+         <p style="margin:0;font-size:14px;color:#92400e;line-height:1.6;">
+           <strong>Ce que ce lien fait :</strong> il confirme votre adresse email uniquement.
+           Votre accès au dashboard sera activé dès que notre équipe aura validé votre paiement.
+         </p>
+       </div>`;
+
+  const body = `
+    <p style="font-size:16px;color:#111827;margin:0 0 6px;">
+      Bonjour <strong>${prenom}</strong> 👋
+    </p>
+    <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 24px;">
+      Bienvenue sur <strong>Portefolia</strong> ! Votre compte a bien été créé.
+      Pour finaliser votre inscription, veuillez vérifier votre adresse email en cliquant sur le bouton ci-dessous.
+    </p>
+
+    ${ctaButton(ctaLabel, verify_url)}
+
+    ${nextStep}
+
+    <p style="font-size:13px;color:#94a3b8;text-align:center;margin:20px 0 0;">
+      Si vous n'avez pas créé de compte sur Portefolia, ignorez cet email.
+    </p>`;
+
+  return {
+    subject: '👋 Bienvenue sur Portefolia — Vérifiez votre email',
+    html: wrap({
+      header: 'Confirmez votre adresse email',
+      subheader: 'Dernière étape avant d\'accéder à votre espace',
+      body,
+    }),
+  };
+}
+
+// ─── 7. Notification comptabilité — paiement validé ─────────────────────────
+
+/**
+ * @param {{ client_prenom, client_nom, client_email, plan_name, montant, duree_mois, reference_wave, date_validation, login_url }} data
+ */
+function emailComptabiliteValidation({ client_prenom, client_nom, client_email, plan_name, montant, duree_mois, reference_wave, date_validation, login_url }) {
+  const dureeLabel = duree_mois === 1 ? '1 mois' : duree_mois === 12 ? '1 an' : `${duree_mois} mois`;
+  const adminUrl   = `${FRONTEND}/admin/sama_connection_page`;
+
+  const body = `
+    <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 20px;">
+      Un paiement Wave a été <strong style="color:#2E7D32;">validé</strong> par l'équipe admin.
+      Le client a reçu son lien d'accès par email.
+    </p>
+
+    ${recapTable([
+      ['Client',          `${client_prenom} ${client_nom}`],
+      ['Email client',    client_email, '#1d4ed8'],
+      ['Plan souscrit',   plan_name, '#2E7D32'],
+      ['Durée',           dureeLabel],
+      ['Montant perçu',   fmtFcfa(montant), '#2E7D32'],
+      ['Référence Wave',  reference_wave, '#1d4ed8'],
+      ['Date validation', fmtDate(date_validation)],
+    ])}
+
+    <div style="background:#f0fdf4;border-left:4px solid #2E7D32;border-radius:0 8px 8px 0;padding:14px 18px;margin:24px 0;">
+      <p style="margin:0;font-size:13px;color:#1b5e20;line-height:1.6;">
+        <strong>Lien d'accès envoyé au client :</strong><br>
+        <a href="${login_url}" style="color:#1d4ed8;word-break:break-all;">${login_url}</a>
+      </p>
+    </div>
+
+    ${ctaButton('Accéder au panel admin', adminUrl, '#1e293b')}
+
+    <p style="font-size:12px;color:#94a3b8;text-align:center;margin:8px 0 0;">
+      Ce mail est généré automatiquement à chaque validation de paiement.
+    </p>`;
+
+  return {
+    subject: `✅ Paiement validé — ${client_prenom} ${client_nom} · ${plan_name} · ${fmtFcfa(montant)}`,
+    html: wrap({
+      header: 'Paiement Wave validé',
+      subheader: `Notification comptabilité — ${fmtDate(date_validation)}`,
+      body,
+    }),
+  };
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -416,4 +522,6 @@ module.exports = {
   emailPaiementRefuse,
   emailRappelEcheance,
   emailCompteExpire,
+  emailComptabiliteValidation,
+  emailBienvenueVerification,
 };

@@ -18,6 +18,8 @@ router.put('/me', auth, userController.updateMe);
 router.put('/me/deactivate', auth, userController.deactivateMe);
 router.delete('/me', auth, userController.deleteMe);
 router.get('/me/paiements', auth, userController.getMyPayments);
+router.get('/me/paiements/:id/receipt', auth, userController.getMyReceiptPDF);
+router.get('/me/invoices/:id/pdf', auth, userController.getMyInvoicePDF);
 router.get('/me/activity', auth, userController.getActivity);
 
 // Admin-managed user CRUD (clients only)

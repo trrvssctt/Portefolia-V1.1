@@ -1,6 +1,7 @@
 const planModel = require('../models/planModel');
 const userModel = require('../models/userModel');
 const abonnementModel = require('../models/abonnementModel');
+const { pool } = require('../db');
 
 // Public endpoint: only active/visible plans, with features
 async function listPublicPlans(req, res) {
@@ -158,6 +159,37 @@ async function getUserPlans(req, res) {
   try {
     const utilisateur_id = req.userId;
     if (!utilisateur_id) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Source primaire : abonnements ACTIVE (flow Wave — toujours à jour)
+    const [aboRows] = await pool.query(
+      `SELECT a.id, a.utilisateur_id, a.plan_id,
+              a.statut_v2 AS status,
+              a.date_debut AS start_date,
+              a.date_echeance AS end_date,
+              a.reference_wave AS payment_reference,
+              a.created_at, a.updated_at,
+              p.name, p.slug, p.price_cents, p.billing_interval, p.currency
+       FROM abonnements a
+       JOIN plans p ON p.id = a.plan_id
+       WHERE a.utilisateur_id = ?
+         AND a.statut_v2 = 'ACTIVE'
+         AND a.plan_id IS NOT NULL
+       ORDER BY a.created_at DESC
+       LIMIT 1`,
+      [utilisateur_id]
+    );
+
+    // Si un abonnement actif existe → le retourner directement
+    if (aboRows.length > 0) {
+      const abo = aboRows[0];
+      const now = new Date();
+      const endDate = abo.end_date ? new Date(abo.end_date) : null;
+      abo.next_billing_date = endDate && endDate > now ? endDate.toISOString() : null;
+      abo.next_payment_date = abo.next_billing_date;
+      return res.json({ plans: [abo] });
+    }
+
+    // Fallback : user_plans (flow legacy Stripe ou inscription gratuite)
     const rows = await planModel.listUserPlans(utilisateur_id);
 
     const now = new Date();

@@ -65,7 +65,7 @@ async function createPublicOrder(req, res) {
         const planMod = require('../models/carte_visite_model');
         const plan = await planMod.getById(Number(plan_id));
         if (plan) {
-          pricePer = (Number(plan.price_cents || 0) / 100);
+          pricePer = Number(plan.price_cents || 0);
         }
       } catch (e) {
         // fallback

@@ -62,7 +62,7 @@ async function uploadToCloudinary(req, res) {
     }
 
     const result = await cloudinary.uploader.upload(payload, {
-      folder: process.env.CLOUDINARY_UPLOAD_FOLDER || 'paiements',
+      folder: req.body?.folder || process.env.CLOUDINARY_UPLOAD_FOLDER || 'portfolios',
       resource_type: resourceType,
       overwrite: false,
     });

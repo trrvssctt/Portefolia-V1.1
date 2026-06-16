@@ -69,6 +69,10 @@ async function getMyBusinessContext(req, res) {
         secondary_color: account.secondary_color,
         accent_color: account.accent_color,
         font_family: account.font_family,
+        website_url: account.website_url || null,
+        description: account.description || null,
+        address: account.address || null,
+        phone: account.phone || null,
       },
       member: member ? {
         id: member.id,

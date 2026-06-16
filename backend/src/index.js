@@ -48,7 +48,7 @@ if ((process.env.NODE_ENV === 'production') && (!process.env.JWT_SECRET || proce
 // Configure CORS early so preflight requests are handled before body parsing
 // Allow multiple origins via CORS_ORIGIN env var (comma-separated). Default includes localhost and the deployed frontend domain.
 // Include frontend dev origin (localhost:8080), backend local (localhost:3000) and production frontend domain `https://portefolia.tech`.
-const rawOrigins = process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:8080,http://localhost:3000,https://portefolia.tech';
+const rawOrigins = process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:8080,http://localhost:8081,http://localhost:3000,https://portefolia.tech';
 //const rawOrigins = process.env.CORS_ORIGIN || 'https://portefolia.tech';
 const allowedOrigins = rawOrigins.split(',').map(s => s.trim()).filter(Boolean);
 const corsOptions = {
@@ -153,6 +153,8 @@ app.post('/webhooks/payment', (req, res) => adminController.paymentWebhook(req, 
     await paiementModel.init();
     const checkoutModel = require('./models/checkoutModel');
     await checkoutModel.init();
+    const upgradeModel = require('./models/upgradeModel');
+    await upgradeModel.init();
     await carteModel.init();
     await carteVisiteModel.init();
     const abonnementModel = require('./models/abonnementModel');

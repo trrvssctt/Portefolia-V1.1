@@ -23,11 +23,11 @@ async function init() {
   `);
 }
 
-async function createAbonnement({ utilisateur_id, plan_id = null, type = 'abonnement', statut = 'pending', montant = 0, currency = 'XOF', start_date = null, end_date = null, payment_reference = null, metadata = null }) {
-  const sql = `INSERT INTO abonnements (utilisateur_id, plan_id, type, statut, montant, currency, start_date, end_date, payment_reference, metadata) VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP), ?, ?, ?)`;
-  const params = [utilisateur_id, plan_id, type, statut, montant, currency, start_date, end_date, payment_reference, metadata ? JSON.stringify(metadata) : null];
+async function createAbonnement({ utilisateur_id, plan_id = null, type = 'abonnement', statut = 'pending', montant = 0, currency = 'XOF', start_date = null, end_date = null, payment_reference = null, metadata = null, duree_mois = null }) {
+  const sql = `INSERT INTO abonnements (utilisateur_id, plan_id, type, statut, montant, currency, start_date, end_date, payment_reference, metadata, duree_mois) VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP), ?, ?, ?, ?)`;
+  const params = [utilisateur_id, plan_id, type, statut, montant, currency, start_date, end_date, payment_reference, metadata ? JSON.stringify(metadata) : null, duree_mois];
   const [result] = await pool.query(sql, params);
-  return { id: result.insertId, utilisateur_id, plan_id, type, statut, montant, currency, start_date, end_date, payment_reference, metadata };
+  return { id: result.insertId, utilisateur_id, plan_id, type, statut, montant, currency, start_date, end_date, payment_reference, metadata, duree_mois };
 }
 
 async function findByUser(utilisateur_id) {
@@ -134,9 +134,11 @@ async function validateSubscription(abonnementId, adminId, commentaire) {
 
   const updated = await findById(abonnementId);
 
+  // Réactiver le compte et marquer l'abonnement comme actif
   await pool.query(
     `UPDATE utilisateurs
      SET subscription_status = 'ACTIVE',
+         is_active = 1,
          last_payment_at = NOW(),
          next_billing_date = ?
      WHERE id = ?`,
@@ -150,7 +152,7 @@ async function validateSubscription(abonnementId, adminId, commentaire) {
          duree_mois = ?,
          plan_id = ?
      WHERE abonnement_id = ?
-       AND statut IN ('RÉUSSI', 'confirmed', 'paid', 'active')`,
+       AND LOWER(CONVERT(statut USING utf8mb4)) IN ('réussi', 'reussi', 'confirmed', 'paid', 'active')`,
     [typeFluxPaie, duree, abo.plan_id ?? null, abonnementId]
   );
 
@@ -293,9 +295,11 @@ async function expireSubscription(abonnementId) {
     [abonnementId]
   );
 
+  // Désactiver le compte ET marquer l'abonnement comme expiré — bloque la connexion au niveau backend
   await pool.query(
     `UPDATE utilisateurs
-     SET subscription_status = 'EXPIRED'
+     SET subscription_status = 'EXPIRED',
+         is_active = 0
      WHERE id = ?`,
     [abo.utilisateur_id]
   );

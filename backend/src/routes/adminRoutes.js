@@ -140,6 +140,7 @@ router.get('/upgrades/:id', auth, adminAuth, adminController.getUpgrade);
 // export invoices CSV
 router.get('/invoices/export.csv', auth, adminAuth, adminController.exportInvoicesCsv);
 router.put('/upgrades/:id/approve', auth, adminAuth, adminController.approveUpgrade);
+router.put('/upgrades/:id/reject',  auth, adminAuth, adminController.rejectUpgrade);
 
 // Wave pending payment management (admin validation)
 const checkoutController = require('../controllers/checkoutController');

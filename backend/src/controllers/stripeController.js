@@ -185,17 +185,17 @@ async function handleWebhook(req, res) {
             if (adminEmail) {
               const user = await userModel.findById(checkout.utilisateur_id);
               const subject = isBusinessPlan
-                ? `[Business] Paiement reçu — validation requise — ${intent.amount} XOF`
-                : `Paiement Stripe confirmé — ${intent.amount} XOF`;
+                ? `[Business] Paiement reçu — validation requise — ${intent.amount} F CFA`
+                : `Paiement Stripe confirmé — ${intent.amount} F CFA`;
               const body = isBusinessPlan
                 ? `<p>Un paiement Business a été reçu et <strong>requiert votre validation</strong> pour activer le compte.</p>
                    <p><strong>Utilisateur :</strong> ${user?.email}</p>
-                   <p><strong>Montant :</strong> ${intent.amount} XOF</p>
+                   <p><strong>Montant :</strong> ${intent.amount} F CFA</p>
                    <p><strong>Plan :</strong> ${plan?.name}</p>
                    <p><strong>PaymentIntent :</strong> ${intent.id}</p>
                    <p>Rendez-vous dans l'administration → Utilisateurs pour valider ce compte Business.</p>`
                 : `<p>Paiement Stripe confirmé pour <strong>${user?.email}</strong>.</p>
-                   <p>Montant : ${intent.amount} XOF — PaymentIntent : ${intent.id}</p>`;
+                   <p>Montant : ${intent.amount} F CFA — PaymentIntent : ${intent.id}</p>`;
               await sendEmail({ to: adminEmail, subject, html: body });
             }
           } catch (e) { /* ignore email errors */ }

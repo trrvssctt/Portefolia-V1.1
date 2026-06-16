@@ -81,6 +81,13 @@ async function init() {
       console.warn('userModel.init: could not add statut column:', err.message);
     }
   }
+  if (!columnNames.has('verification_token_expires_at')) {
+    try {
+      await pool.query("ALTER TABLE utilisateurs ADD COLUMN verification_token_expires_at TIMESTAMP NULL");
+    } catch (err) {
+      console.warn('userModel.init: could not add verification_token_expires_at column:', err.message);
+    }
+  }
 
   // Fix: when the deleted_at TIMESTAMP column was added via ALTER TABLE on older MySQL configs
   // (explicit_defaults_for_timestamp=OFF), existing rows got '0000-00-00 00:00:00' instead of NULL.
@@ -97,10 +104,9 @@ async function init() {
   }
 }
 
-async function createUser({ nom, prenom, email, mot_de_passe, phone = null, photo_profil = null, biographie = null, role = 'USER', is_active = true, verified = null }) {
-  // Create user. `is_active` controls whether account is active; when `verified` is not provided,
-  // we set it to the same value as `is_active` to follow admin intent.
-  const verifiedValue = typeof verified === 'boolean' || typeof verified === 'number' ? (verified ? 1 : 0) : (is_active ? 1 : 0);
+async function createUser({ nom, prenom, email, mot_de_passe, phone = null, photo_profil = null, biographie = null, role = 'USER', is_active = true, verified = false }) {
+  // verified defaults to false — users must verify their email via the welcome link
+  const verifiedValue = verified ? 1 : 0;
   const isActiveValue = is_active ? 1 : 0;
   const [result] = await pool.query(
     'INSERT INTO utilisateurs (nom, prenom, email, mot_de_passe, phone, photo_profil, biographie, role, is_active, verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -161,12 +167,28 @@ async function updateUser(id, fields = {}) {
 }
 
 async function findByVerificationToken(token) {
-  const [rows] = await pool.query('SELECT * FROM utilisateurs WHERE verification_token = ? LIMIT 1', [token]);
+  const [rows] = await pool.query(
+    `SELECT * FROM utilisateurs
+     WHERE verification_token = ?
+       AND (verification_token_expires_at IS NULL OR verification_token_expires_at > NOW())
+     LIMIT 1`,
+    [token]
+  );
   return rows[0];
 }
 
 async function verifyUser(id) {
-  await pool.query('UPDATE utilisateurs SET verified = TRUE, verification_token = NULL WHERE id = ?', [id]);
+  await pool.query(
+    'UPDATE utilisateurs SET verified = TRUE, verification_token = NULL, verification_token_expires_at = NULL WHERE id = ?',
+    [id]
+  );
+}
+
+async function setVerificationToken(id, token, expiresAt) {
+  await pool.query(
+    'UPDATE utilisateurs SET verification_token = ?, verification_token_expires_at = ? WHERE id = ?',
+    [token, expiresAt, id]
+  );
 }
 
 async function setLastLogin(id) {
@@ -277,4 +299,5 @@ module.exports = {
   findByPhone,
   findByEmailOrPhone,
   setRole,
+  setVerificationToken,
 };

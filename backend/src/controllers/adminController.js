@@ -103,14 +103,35 @@ async function usersDebug(req, res) {
 // --- Upgrade requests admin ---
 async function listUpgrades(req, res) {
   try {
-    const page = Number(req.query.page) || 1;
+    const page  = Number(req.query.page)  || 1;
     const limit = Math.min(Number(req.query.limit) || 50, 200);
-    const data = await checkoutModel.list({ page, limit });
-    return res.json(data);
+    const upgradeModel = require('../models/upgradeModel');
+    const data = await upgradeModel.list({ page, limit });
+
+    // Normaliser le statut depuis l'enum upgrades + paiement_statut
+    const upgrades = (data.upgrades || []).map(u => ({
+      ...u,
+      status: u.statut === 'VALIDATED' ? 'approved'
+            : u.statut === 'REJECTED'  ? 'rejected'
+            : normalizePaiementStatus(u.paiement_statut || 'pending'),
+    }));
+
+    return res.json({ checkouts: upgrades, upgrades, page: data.page, limit: data.limit, total: data.total });
   } catch (err) {
     console.error('admin.listUpgrades error:', err);
     return res.status(500).json({ error: 'Server error' });
   }
+}
+
+function normalizePaiementStatus(statut) {
+  const s = (statut || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  if (['reussi', 'confirmed', 'paid'].includes(s)) return 'approved';
+  if (['refunded', 'rembourse'].includes(s)) return 'refunded';
+  if (['failed', 'echoue'].includes(s)) return 'rejected';
+  if (['pending_admin', 'pending_validation', 'en_attente', 'pending'].includes(s)) return 'pending';
+  if (s === 'approved') return 'approved';
+  if (s === 'rejected') return 'rejected';
+  return 'pending';
 }
 
 async function getUpgrade(req, res) {
@@ -134,741 +155,188 @@ async function approveUpgrade(req, res) {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const adminId = req.userId || null;
     const { reference = null, payment_method = null, image_paiement = null } = req.body;
-    const checkout = await checkoutModel.findById(id);
-    if (!checkout) return res.status(404).json({ error: 'Not found' });
 
-    // update paiement record with reference/method/image and mark as paid
+    // Charger l'enregistrement upgrades (source de vérité)
+    const upgradeModel = require('../models/upgradeModel');
+    const upgrade = await upgradeModel.findById(id);
+    if (!upgrade) return res.status(404).json({ error: 'Not found' });
+    if (upgrade.statut === 'VALIDATED') return res.status(409).json({ error: 'Upgrade déjà validé' });
+
+    // Checkout pour les métadonnées (facultatif, fallback vers upgrade columns)
+    const checkout = upgrade.checkout_id ? await checkoutModel.findById(upgrade.checkout_id) : null;
+
+    const durationMonths  = Number(upgrade.duree_mois) || 1;
+    const discountPercent = Number(upgrade.remise_appliquee) || 0;
+    const dureeLabel = durationMonths === 12 ? '1 an' : `${durationMonths} mois`;
+
+    // Alias pour lisibilité
+    const utilisateurId = upgrade.utilisateur_id;
+    const paiementId    = upgrade.paiement_id;
+    const abonnementId  = upgrade.abonnement_id;
+    const planId        = upgrade.plan_cible_id;
+
+    // 1. Mettre à jour le paiement (référence, moyen, statut Réussi)
     try {
-      // update paiement details by creating a new paiement update path: here we call updateStatus
-      if (reference || payment_method || image_paiement) {
-        // Note: paiementModel.createPaiement creates new paiements; updateStatus only updates statut
-        // We'll directly update the row to set reference and image if present
-        await (async () => {
-          const updates = [];
-          const params = [];
-          if (reference) { updates.push('reference_transaction = ?'); params.push(reference); }
-          if (payment_method) { updates.push('moyen_paiement = ?'); params.push(payment_method); }
-          if (image_paiement) { updates.push('image_paiement = ?'); params.push(image_paiement); }
-          updates.push('statut = ?'); params.push('confirmed');
-          params.push(checkout.paiement_id);
-          const sql = `UPDATE paiements SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-          await pool.query(sql, params);
-        })();
-      } else {
-        await paiementModel.updateStatus(checkout.paiement_id, 'confirmed');
-      }
+      const updates = ['statut = ?'];
+      const params = ['Réussi'];
+      if (reference) { updates.push('reference_transaction = ?'); params.push(reference); }
+      if (payment_method) { updates.push('moyen_paiement = ?'); params.push(payment_method); }
+      if (image_paiement) { updates.push('image_paiement = ?'); params.push(image_paiement); }
+      params.push(paiementId);
+      await pool.query(`UPDATE paiements SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, params);
     } catch (e) {
-      console.warn('approveUpgrade: could not update paiement details', e.message || e);
+      console.warn('approveUpgrade: could not update paiement:', e.message || e);
     }
 
-    // mark checkout as approved
-    await checkoutModel.updateStatus(checkout.id, 'approved');
+    // 2. Marquer le checkout comme approuvé (si lié)
+    if (checkout) await checkoutModel.updateStatus(checkout.id, 'approved').catch(() => {});
 
-
-    // subscribe user to plan
-    await planModel.subscribeUser({ utilisateur_id: checkout.utilisateur_id, plan_id: checkout.plan_id, status: 'active', payment_reference: reference || null });
-
-    // mark the user active now that payment is approved
-    try {
-      await userModel.setActive(checkout.utilisateur_id, true);
-    } catch (e) {
-      console.warn('approveUpgrade: could not set user active', e.message || e);
-    }
-
-    // update commande status
-    await commandeModelLocal.updateStatus(checkout.commande_id, 'En_traitement');
-
-    // Optionally send email to user
-    try {
-      const user = await userModel.findById(checkout.utilisateur_id);
-
-      // Fetch related details for the email: old plan, new plan, paiement, abonnement
-      let oldPlan = null;
+    // 3. Activer l'abonnement via validateSubscription
+    if (abonnementId) {
       try {
-        const ups = await planModel.listUserPlans(checkout.utilisateur_id);
-        if (ups && ups.length) oldPlan = ups[0];
-      } catch (e) { oldPlan = null; }
+        const [[abo]] = await pool.query('SELECT statut_v2 FROM abonnements WHERE id = ? LIMIT 1', [abonnementId]);
+        if (abo && abo.statut_v2 === 'PENDING_PAYMENT') {
+          await abonnementModel.validateSubscription(
+            abonnementId, adminId,
+            `Validation upgrade depuis panel admin (upgrade #${id})`
+          );
+        }
+      } catch (e) {
+        console.warn('approveUpgrade: validateSubscription error:', e.message || e);
+      }
+    }
 
-      const newPlan = await planModel.getPlanById(checkout.plan_id);
-      const paiement = checkout.paiement_id ? await paiementModel.findById(checkout.paiement_id) : null;
+    // 3b. Forcer type_flux = 'UPGRADE' sur le paiement
+    if (paiementId) {
+      try {
+        await pool.query(`UPDATE paiements SET type_flux = 'UPGRADE' WHERE id = ?`, [paiementId]);
+      } catch (e) {
+        console.warn('approveUpgrade: could not set type_flux to UPGRADE:', e.message || e);
+      }
+    }
+
+    // 3c. Expirer les anciens abonnements actifs pour éviter double-comptage MRR
+    if (abonnementId) {
+      try {
+        await pool.query(
+          `UPDATE abonnements
+           SET statut = 'expired',
+               statut_v2 = 'EXPIRED',
+               updated_at = CURRENT_TIMESTAMP
+           WHERE utilisateur_id = ?
+             AND id != ?
+             AND statut_v2 = 'ACTIVE'`,
+          [utilisateurId, abonnementId]
+        );
+      } catch (e) {
+        console.warn('approveUpgrade: could not expire old abonnements:', e.message || e);
+      }
+    }
+
+    // 4. Synchroniser user_plans pour le dashboard
+    const newPlan = await planModel.getPlanById(planId);
+    const [[freshAbo]] = await pool.query(
+      'SELECT date_debut, date_echeance, end_date FROM abonnements WHERE id = ? LIMIT 1',
+      [abonnementId || 0]
+    ).catch(() => [[null]]);
+    try {
+      await pool.query('DELETE FROM user_plans WHERE utilisateur_id = ?', [utilisateurId]);
+      await planModel.subscribeUser({
+        utilisateur_id:    utilisateurId,
+        plan_id:           planId,
+        start_date:        freshAbo?.date_debut || null,
+        end_date:          freshAbo?.date_echeance || freshAbo?.end_date || null,
+        status:            'active',
+        payment_reference: reference || null,
+      });
+    } catch (e) {
+      console.warn('approveUpgrade: subscribeUser error:', e.message || e);
+    }
+
+    // 5. Activer l'utilisateur
+    try { await userModel.setActive(utilisateurId, true); } catch (e) { /* ignore */ }
+    try {
+      await pool.query(
+        "UPDATE utilisateurs SET subscription_status = 'ACTIVE', last_payment_at = NOW() WHERE id = ?",
+        [utilisateurId]
+      );
+    } catch (e) { console.warn('approveUpgrade: subscription_status error:', e.message || e); }
+
+    // 6. Marquer upgrade comme VALIDATED
+    await upgradeModel.updateStatus(id, 'VALIDATED', { valide_par: adminId }).catch(() => {});
+
+    // 7. Commande (nullable)
+    if (checkout?.commande_id) {
+      try { await commandeModelLocal.updateStatus(checkout.commande_id, 'En_traitement'); } catch (e) { /* ignore */ }
+    }
+
+    // 8. Email de confirmation avec reçu + lien de connexion
+    try {
+      const user = await userModel.findById(utilisateurId);
+      const paiement = paiementId ? await paiementModel.findById(paiementId) : null;
       let abonnement = null;
-      try { if (checkout.abonnement_id) abonnement = await abonnementModel.findById(checkout.abonnement_id); } catch (e) { abonnement = null; }
+      try { if (abonnementId) abonnement = await abonnementModel.findById(abonnementId); } catch (e) { /* ignore */ }
 
-      // Normalize price fields for display
-      const normalizePlanForDisplay = (p) => {
-        if (!p) return { name: null, price: 0, currency: p && p.currency ? p.currency : 'F CFA', features: [] };
-        const price = p.price_cents ? Number(p.price_cents) / 100 : (p.price ? Number(p.price) : 0);
-        const features = Array.isArray(p.features) ? p.features : (typeof p.features === 'string' ? p.features.split(',').map(s => s.trim()) : []);
-        return { ...p, price, currency: p.currency || 'F CFA', features };
-      };
+      if (!user?.email) throw new Error('no user email');
 
-      const oldPlanDisplay = normalizePlanForDisplay(oldPlan);
-      const newPlanDisplay = normalizePlanForDisplay(newPlan);
+      const ASSET_BASE = process.env.EMAIL_ASSET_BASE || 'https://portefolia.tech';
+      const FRONTEND   = process.env.FRONTEND_BASE || 'http://localhost:8080';
+      const prenom     = user?.prenom || user?.nom || 'Cher client';
+      const montantPaye = Number(paiement?.montant || 0);
+      const refPaiement = paiement?.reference_transaction || reference || '—';
+      const echeance = abonnement?.date_echeance || abonnement?.end_date
+        ? new Date(abonnement.date_echeance || abonnement.end_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+        : '—';
+      const loginUrl = `${FRONTEND}/auth`;
 
-      const loginUrl = process.env.APP_URL || process.env.FRONTEND_URL || 'http://localhost:5173';
-      const userName = `${user?.prenom || user?.first_name || ''} ${user?.nom || user?.last_name || ''}`.trim();
-
-      const body = `<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Confirmation de mise à niveau - Portefolia</title>
-    <style>
-        /* Styles pour l'email d'upgrade */
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            margin: 0;
-            padding: 20px;
-            background-color: #f9fafb;
-        }
-        
-        .upgrade-container {
-            max-width: 650px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-            overflow: hidden;
-        }
-        
-        .upgrade-header {
-            background: linear-gradient(135deg, #28A745 0%, #20c997 100%);
-            color: white;
-            padding: 50px 40px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .upgrade-header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            right: -50%;
-            bottom: -50%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-            background-size: 30px 30px;
-            opacity: 0.3;
-        }
-        
-        .logo-container {
-            margin-bottom: 25px;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .logo {
-            max-height: 70px;
-            width: auto;
-        }
-        
-        .upgrade-title {
-            margin: 15px 0 10px 0;
-            font-size: 32px;
-            font-weight: 800;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .upgrade-subtitle {
-            margin: 0;
-            opacity: 0.95;
-            font-size: 18px;
-            font-weight: 300;
-            position: relative;
-            z-index: 1;
-        }
-        
-        .upgrade-content {
-            padding: 50px 40px;
-        }
-        
-        .greeting-section {
-            margin-bottom: 40px;
-            text-align: center;
-        }
-        
-        .user-name {
-            color: #28A745;
-            font-size: 28px;
-            font-weight: 700;
-            margin: 15px 0;
-            background: linear-gradient(135deg, #28A745, #20c997);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .upgrade-icon {
-            font-size: 80px;
-            margin: 20px 0;
-            background: linear-gradient(135deg, #28A745, #20c997);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .upgrade-message {
-            font-size: 18px;
-            color: #4b5563;
-            line-height: 1.8;
-            text-align: center;
-            max-width: 500px;
-            margin: 0 auto 40px;
-        }
-        
-        .plans-comparison {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 30px;
-            margin: 50px 0;
-            position: relative;
-        }
-        
-        .plans-comparison::before {
-            content: '';
-            position: absolute;
-            left: 50%;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: linear-gradient(to bottom, transparent, #28A745, transparent);
-            transform: translateX(-50%);
-        }
-        
-        .plan-card {
-            background: white;
-            border-radius: 12px;
-            padding: 30px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-            border: 2px solid #e5e7eb;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .plan-card.old {
-            border-color: #d1d5db;
-        }
-        
-        .plan-card.new {
-            border-color: #28A745;
-            border-width: 3px;
-            box-shadow: 0 6px 25px rgba(40, 167, 69, 0.15);
-        }
-        
-        .plan-badge {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .badge-old {
-            background: #f3f4f6;
-            color: #6b7280;
-        }
-        
-        .badge-new {
-            background: linear-gradient(135deg, #28A745, #20c997);
-            color: white;
-        }
-        
-        .plan-name {
-            font-size: 24px;
-            font-weight: 700;
-            margin: 0 0 10px 0;
-            color: #1f2937;
-        }
-        
-        .plan-price {
-            font-size: 36px;
-            font-weight: 800;
-            margin: 15px 0;
-            color: #28A745;
-        }
-        
-        .plan-price.old {
-            color: #6b7280;
-            text-decoration: line-through;
-            opacity: 0.7;
-        }
-        
-        .plan-price span {
-            font-size: 16px;
-            font-weight: 400;
-            color: #6b7280;
-        }
-        
-        .plan-features {
-            margin: 25px 0;
-            padding: 0;
-            list-style: none;
-        }
-        
-        .plan-features li {
-            padding: 8px 0;
-            color: #4b5563;
-            display: flex;
-            align-items: flex-start;
-        }
-        
-        .plan-features li::before {
-            content: '✓';
-            color: #28A745;
-            font-weight: bold;
-            margin-right: 10px;
-            flex-shrink: 0;
-        }
-        
-        .plan-features.old li::before {
-            color: #9ca3af;
-        }
-        
-        .plan-features li.disabled {
-            color: #9ca3af;
-        }
-        
-        .plan-features li.disabled::before {
-            content: '✗';
-            color: #ef4444;
-        }
-        
-        .upgrade-benefits {
-            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-            border-radius: 12px;
-            padding: 35px;
-            margin: 50px 0;
-            border-left: 5px solid #28A745;
-        }
-        
-        .benefits-title {
-            color: #065f46;
-            margin-top: 0;
-            font-size: 22px;
-        }
-        
-        .benefits-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-top: 25px;
-        }
-        
-        .benefit-item {
-            text-align: center;
-            padding: 20px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
-        }
-        
-        .benefit-icon {
-            font-size: 32px;
-            margin-bottom: 15px;
-            color: #28A745;
-        }
-        
-        .benefit-item h4 {
-            margin: 0 0 10px 0;
-            color: #1f2937;
-        }
-        
-        .activation-details {
-            background: #f8fafc;
-            border-radius: 10px;
-            padding: 25px;
-            margin: 40px 0;
-        }
-        
-        .detail-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 0;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        
-        .detail-row:last-child {
-            border-bottom: none;
-        }
-        
-        .detail-label {
-            color: #6b7280;
-            font-weight: 500;
-        }
-        
-        .detail-value {
-            color: #1f2937;
-            font-weight: 600;
-        }
-        
-        .detail-value.highlight {
-            color: #28A745;
-            font-weight: 700;
-        }
-        
-        .cta-section {
-            text-align: center;
-            margin: 50px 0 30px;
-        }
-        
-        .explore-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            padding: 18px 45px;
-            background: linear-gradient(135deg, #28A745, #20c997);
-            color: white;
-            text-decoration: none;
-            border-radius: 10px;
-            font-size: 18px;
-            font-weight: 700;
-            transition: all 0.3s ease;
-            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.25);
-        }
-        
-        .explore-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 35px rgba(40, 167, 69, 0.35);
-        }
-        
-        .next-steps {
-            margin: 40px 0;
-            padding: 30px;
-            background: #f8fafc;
-            border-radius: 10px;
-        }
-        
-        .next-steps h3 {
-            color: #1f2937;
-            text-align: center;
-            margin-top: 0;
-        }
-        
-        .steps-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-top: 25px;
-        }
-        
-        .step-item {
-            text-align: center;
-            padding: 20px;
-        }
-        
-        .step-number {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 40px;
-            height: 40px;
-            background: #28A745;
-            color: white;
-            border-radius: 50%;
-            font-weight: 700;
-            margin-bottom: 15px;
-        }
-        
-        .upgrade-footer {
-            text-align: center;
-            padding: 40px;
-            background: #f8fafc;
-            border-top: 1px solid #e5e7eb;
-        }
-        
-        .contact-info {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 40px;
-            margin: 30px 0;
-        }
-        
-        .contact-item {
-            text-align: center;
-            min-width: 180px;
-        }
-        
-        @media (max-width: 768px) {
-            .upgrade-content {
-                padding: 30px 20px;
-            }
-            
-            .plans-comparison {
-                grid-template-columns: 1fr;
-                gap: 20px;
-            }
-            
-            .plans-comparison::before {
-                display: none;
-            }
-            
-            .benefits-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .contact-info {
-                flex-direction: column;
-                gap: 20px;
-            }
-            
-            .explore-btn {
-                padding: 16px 30px;
-                font-size: 16px;
-                width: 100%;
-                box-sizing: border-box;
-                justify-content: center;
-            }
-            
-            .detail-row {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 5px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="upgrade-container">
-        <!-- En-tête avec logo -->
-        <div class="upgrade-header">
-            <div class="logo-container">
-                <!-- Remplacer src par l'URL de votre logo -->
-                <img src="https://example.com/logo.png" alt="Portefolia Logo" class="logo">
-                <h1 class="upgrade-title">Mise à niveau confirmée ! 🎉</h1>
-                <p class="upgrade-subtitle">Votre formule a été améliorée avec succès</p>
-            </div>
-        </div>
-        
-        <!-- Contenu principal -->
-        <div class="upgrade-content">
-            <!-- Salutation personnalisée -->
-            <div class="greeting-section">
-                <div class="upgrade-icon">🚀</div>
-                <div class="user-name">${user.prenom || user.nom || 'Cher client'}</div>
-                <p class="upgrade-message">
-                    Félicitations ! Votre demande de mise à niveau a été approuvée par notre équipe.
-                    Votre compte est désormais activé avec la nouvelle formule.
-                </p>
-            </div>
-            
-            <!-- Comparaison des plans -->
-            <div class="plans-comparison">
-                <!-- Ancien plan -->
-                <div class="plan-card old">
-                    <div class="plan-badge badge-old">Ancienne formule</div>
-                    <h3 class="plan-name">${oldPlan?.name || 'Formule Basique'}</h3>
-                    <div class="plan-price old">${oldPlan?.price || '0'} ${oldPlan?.currency || 'F CFA'}<span>/mois</span></div>
-                    <ul class="plan-features old">
-                        ${(oldPlan?.features || [
-          '1 portfolio maximum',
-          'Analytics basiques',
-          'Support par email',
-          'Stockage limité',
-          'Pas de carte NFC'
-        ]).map(feature => `<li>${feature}</li>`).join('')}
-                    </ul>
-                </div>
-                
-                <!-- Nouveau plan -->
-                <div class="plan-card new">
-                    <div class="plan-badge badge-new">Nouvelle formule</div>
-                    <h3 class="plan-name">${newPlan?.name || 'Formule Premium'}</h3>
-                    <div class="plan-price">${newPlan?.price || '0'} ${newPlan?.currency || 'F CFA'}<span>/mois</span></div>
-                    <ul class="plan-features">
-                        ${(newPlan?.features || [
-          'Portfolios illimités',
-          'Analytics avancés',
-          'Support prioritaire',
-          'Stockage étendu',
-          'Carte NFC incluse',
-          'Domaines personnalisés',
-          'Statistiques détaillées',
-          'Intégrations API'
-        ]).map(feature => `<li>${feature}</li>`).join('')}
-                    </ul>
-                </div>
-            </div>
-            
-            <!-- Détails d'activation -->
-            <div class="activation-details">
-                <h3 style="color: #1f2937; margin-top: 0; text-align: center;">📋 Détails de l'activation</h3>
-                <div class="detail-row">
-                    <span class="detail-label">Date d'activation :</span>
-                    <span class="detail-value highlight">${new Date().toLocaleDateString('fr-FR', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        })}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Prochaine facturation :</span>
-                    <span class="detail-value">${(() => {
-          const nextDate = new Date();
-          nextDate.setMonth(nextDate.getMonth() + 1);
-          return nextDate.toLocaleDateString('fr-FR', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
-          });
-        })()}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">Montant de l'upgrade :</span>
-                    <span class="detail-value highlight">${(() => {
-          const oldPrice = parseFloat(oldPlan?.price || 0);
-          const newPrice = parseFloat(newPlan?.price || 0);
-          return (newPrice - oldPrice) + ' ' + (newPlan?.currency || 'F CFA');
-        })()} / mois</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Référence de paiement :</span>
-                  <span class="detail-value">${paiement?.reference_transaction || paiement?.reference || reference || 'N/A'}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Montant payé :</span>
-                  <span class="detail-value highlight">${(paiement?.montant || paiement?.montant_total || newPlanDisplay.price) + ' ' + (paiement?.currency || newPlanDisplay.currency || 'F CFA')}</span>
-                </div>
-            </div>
-            
-            <!-- Avantages de l'upgrade -->
-            <div class="upgrade-benefits">
-                <h3 class="benefits-title">✨ Vos nouveaux avantages</h3>
-                <div class="benefits-grid">
-                    <div class="benefit-item">
-                        <div class="benefit-icon">🎨</div>
-                        <h4>Portfolios Illimités</h4>
-                        <p style="color: #6b7280; font-size: 14px;">Créez autant de portfolios que vous souhaitez</p>
-                    </div>
-                    <div class="benefit-item">
-                        <div class="benefit-icon">📊</div>
-                        <h4>Analytics Avancés</h4>
-                        <p style="color: #6b7280; font-size: 14px;">Suivez les performances détaillées</p>
-                    </div>
-                    <div class="benefit-item">
-                        <div class="benefit-icon">🚀</div>
-                        <h4>Support Prioritaire</h4>
-                        <p style="color: #6b7280; font-size: 14px;">Réponses rapides de notre équipe</p>
-                    </div>
-                    <div class="benefit-item">
-                        <div class="benefit-icon">🔗</div>
-                        <h4>Carte NFC Incluse</h4>
-                        <p style="color: #6b7280; font-size: 14px;">Partagez votre profil en un tap</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Prochaines étapes -->
-            <div class="next-steps">
-                <h3>🚀 Comment profiter au maximum de votre nouvelle formule ?</h3>
-                <div class="steps-grid">
-                    <div class="step-item">
-                        <div class="step-number">1</div>
-                        <h4>Explorez les nouvelles fonctionnalités</h4>
-                        <p style="color: #6b7280; font-size: 14px;">Découvrez tout ce que vous pouvez faire maintenant</p>
-                    </div>
-                    <div class="step-item">
-                        <div class="step-number">2</div>
-                        <h4>Créez vos portfolios supplémentaires</h4>
-                        <p style="color: #6b7280; font-size: 14px;">Profitez de la possibilité de créer plusieurs portfolios</p>
-                    </div>
-                    <div class="step-item">
-                        <div class="step-number">3</div>
-                        <h4>Configurez vos statistiques</h4>
-                        <p style="color: #6b7280; font-size: 14px;">Activez le suivi avancé de vos performances</p>
-                    </div>
-                    <div class="step-item">
-                        <div class="step-number">4</div>
-                        <h4>Commander votre carte NFC</h4>
-                        <p style="color: #6b7280; font-size: 14px;">Profitez de votre carte NFC gratuite</p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Bouton d'action principal -->
-            <div class="cta-section">
-                <a href="${loginUrl || process.env.FRONTEND_URL || 'http://localhost:5173'}" class="explore-btn">
-                    <span>🚀 Découvrir ma nouvelle formule</span>
-                </a>
-                <p style="color: #6b7280; margin-top: 20px;">
-                    Accédez directement à votre tableau de bord pour commencer
-                </p>
-            </div>
-            
-            <!-- Ressources supplémentaires -->
-            <div style="text-align: center; margin: 40px 0;">
-                <h4 style="color: #4b5563; margin-bottom: 20px;">📚 Ressources utiles</h4>
-                <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 15px;">
-                    <a href="https://help.portefolia.com/premium-features" style="color: #28A745; text-decoration: none; padding: 8px 16px; border: 1px solid #28A745; border-radius: 6px;">
-                        Guide des fonctionnalités Premium
-                    </a>
-                    <a href="https://help.portefolia.com/nfc-cards" style="color: #28A745; text-decoration: none; padding: 8px 16px; border: 1px solid #28A745; border-radius: 6px;">
-                        Commander ma carte NFC
-                    </a>
-                    <a href="https://help.portefolia.com/analytics" style="color: #28A745; text-decoration: none; padding: 8px 16px; border: 1px solid #28A745; border-radius: 6px;">
-                        Maîtriser les analytics
-                    </a>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Pied de page -->
-        <div class="upgrade-footer">
-            <div class="contact-info">
-                <div class="contact-item">
-                    <strong>🎯 Support Premium</strong><br>
-                    <a href="tel:+33123456789" style="color: #28A745; text-decoration: none;">+33 1 23 45 67 89</a><br>
-                    <a href="mailto:premium@portefolia.com" style="color: #28A745;">premium@portefolia.com</a>
-                </div>
-                
-                <div class="contact-item">
-                    <strong>💡 Assistance 24/7</strong><br>
-                    Support prioritaire inclus<br>
-                    Réponse sous 2 heures
-                </div>
-                
-                <div class="contact-item">
-                    <strong>📞 Contact général</strong><br>
-                    <a href="mailto:support@portefolia.com" style="color: #28A745;">support@portefolia.com</a><br>
-                    Centre d'aide en ligne
-                </div>
-            </div>
-            
-            <p style="margin: 30px 0 0 0; color: #6b7280; font-size: 14px;">
-                <strong>Important :</strong> Votre nouvelle formule est activée immédiatement. Le prochain prélèvement aura lieu à la date de renouvellement.<br>
-                Vous pouvez modifier votre formule à tout moment depuis votre tableau de bord.
-            </p>
-            
-            <p style="margin: 25px 0 0 0; color: #4b5563;">
-                Bienvenue dans l'expérience Premium !<br>
-                <strong>L'équipe Portefolia</strong><br>
-                Nous sommes là pour votre succès
-            </p>
-            
-            <p style="margin-top: 20px; font-size: 12px; color: #9ca3af;">
-                © ${new Date().getFullYear()} Portefolia. Tous droits réservés.<br>
-                <a href="https://portefolia.com/terms" style="color: #9ca3af;">Conditions générales</a> • 
-                <a href="https://portefolia.com/privacy" style="color: #9ca3af;">Confidentialité</a> • 
-                <a href="https://portefolia.com/premium-terms" style="color: #9ca3af;">Conditions Premium</a>
-            </p>
-        </div>
-    </div>
-</body>
-</html>`;
-      await sendEmail(user.email, 'Mise à niveau acceptée', body);
+      const body = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<style>
+body{margin:0;padding:0;background:#F7F8F8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif}
+.wrap{max-width:580px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.hdr{background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:40px 40px 32px;text-align:center}
+.hdr img{height:48px;margin-bottom:16px}
+.hdr h1{margin:0;color:#fff;font-size:22px;font-weight:700}
+.hdr p{margin:8px 0 0;color:rgba(255,255,255,.85);font-size:14px}
+.body{padding:36px 40px}
+.badge{display:inline-block;background:#DCFCE7;color:#166534;font-size:12px;font-weight:700;padding:5px 14px;border-radius:999px;margin-bottom:20px}
+.body h2{margin:0 0 8px;font-size:18px;color:#18181B}
+.body .sub{color:#71717A;font-size:14px;margin:0 0 28px;line-height:1.6}
+table.recap{width:100%;border-collapse:collapse;margin-bottom:28px}
+table.recap td{padding:13px 0;font-size:14px;border-bottom:1px solid #F4F4F5;color:#18181B}
+table.recap td:first-child{color:#71717A;font-weight:500;width:45%}
+table.recap td:last-child{font-weight:600;text-align:right}
+.hl{color:#1B5E20;font-weight:700}
+.btn{display:block;margin:0 auto 8px;width:fit-content;padding:14px 36px;background:#1B5E20;color:#fff;text-decoration:none;border-radius:10px;font-size:15px;font-weight:700}
+.ftr{background:#F7F8F8;padding:24px 40px;text-align:center;font-size:12px;color:#71717A}
+</style></head><body>
+<div class="wrap">
+  <div class="hdr">
+    <img src="${ASSET_BASE}/logo.png" alt="Portefolia">
+    <h1>Formule activée ✓</h1>
+    <p>Votre nouveau plan est maintenant actif</p>
+  </div>
+  <div class="body">
+    <div class="badge">✅ Paiement validé</div>
+    <h2>Félicitations ${prenom} !</h2>
+    <p class="sub">Votre paiement a été validé par notre équipe. Votre nouveau plan est maintenant actif. Connectez-vous pour en profiter dès maintenant.</p>
+    <table class="recap">
+      <tr><td>Formule activée</td><td class="hl">${newPlan?.name || '—'}</td></tr>
+      <tr><td>Durée</td><td>${dureeLabel}${discountPercent > 0 ? ` <span style="color:#1B5E20">(−${discountPercent}%)</span>` : ''}</td></tr>
+      <tr><td>Montant payé</td><td class="hl">${montantPaye.toLocaleString('fr-FR')} F CFA</td></tr>
+      <tr><td>Référence</td><td><code style="font-size:13px">${refPaiement}</code></td></tr>
+      <tr><td>Accès valide jusqu'au</td><td class="hl">${echeance}</td></tr>
+      <tr><td>Date d'activation</td><td>${new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</td></tr>
+    </table>
+    <a href="${loginUrl}" class="btn">Accéder à mon espace →</a>
+    <p style="text-align:center;font-size:12px;color:#71717A;margin:12px 0 28px">Cliquez sur le bouton ci-dessus pour vous connecter</p>
+    <p style="font-size:13px;color:#71717A;text-align:center">Une question ? <a href="mailto:contact@portefolia.tech" style="color:#1B5E20">contact@portefolia.tech</a></p>
+  </div>
+  <div class="ftr">© ${new Date().getFullYear()} Portefolia · <a href="${FRONTEND}" style="color:#1B5E20">portefolia.tech</a></div>
+</div>
+</body></html>`;
+      await sendEmail(user.email, 'Formule activée — Portefolia', body);
     } catch (e) {
       console.warn('approveUpgrade: failed to send email', e.message || e);
     }
@@ -876,6 +344,91 @@ async function approveUpgrade(req, res) {
     return res.json({ ok: true });
   } catch (err) {
     console.error('admin.approveUpgrade error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+async function rejectUpgrade(req, res) {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const adminId = req.userId || null;
+    const { reason = 'Raison non spécifiée' } = req.body;
+
+    const upgradeModel = require('../models/upgradeModel');
+    const upgrade = await upgradeModel.findById(id);
+    if (!upgrade) return res.status(404).json({ error: 'Not found' });
+    if (upgrade.statut === 'VALIDATED') return res.status(409).json({ error: 'Upgrade déjà validé, impossible de rejeter' });
+
+    // Marquer comme rejeté
+    await upgradeModel.updateStatus(id, 'REJECTED', { valide_par: adminId, motif_refus: reason });
+
+    // Marquer le checkout comme rejeté si présent
+    if (upgrade.checkout_id) {
+      await checkoutModel.updateStatus(upgrade.checkout_id, 'rejected').catch(() => {});
+    }
+
+    // Remettre le paiement en échec
+    if (upgrade.paiement_id) {
+      await pool.query(
+        `UPDATE paiements SET statut = 'Échoué', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [upgrade.paiement_id]
+      ).catch(() => {});
+    }
+
+    // Email de refus à l'utilisateur
+    try {
+      const user = await userModel.findById(upgrade.utilisateur_id);
+      if (user?.email) {
+        const sendEmail = require('../utils/sendEmail');
+        const ASSET_BASE = process.env.EMAIL_ASSET_BASE || 'https://portefolia.tech';
+        const FRONTEND   = process.env.FRONTEND_BASE || 'http://localhost:8080';
+        const prenom = user.prenom || user.nom || 'Cher client';
+        const [[plan]] = await pool.query('SELECT name FROM plans WHERE id = ? LIMIT 1', [upgrade.plan_cible_id]);
+
+        const body = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">
+<style>
+body{margin:0;padding:0;background:#F7F8F8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif}
+.wrap{max-width:580px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.hdr{background:linear-gradient(135deg,#B71C1C,#C62828);padding:36px 40px 28px;text-align:center}
+.hdr img{height:44px;margin-bottom:14px}
+.hdr h1{margin:0;color:#fff;font-size:20px;font-weight:700}
+.body{padding:32px 40px}
+.badge{display:inline-block;background:#FEECEC;color:#C62828;font-size:12px;font-weight:700;padding:5px 14px;border-radius:999px;margin-bottom:18px}
+.reason{background:#FEF3E2;border-left:3px solid #F59E0B;border-radius:8px;padding:14px 16px;font-size:13px;color:#92400E;margin:0 0 24px}
+.btn{display:block;margin:0 auto 8px;width:fit-content;padding:13px 32px;background:#1B5E20;color:#fff;text-decoration:none;border-radius:10px;font-size:14px;font-weight:700}
+.ftr{background:#F7F8F8;padding:20px 40px;text-align:center;font-size:12px;color:#71717A}
+</style></head><body>
+<div class="wrap">
+  <div class="hdr">
+    <img src="${ASSET_BASE}/logo.png" alt="Portefolia">
+    <h1>Demande non validée</h1>
+  </div>
+  <div class="body">
+    <div class="badge">❌ Paiement non validé</div>
+    <p style="font-size:15px;font-weight:600;color:#18181B;margin:0 0 8px">Bonjour ${prenom},</p>
+    <p style="font-size:14px;color:#71717A;margin:0 0 20px;line-height:1.6">
+      Votre demande de mise à niveau vers le plan <strong>${plan?.name || '—'}</strong> n'a pas pu être validée.
+    </p>
+    <div class="reason"><strong>Motif :</strong> ${reason}</div>
+    <p style="font-size:13px;color:#71717A;margin:0 0 24px;line-height:1.6">
+      Votre plan actuel reste inchangé. Si vous pensez qu'il s'agit d'une erreur, contactez notre support.
+    </p>
+    <a href="${FRONTEND}/plans" class="btn">Voir les plans disponibles →</a>
+    <p style="text-align:center;font-size:12px;color:#71717A;margin:16px 0 0">
+      Une question ? <a href="mailto:contact@portefolia.tech" style="color:#1B5E20">contact@portefolia.tech</a>
+    </p>
+  </div>
+  <div class="ftr">© ${new Date().getFullYear()} Portefolia · <a href="${FRONTEND}" style="color:#1B5E20">portefolia.tech</a></div>
+</div>
+</body></html>`;
+        await sendEmail(user.email, 'Demande de mise à niveau — Non validée', body);
+      }
+    } catch (e) { console.warn('rejectUpgrade: email error:', e.message || e); }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('admin.rejectUpgrade error:', err);
     return res.status(500).json({ error: 'Server error' });
   }
 }
@@ -929,27 +482,29 @@ async function listCommandes(req, res) {
 // --- Revenue / Finance ---
 async function revenueSummary(req, res) {
   try {
+    const paidFilter = `LOWER(CONVERT(statut USING utf8mb4)) IN ('réussi', 'reussi', 'confirmed', 'paid')`;
+
     // total revenue (confirmed or paid)
-    const [tot] = await pool.query(`SELECT COALESCE(SUM(montant),0) AS total_revenue FROM paiements WHERE statut IN ('confirmed','paid')`);
+    const [tot] = await pool.query(`SELECT COALESCE(SUM(montant),0) AS total_revenue FROM paiements WHERE ${paidFilter}`);
     const totalRevenue = tot && tot[0] ? Number(tot[0].total_revenue) : 0;
 
     // today's revenue
-    const [todayRow] = await pool.query(`SELECT COALESCE(SUM(montant),0) AS today_revenue FROM paiements WHERE statut IN ('confirmed','paid') AND DATE(created_at) = CURRENT_DATE()`);
+    const [todayRow] = await pool.query(`SELECT COALESCE(SUM(montant),0) AS today_revenue FROM paiements WHERE ${paidFilter} AND DATE(created_at) = CURRENT_DATE()`);
     const todayRevenue = todayRow && todayRow[0] ? Number(todayRow[0].today_revenue) : 0;
 
     // this month
-    const [monthRow] = await pool.query(`SELECT COALESCE(SUM(montant),0) AS month_revenue FROM paiements WHERE statut IN ('confirmed','paid') AND DATE_FORMAT(created_at,'%Y-%m') = DATE_FORMAT(CURRENT_DATE(), '%Y-%m')`);
+    const [monthRow] = await pool.query(`SELECT COALESCE(SUM(montant),0) AS month_revenue FROM paiements WHERE ${paidFilter} AND DATE_FORMAT(created_at,'%Y-%m') = DATE_FORMAT(CURRENT_DATE(), '%Y-%m')`);
     const monthRevenue = monthRow && monthRow[0] ? Number(monthRow[0].month_revenue) : 0;
 
     // this year
-    const [yearRow] = await pool.query(`SELECT COALESCE(SUM(montant),0) AS year_revenue FROM paiements WHERE statut IN ('confirmed','paid') AND YEAR(created_at) = YEAR(CURRENT_DATE())`);
+    const [yearRow] = await pool.query(`SELECT COALESCE(SUM(montant),0) AS year_revenue FROM paiements WHERE ${paidFilter} AND YEAR(created_at) = YEAR(CURRENT_DATE())`);
     const yearRevenue = yearRow && yearRow[0] ? Number(yearRow[0].year_revenue) : 0;
 
     // monthly breakdown (last 12 months)
     const [monthly] = await pool.query(`
       SELECT DATE_FORMAT(created_at, '%Y-%m') AS month, COALESCE(SUM(montant),0) AS revenue
       FROM paiements
-      WHERE statut IN ('confirmed','paid') AND created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH)
+      WHERE ${paidFilter} AND created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH)
       GROUP BY month
       ORDER BY month ASC
     `);
@@ -975,7 +530,7 @@ async function revenueByUser(req, res) {
       FROM paiements p
       LEFT JOIN commandes c ON c.id = p.commande_id
       LEFT JOIN utilisateurs u ON u.id = c.utilisateur_id
-      WHERE p.statut IN ('confirmed','paid')
+      WHERE LOWER(CONVERT(p.statut USING utf8mb4)) IN ('réussi', 'reussi', 'confirmed', 'paid')
       GROUP BY u.id
       ORDER BY total_amount DESC
       LIMIT ? OFFSET ?
@@ -1208,8 +763,7 @@ async function confirmPaymentAndValidate(req, res) {
       try {
         const plan = await planModel.getPlanById(plan_id);
         if (plan) {
-          // plan.price_cents stored in cents; convert to major unit
-          amount = (Number(plan.price_cents || 0) / 100);
+          amount = Number(plan.price_cents || 0);
         }
       } catch (e) {
         // ignore
@@ -1267,7 +821,7 @@ async function confirmPaymentAndValidate(req, res) {
     // build rich email body with all references
     const prevPlanHtml = previousPlan ? `
       <li>Plan précédent: ${previousPlan.name || previousPlan.nom || '—'}</li>
-      <li>Prix précédent: ${(Number(previousPlan.price_cents || 0) / 100).toLocaleString()} ${previousPlan.currency || 'XOF'}</li>
+      <li>Prix précédent: ${Number(previousPlan.price_cents || 0).toLocaleString('fr-FR')} F CFA</li>
       <li>Début: ${previousPlan.start_date || ''}</li>
       <li>Statut précédent: ${previousPlan.status || previousPlan.state || '—'}</li>
     ` : `<li>Plan précédent: Aucun</li>`;
@@ -1277,7 +831,7 @@ async function confirmPaymentAndValidate(req, res) {
         const p = await planModel.getPlanById(plan_id);
         return `
           <li>Plan demandé: ${p?.name || p?.nom || '—'}</li>
-          <li>Prix demandé: ${(Number(p?.price_cents || 0) / 100).toLocaleString()} ${p?.currency || 'XOF'}</li>
+          <li>Prix demandé: ${Number(p?.price_cents || 0).toLocaleString('fr-FR')} F CFA</li>
         `;
       } catch (e) {
         return `<li>Plan demandé: ${plan_id}</li>`;
@@ -2136,6 +1690,7 @@ module.exports.confirmPaymentAndValidate = confirmPaymentAndValidate;
 module.exports.listUpgrades = listUpgrades;
 module.exports.getUpgrade = getUpgrade;
 module.exports.approveUpgrade = approveUpgrade;
+module.exports.rejectUpgrade = rejectUpgrade;
 
 // --- Analytics / Reports ---
 async function totals(req, res) {

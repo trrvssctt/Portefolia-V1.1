@@ -12,7 +12,7 @@ async function getRevenusReels({ date_debut, date_fin }) {
        SUM(montant)   AS total,
        AVG(montant)   AS moyenne
      FROM paiements
-     WHERE statut = 'RÉUSSI'
+     WHERE LOWER(CONVERT(statut USING utf8mb4)) IN ('réussi', 'reussi', 'confirmed', 'paid')
        AND created_at BETWEEN ? AND ?
      GROUP BY type_flux WITH ROLLUP`,
     [date_debut, date_fin]
@@ -43,11 +43,11 @@ async function getRevenusReels({ date_debut, date_fin }) {
 async function getMRR() {
   const [[row]] = await pool.query(
     `SELECT
-       SUM(montant_mensuel_equivalent)  AS mrr,
-       COUNT(*)                          AS abonnes_actifs,
-       AVG(montant_mensuel_equivalent)   AS arpu
+       SUM(COALESCE(montant_mensuel_equivalent, montant / NULLIF(duree_mois, 0), montant)) AS mrr,
+       COUNT(*)                                                                              AS abonnes_actifs,
+       AVG(COALESCE(montant_mensuel_equivalent, montant / NULLIF(duree_mois, 0), montant)) AS arpu
      FROM abonnements
-     WHERE statut = 'ACTIVE'`
+     WHERE statut_v2 = 'ACTIVE'`
   );
 
   return {
@@ -65,7 +65,7 @@ async function getEvolutionMensuelle({ nb_mois = 12 } = {}) {
        type_flux,
        SUM(montant) AS total
      FROM paiements
-     WHERE statut = 'RÉUSSI'
+     WHERE LOWER(CONVERT(statut USING utf8mb4)) IN ('réussi', 'reussi', 'confirmed', 'paid')
        AND created_at >= DATE_SUB(NOW(), INTERVAL ? MONTH)
      GROUP BY mois, type_flux
      ORDER BY mois ASC`,
@@ -90,32 +90,33 @@ async function getEvolutionMensuelle({ nb_mois = 12 } = {}) {
 // ═══════════════════════════════════════════════════════
 
 async function getPipelineEnAttente() {
+  // Utilise abonnements.statut_v2 = 'PENDING_PAYMENT' comme source de vérité
+  // (les paiements peuvent avoir 'pending', 'En_attente' ou 'EN_ATTENTE' selon le code path)
   const [parFlux] = await pool.query(
     `SELECT
-       type_flux,
-       COUNT(*)     AS nb_en_attente,
-       SUM(montant) AS total_attendu
-     FROM paiements
-     WHERE statut = 'EN_ATTENTE'
+       COALESCE(p.type_flux, 'ABONNEMENT') AS type_flux,
+       COUNT(*)                             AS nb_en_attente,
+       SUM(COALESCE(p.montant, a.montant))  AS total_attendu
+     FROM abonnements a
+     LEFT JOIN paiements p ON p.abonnement_id = a.id
+     WHERE a.statut_v2 = 'PENDING_PAYMENT'
      GROUP BY type_flux`
   );
 
   const [plusAnciens] = await pool.query(
     `SELECT
-       p.id,
-       p.montant,
-       p.type_flux,
-       p.created_at,
-       TIMESTAMPDIFF(HOUR, p.created_at, NOW()) AS heures_attente,
-       COALESCE(uc.nom,  ua.nom)    AS nom,
-       COALESCE(uc.prenom, ua.prenom) AS prenom
-     FROM paiements p
-     LEFT JOIN commandes c     ON c.id  = p.commande_id
-     LEFT JOIN utilisateurs uc ON uc.id = c.utilisateur_id
-     LEFT JOIN abonnements a   ON a.id  = p.abonnement_id
-     LEFT JOIN utilisateurs ua ON ua.id = a.utilisateur_id
-     WHERE p.statut = 'EN_ATTENTE'
-     ORDER BY p.created_at ASC
+       a.id,
+       COALESCE(p.montant, a.montant)          AS montant,
+       COALESCE(p.type_flux, 'ABONNEMENT')     AS type_flux,
+       a.created_at,
+       TIMESTAMPDIFF(HOUR, a.created_at, NOW()) AS heures_attente,
+       u.nom,
+       u.prenom
+     FROM abonnements a
+     JOIN utilisateurs u ON u.id = a.utilisateur_id
+     LEFT JOIN paiements p ON p.abonnement_id = a.id
+     WHERE a.statut_v2 = 'PENDING_PAYMENT'
+     ORDER BY a.created_at ASC
      LIMIT 10`
   );
 
@@ -133,13 +134,13 @@ async function getPipelineEnAttente() {
 async function getRevenusPrevisionnels({ horizon_mois = 3 } = {}) {
   const [rows] = await pool.query(
     `SELECT
-       DATE_FORMAT(a.date_echeance, '%Y-%m')  AS mois_echeance,
-       COUNT(*)                                AS nb_renouvellements_attendus,
-       SUM(a.montant_mensuel_equivalent)       AS revenu_previsionnel
+       DATE_FORMAT(COALESCE(a.date_echeance, a.end_date), '%Y-%m')                                     AS mois_echeance,
+       COUNT(*)                                                                                          AS nb_renouvellements_attendus,
+       SUM(COALESCE(a.montant_mensuel_equivalent, a.montant / NULLIF(a.duree_mois, 0), a.montant))     AS revenu_previsionnel
      FROM abonnements a
      JOIN utilisateurs u ON a.utilisateur_id = u.id
-     WHERE a.statut = 'ACTIVE'
-       AND a.date_echeance BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL ? MONTH)
+     WHERE a.statut_v2 = 'ACTIVE'
+       AND COALESCE(a.date_echeance, a.end_date) BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL ? MONTH)
      GROUP BY mois_echeance
      ORDER BY mois_echeance ASC`,
     [horizon_mois]
@@ -164,17 +165,17 @@ async function getChurnStats({ mois } = {}) {
   const [[{ actifs_debut_mois }]] = await pool.query(
     `SELECT COUNT(*) AS actifs_debut_mois
      FROM abonnements
-     WHERE statut = 'ACTIVE'
-       AND date_debut <= ?`,
+     WHERE statut_v2 = 'ACTIVE'
+       AND COALESCE(date_debut, start_date) <= ?`,
     [debutMois]
   );
 
   const [[{ expires_ce_mois, revenu_perdu }]] = await pool.query(
     `SELECT
-       COUNT(*)                             AS expires_ce_mois,
-       SUM(montant_mensuel_equivalent)      AS revenu_perdu
+       COUNT(*)                                                                                        AS expires_ce_mois,
+       SUM(COALESCE(montant_mensuel_equivalent, montant / NULLIF(duree_mois, 0), montant))            AS revenu_perdu
      FROM abonnements
-     WHERE statut = 'EXPIRED'
+     WHERE statut_v2 = 'EXPIRED'
        AND DATE_FORMAT(updated_at, '%Y-%m') = ?`,
     [moisRef]
   );

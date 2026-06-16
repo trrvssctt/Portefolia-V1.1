@@ -11,9 +11,9 @@ const PRICING = {
 };
 
 function calcMontant(priceCents, duree) {
-  const monthlyXOF = priceCents / 100;
+  // price_cents stocke directement des F CFA (devise zero-decimal) — pas de division par 100
   const remise = PRICING[duree]?.remise ?? 0;
-  return Math.round(monthlyXOF * duree * (1 - remise));
+  return Math.round(priceCents * duree * (1 - remise));
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +55,7 @@ async function initiate(req, res) {
 
     const remise = PRICING[duree].remise;
     const montant = calcMontant(plan.price_cents, duree);
-    const montant_base = Math.round((plan.price_cents / 100) * duree);
+    const montant_base = Math.round(plan.price_cents * duree);
 
     // Créer l'abonnement en statut PENDING_PAYMENT
     const { id: abonnement_id } = await abonnementModel.createPendingSubscription(
@@ -75,11 +75,17 @@ async function initiate(req, res) {
       );
     }
 
-    // Mettre à jour le statut de l'utilisateur
-    await pool.query(
-      "UPDATE utilisateurs SET subscription_status = 'PENDING_PAYMENT' WHERE id = ?",
+    // Mettre à jour le statut de l'utilisateur — seulement si pas déjà abonné (cas upgrade)
+    const [activeAboWave] = await pool.query(
+      "SELECT id FROM abonnements WHERE utilisateur_id = ? AND statut_v2 = 'ACTIVE' LIMIT 1",
       [userId]
     );
+    if (!activeAboWave || !activeAboWave.length) {
+      await pool.query(
+        "UPDATE utilisateurs SET subscription_status = 'PENDING_PAYMENT' WHERE id = ?",
+        [userId]
+      );
+    }
 
     // Récupérer l'email de l'utilisateur pour l'email de confirmation
     const [[user]] = await pool.query(
@@ -172,16 +178,16 @@ async function pricingOptions(req, res) {
     const plan = await planModel.getPlanById(req.params.planId);
     if (!plan) return res.status(404).json({ error: 'Plan introuvable' });
 
-    const monthlyXOF = plan.price_cents / 100;
+    const monthlyFCFA = plan.price_cents; // déjà en F CFA, pas de division
     const options = Object.entries(PRICING).map(([dureeStr, { label, remise }]) => {
       const duree        = Number(dureeStr);
-      const montant_base  = Math.round(monthlyXOF * duree);
+      const montant_base  = Math.round(monthlyFCFA * duree);
       const montant_final = Math.round(montant_base * (1 - remise));
-      return { duree, label, montant_base, remise, montant_final, currency: plan.currency || 'XOF' };
+      return { duree, label, montant_base, remise, montant_final, currency: 'F CFA' };
     });
 
     return res.json({
-      plan: { id: plan.id, name: plan.name, currency: plan.currency || 'XOF' },
+      plan: { id: plan.id, name: plan.name, currency: 'F CFA' },
       options,
     });
   } catch (err) {
@@ -246,11 +252,11 @@ function buildConfirmationEmail({ prenom, plan, montant, montant_base, duree, re
           ${remisePct > 0 ? `
           <tr>
             <td style="padding:5px 0;color:#6b7280;">Remise</td>
-            <td style="text-align:right;color:#28A745;font-weight:600;">−${remisePct}% (économie de ${economie.toLocaleString('fr-FR')} XOF)</td>
+            <td style="text-align:right;color:#28A745;font-weight:600;">−${remisePct}% (économie de ${economie.toLocaleString('fr-FR')} F CFA)</td>
           </tr>` : ''}
           <tr style="border-top:1px solid #d1fae5;">
             <td style="padding:10px 0 4px;font-weight:700;font-size:15px;">Total</td>
-            <td style="text-align:right;font-weight:800;font-size:17px;color:#28A745;">${montant.toLocaleString('fr-FR')} XOF</td>
+            <td style="text-align:right;font-weight:800;font-size:17px;color:#28A745;">${montant.toLocaleString('fr-FR')} F CFA</td>
           </tr>
         </table>
       </div>

@@ -27,7 +27,7 @@ const CA_SUBQUERY = `(
   LEFT JOIN abonnements pab ON pab.id = pa.abonnement_id
   LEFT JOIN commandes   pc  ON pc.id  = pa.commande_id
   WHERE (pab.utilisateur_id = u.id OR pc.utilisateur_id = u.id)
-    AND pa.statut = 'RÉUSSI'
+    AND LOWER(CONVERT(pa.statut USING utf8mb4)) IN ('réussi', 'reussi', 'confirmed', 'paid')
 ) AS ca_total`;
 
 // ─── profil360 : sous-requêtes ───────────────────────────────────────────────
@@ -46,8 +46,15 @@ async function getClientInfos(id) {
       (SELECT COUNT(*) FROM portfolios p WHERE p.utilisateur_id = u.id) AS nb_portfolios,
       ${CA_SUBQUERY}
     FROM utilisateurs u
-    LEFT JOIN abonnements a ON a.utilisateur_id = u.id
-      AND a.statut_v2 IN ('ACTIVE','PENDING_PAYMENT','GRACE_PERIOD')
+    LEFT JOIN (
+      SELECT a.* FROM abonnements a
+      INNER JOIN (
+        SELECT utilisateur_id, MAX(id) AS max_id
+        FROM abonnements
+        WHERE statut_v2 IN ('ACTIVE','PENDING_PAYMENT','GRACE_PERIOD')
+        GROUP BY utilisateur_id
+      ) latest ON a.id = latest.max_id
+    ) a ON a.utilisateur_id = u.id
     LEFT JOIN plans pl ON a.plan_id = pl.id
     WHERE u.id = ?
     LIMIT 1
@@ -202,6 +209,18 @@ async function listClients(req, res) {
       plan_id, plan_id,
     ];
 
+    // Sous-requête : dernier abonnement actif/en-attente par utilisateur (évite les doublons)
+    const LAST_ABO = `(
+      SELECT a.*
+      FROM abonnements a
+      INNER JOIN (
+        SELECT utilisateur_id, MAX(id) AS max_id
+        FROM abonnements
+        WHERE statut_v2 IN ('ACTIVE','PENDING_PAYMENT','GRACE_PERIOD')
+        GROUP BY utilisateur_id
+      ) latest ON a.id = latest.max_id
+    )`;
+
     const mainSql = `
       SELECT
         u.id, u.nom, u.prenom,
@@ -219,8 +238,7 @@ async function listClients(req, res) {
         (SELECT COUNT(*) FROM portfolios p WHERE p.utilisateur_id = u.id) AS nb_portfolios,
         ${CA_SUBQUERY}
       FROM utilisateurs u
-      LEFT JOIN abonnements a ON a.utilisateur_id = u.id
-        AND a.statut_v2 IN ('ACTIVE','PENDING_PAYMENT','GRACE_PERIOD')
+      LEFT JOIN ${LAST_ABO} a ON a.utilisateur_id = u.id
       LEFT JOIN plans pl ON a.plan_id = pl.id
       WHERE u.role = 'USER'
         AND (? IS NULL OR (u.nom LIKE ? OR u.prenom LIKE ? OR u.email LIKE ? OR u.phone LIKE ?))
@@ -233,7 +251,7 @@ async function listClients(req, res) {
           LEFT JOIN abonnements ax ON ax.id = px.abonnement_id
           LEFT JOIN commandes   cx ON cx.id = px.commande_id
           WHERE (ax.utilisateur_id = u.id OR cx.utilisateur_id = u.id)
-            AND px.statut = 'RÉUSSI'
+            AND LOWER(CONVERT(px.statut USING utf8mb4)) IN ('réussi', 'reussi', 'confirmed', 'paid')
         ) END DESC,
         CASE WHEN ? = 'date_asc'     THEN u.date_inscription END ASC,
         u.date_inscription DESC
@@ -243,8 +261,7 @@ async function listClients(req, res) {
     const countSql = `
       SELECT COUNT(*) AS total
       FROM utilisateurs u
-      LEFT JOIN abonnements a ON a.utilisateur_id = u.id
-        AND a.statut_v2 IN ('ACTIVE','PENDING_PAYMENT','GRACE_PERIOD')
+      LEFT JOIN ${LAST_ABO} a ON a.utilisateur_id = u.id
       LEFT JOIN plans pl ON a.plan_id = pl.id
       WHERE u.role = 'USER'
         AND (? IS NULL OR (u.nom LIKE ? OR u.prenom LIKE ? OR u.email LIKE ? OR u.phone LIKE ?))
@@ -591,6 +608,17 @@ async function exportClientsCSV(req, res) {
     const searchVal = search ? `%${search}%` : null;
     const statutVal = (statut && statut !== 'NONE') ? statut : null;
 
+    const LAST_ABO_EXP = `(
+      SELECT a.*
+      FROM abonnements a
+      INNER JOIN (
+        SELECT utilisateur_id, MAX(id) AS max_id
+        FROM abonnements
+        WHERE statut_v2 IN ('ACTIVE','PENDING_PAYMENT','GRACE_PERIOD')
+        GROUP BY utilisateur_id
+      ) latest ON a.id = latest.max_id
+    )`;
+
     const [rows] = await pool.query(`
       SELECT
         u.id,
@@ -602,8 +630,7 @@ async function exportClientsCSV(req, res) {
         u.date_inscription,
         ${CA_SUBQUERY}
       FROM utilisateurs u
-      LEFT JOIN abonnements a ON a.utilisateur_id = u.id
-        AND a.statut_v2 IN ('ACTIVE','PENDING_PAYMENT','GRACE_PERIOD')
+      LEFT JOIN ${LAST_ABO_EXP} a ON a.utilisateur_id = u.id
       LEFT JOIN plans pl ON a.plan_id = pl.id
       WHERE u.role = 'USER'
         AND (? IS NULL OR (u.nom LIKE ? OR u.prenom LIKE ? OR u.email LIKE ? OR u.phone LIKE ?))

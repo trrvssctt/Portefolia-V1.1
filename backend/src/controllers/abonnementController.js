@@ -73,7 +73,7 @@ async function createAbonnement(req, res) {
     const plan = await planModel.getPlanById(plan_id);
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
 
-    const montantVal = Number(montant) || (Number(plan.price_cents || 0) / 100) || 0;
+    const montantVal = Number(montant) || Number(plan.price_cents || 0) || 0;
     const ab = await abonnementModel.createAbonnement({ utilisateur_id, plan_id, montant: montantVal, currency, statut: 'active', metadata });
     return res.json({ abonnement: ab });
   } catch (err) {

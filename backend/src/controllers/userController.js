@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
 const { pool } = require('../db');
+const { generateReceiptPDF } = require('../utils/generateReceiptPDF');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
@@ -41,40 +42,230 @@ async function getMyPayments(req, res) {
     const utilisateur_id = req.userId;
     if (!utilisateur_id) return res.status(401).json({ error: 'Unauthorized' });
 
+    // Récupère tous les paiements liés à l'utilisateur via :
+    //   1. commandes (flow legacy/Stripe)
+    //   2. abonnement_id direct (flow Wave post-validation)
+    //   3. reference_transaction matching payment_reference d'un abonnement
+    //   4. checkouts (flow upgrade/reabonnement via checkout token)
     const [rows] = await pool.query(`
-      SELECT p.*, c.numero_commande AS numero_commande, c.utilisateur_id AS utilisateur_id
+      SELECT DISTINCT
+        p.id, COALESCE(p.statut, 'pending_admin') AS statut, p.montant, p.moyen_paiement, p.reference_transaction,
+        p.date_paiement, p.created_at, p.updated_at, p.abonnement_id, p.invoice_id,
+        p.metadata, p.image_paiement, p.type_flux,
+        c.numero_commande,
+        COALESCE(pl.name, pl2.name) AS plan_name,
+        COALESCE(a.duree_mois, a2.duree_mois) AS duree_mois,
+        COALESCE(a.date_echeance, a2.date_echeance) AS date_echeance,
+        COALESCE(a.reference_wave, p.reference_transaction) AS reference_wave
       FROM paiements p
-      LEFT JOIN commandes c ON c.id = p.commande_id
-      WHERE (c.utilisateur_id = ?)
-         OR EXISTS (
-           SELECT 1 FROM abonnements a
-           WHERE a.utilisateur_id = ?
-             AND a.payment_reference IS NOT NULL
-             AND p.reference_transaction COLLATE utf8mb4_unicode_ci = a.payment_reference COLLATE utf8mb4_unicode_ci
+      LEFT JOIN commandes  c   ON c.id  = p.commande_id
+      LEFT JOIN abonnements a  ON a.id  = p.abonnement_id
+      LEFT JOIN plans      pl  ON pl.id = a.plan_id
+      LEFT JOIN checkouts  ck  ON ck.paiement_id = p.id
+      LEFT JOIN abonnements a2 ON a2.id = ck.abonnement_id
+      LEFT JOIN plans      pl2 ON pl2.id = ck.plan_id
+      WHERE
+        c.utilisateur_id = ?
+        OR a.utilisateur_id = ?
+        OR ck.utilisateur_id = ?
+        OR p.reference_transaction COLLATE utf8mb4_unicode_ci IN (
+          SELECT payment_reference COLLATE utf8mb4_unicode_ci FROM abonnements
+          WHERE utilisateur_id = ? AND payment_reference IS NOT NULL
         )
       ORDER BY p.created_at DESC
-    `, [utilisateur_id, utilisateur_id]);
+    `, [utilisateur_id, utilisateur_id, utilisateur_id, utilisateur_id]);
 
     const [tot] = await pool.query(`
-      SELECT COALESCE(SUM(p.montant),0) AS total_revenue
+      SELECT COALESCE(SUM(p.montant), 0) AS total_revenue
       FROM paiements p
-      LEFT JOIN commandes c ON c.id = p.commande_id
+      LEFT JOIN commandes c   ON c.id = p.commande_id
+      LEFT JOIN abonnements a ON a.id = p.abonnement_id
       WHERE (
-        (c.utilisateur_id = ?)
-        OR EXISTS (
-          SELECT 1 FROM abonnements a
-          WHERE a.utilisateur_id = ?
-            AND a.payment_reference IS NOT NULL
-            AND p.reference_transaction COLLATE utf8mb4_unicode_ci = a.payment_reference COLLATE utf8mb4_unicode_ci
+        c.utilisateur_id = ?
+        OR a.utilisateur_id = ?
+        OR p.reference_transaction COLLATE utf8mb4_unicode_ci IN (
+          SELECT payment_reference COLLATE utf8mb4_unicode_ci FROM abonnements
+          WHERE utilisateur_id = ? AND payment_reference IS NOT NULL
         )
       )
-        AND p.statut IN ('reussi','confirmed','paid')
-    `, [utilisateur_id, utilisateur_id]);
+      AND LOWER(CONVERT(p.statut USING utf8mb4)) IN ('réussi','reussi','confirmed','paid')
+    `, [utilisateur_id, utilisateur_id, utilisateur_id]);
 
     const totalRevenue = tot && tot[0] ? Number(tot[0].total_revenue) : 0;
     return res.json({ paiements: rows || [], totalRevenue });
   } catch (err) {
     console.error('user.getMyPayments error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+async function getMyReceiptPDF(req, res) {
+  try {
+    const utilisateur_id = req.userId;
+    const paiementId = Number(req.params.id);
+    if (!utilisateur_id) return res.status(401).json({ error: 'Unauthorized' });
+    if (!paiementId)    return res.status(400).json({ error: 'ID invalide' });
+
+    // Récupère le paiement + abonnement + plan + utilisateur en une requête
+    const [[row]] = await pool.query(`
+      SELECT
+        p.id, p.montant, p.statut, p.moyen_paiement, p.reference_transaction,
+        p.date_paiement, p.created_at,
+        a.id AS abo_id, a.utilisateur_id AS abo_utilisateur_id,
+        a.duree_mois, a.date_echeance, a.reference_wave,
+        pl.name AS plan_name,
+        u.nom, u.prenom, u.email,
+        c.utilisateur_id AS commande_utilisateur_id
+      FROM paiements p
+      LEFT JOIN abonnements a  ON a.id = p.abonnement_id
+      LEFT JOIN plans       pl ON pl.id = a.plan_id
+      LEFT JOIN commandes   c  ON c.id  = p.commande_id
+      LEFT JOIN utilisateurs u ON u.id  = COALESCE(a.utilisateur_id, c.utilisateur_id)
+      WHERE p.id = ?
+      LIMIT 1
+    `, [paiementId]);
+
+    if (!row) return res.status(404).json({ error: 'Paiement introuvable' });
+
+    // Vérification d'appartenance
+    const owner = row.abo_utilisateur_id || row.commande_utilisateur_id;
+    if (Number(owner) !== Number(utilisateur_id)) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    // Seuls les paiements validés ont un reçu
+    const statutNorm = (row.statut || '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+    if (!/reuss|paid|confirmed|success/.test(statutNorm)) {
+      return res.status(400).json({ error: 'Reçu disponible uniquement pour les paiements validés' });
+    }
+
+    const now           = new Date(row.date_paiement || row.created_at || new Date());
+    const receiptMonth  = String(now.getMonth() + 1).padStart(2, '0');
+    const receiptNumber = `RECU-${now.getFullYear()}${receiptMonth}-${String(paiementId).padStart(5, '0')}`;
+
+    const pdfBuffer = await generateReceiptPDF({
+      receiptNumber,
+      client:         { prenom: row.prenom || '', nom: row.nom || '', email: row.email || '' },
+      plan:           { name: row.plan_name || 'Abonnement' },
+      montant:        Number(row.montant || 0),
+      duree_mois:     row.duree_mois ?? 1,
+      reference_wave: row.reference_wave || row.reference_transaction || null,
+      moyen_paiement: row.moyen_paiement || 'wave',
+      date_paiement:  now,
+      date_echeance:  row.date_echeance ?? null,
+    });
+
+    if (!pdfBuffer) {
+      return res.status(500).json({ error: 'Génération du PDF échouée' });
+    }
+
+    res.set({
+      'Content-Type':        'application/pdf',
+      'Content-Disposition': `attachment; filename="recu-portefolia-${receiptNumber}.pdf"`,
+      'Content-Length':      pdfBuffer.length,
+    });
+    return res.end(pdfBuffer);
+  } catch (err) {
+    console.error('user.getMyReceiptPDF error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+async function getMyInvoicePDF(req, res) {
+  try {
+    const utilisateur_id = req.userId;
+    const invoiceId = Number(req.params.id);
+    if (!utilisateur_id) return res.status(401).json({ error: 'Unauthorized' });
+    if (!invoiceId)      return res.status(400).json({ error: 'ID invalide' });
+
+    const invoiceModel = require('../models/invoiceModel');
+    const inv = await invoiceModel.findById(invoiceId);
+    if (!inv) return res.status(404).json({ error: 'Facture introuvable' });
+
+    // Vérification d'appartenance
+    if (Number(inv.utilisateur_id) !== Number(utilisateur_id)) {
+      return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    const [[user]] = await pool.query(
+      'SELECT nom, prenom, email FROM utilisateurs WHERE id = ? LIMIT 1',
+      [utilisateur_id]
+    );
+
+    const invoiceNumber = `INV-${new Date(inv.created_at || Date.now()).toISOString().slice(0, 7).replace('-', '')}-${inv.id}`;
+    const amount   = Number(inv.amount || inv.montant || 0);
+    const currency = inv.currency || 'XOF';
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><title>Facture ${invoiceNumber}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;background:#fff;color:#111;padding:40px}
+  .hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px}
+  .hdr h1{font-size:28px;font-weight:900;color:#1b5e20}
+  .hdr .meta{text-align:right;font-size:13px;color:#6b7280}
+  .div{height:3px;background:linear-gradient(to right,#2E7D32,#1BC29A);border-radius:2px;margin:0 0 28px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:28px}
+  .box h3{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#9ca3af;font-weight:700;margin-bottom:8px}
+  .box p{font-size:14px;font-weight:600;color:#111}
+  .box .sub{font-size:12px;color:#6b7280;font-weight:400}
+  table{width:100%;border-collapse:collapse;border-radius:8px;overflow:hidden;margin-bottom:20px}
+  thead th{background:#2E7D32;color:#fff;padding:12px 16px;text-align:left;font-size:12px;font-weight:700;text-transform:uppercase}
+  thead th:last-child{text-align:right}
+  tbody td{padding:14px 16px;border-top:1px solid #e5e7eb;font-size:13px}
+  tbody td:last-child{text-align:right;font-weight:700;color:#2E7D32}
+  .total-row td{background:#f0fdf4;border-top:2px solid #2E7D32;font-weight:800;font-size:14px}
+  .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af}
+</style>
+</head>
+<body>
+  <div class="hdr">
+    <div><h1>Portefolia</h1><p style="font-size:13px;color:#6b7280;margin-top:4px">contact@portefolia.tech</p></div>
+    <div class="meta">
+      <p style="font-size:20px;font-weight:700;color:#111">FACTURE</p>
+      <p>N° ${invoiceNumber}</p>
+      <p style="margin-top:4px">Date : ${new Date(inv.created_at || Date.now()).toLocaleDateString('fr-FR')}</p>
+    </div>
+  </div>
+  <div class="div"></div>
+  <div class="grid">
+    <div class="box"><h3>Émetteur</h3><p>Portefolia</p><p class="sub">comptabilite@portefolia.tech</p></div>
+    <div class="box"><h3>Client</h3><p>${(user?.prenom || '')} ${(user?.nom || '')}</p><p class="sub">${user?.email || ''}</p></div>
+  </div>
+  <table>
+    <thead><tr><th>Description</th><th>Référence</th><th>Montant</th></tr></thead>
+    <tbody>
+      <tr><td>Abonnement Portefolia</td><td style="font-family:monospace;font-size:12px">${inv.reference || '—'}</td><td>${amount.toLocaleString('fr-FR')} ${currency}</td></tr>
+      <tr class="total-row"><td colspan="2" style="text-align:right">Total</td><td>${amount.toLocaleString('fr-FR')} ${currency}</td></tr>
+    </tbody>
+  </table>
+  <div class="footer">
+    <p>Portefolia · contact@portefolia.tech · Merci pour votre confiance.</p>
+    <p>Ce document est généré automatiquement et constitue votre facture officielle.</p>
+  </div>
+</body></html>`;
+
+    try {
+      const puppeteer = require('puppeteer');
+      const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'load', timeout: 20000 });
+      const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
+      await browser.close();
+      res.set({
+        'Content-Type':        'application/pdf',
+        'Content-Disposition': `attachment; filename="facture-portefolia-${invoiceNumber}.pdf"`,
+        'Content-Length':      pdfBuffer.length,
+      });
+      return res.end(Buffer.from(pdfBuffer));
+    } catch (e) {
+      console.warn('getMyInvoicePDF: puppeteer failed, returning HTML:', e.message);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.send(html);
+    }
+  } catch (err) {
+    console.error('user.getMyInvoicePDF error:', err);
     return res.status(500).json({ error: 'Server error' });
   }
 }
@@ -112,7 +303,7 @@ async function getUserPayments(req, res) {
             AND p.reference_transaction COLLATE utf8mb4_unicode_ci = a.payment_reference COLLATE utf8mb4_unicode_ci
         )
       )
-        AND p.statut IN ('reussi','confirmed','paid')
+        AND LOWER(CONVERT(p.statut USING utf8mb4)) IN ('réussi', 'reussi', 'confirmed', 'paid')
     `, [id, id]);
 
     const totalRevenue = tot && tot[0] ? Number(tot[0].total_revenue) : 0;
@@ -201,7 +392,7 @@ async function adminCreateUser(req, res) {
             const abonnementModel = require('../models/abonnementModel');
             const paymentToken = require('crypto').randomBytes(16).toString('hex');
             const metadata = { admin_created: true, payment_token: paymentToken };
-            await abonnementModel.createAbonnement({ utilisateur_id: created.id, plan_id: plan.id, montant: Number(plan.price_cents || 0) / 100, currency: 'XOF', statut: 'active', metadata });
+            await abonnementModel.createAbonnement({ utilisateur_id: created.id, plan_id: plan.id, montant: Number(plan.price_cents || 0), currency: 'XOF', statut: 'active', metadata });
           } catch (e) {
             console.warn('adminCreateUser: could not create abonnement for user', e.message || e);
           }
@@ -1047,9 +1238,9 @@ async function getActivity(req, res) {
 
     const [payments] = await pool.query(`
       SELECT 'payment_made' as activity_type, p.id as entity_id,
-             CONCAT(p.montant, ' XOF') as title,
+             CONCAT(p.montant, ' F CFA') as title,
              p.created_at,
-             CONCAT('Paiement de ', p.montant, ' XOF - ', COALESCE(p.statut, 'pending')) as description,
+             CONCAT('Paiement de ', p.montant, ' F CFA - ', COALESCE(p.statut, 'pending')) as description,
              'credit-card' as icon
       FROM paiements p
       LEFT JOIN commandes c ON c.id = p.commande_id
@@ -1091,4 +1282,4 @@ async function getActivity(req, res) {
   }
 }
 
-module.exports = { register, login, me, updateMe, deactivateMe, deleteMe, adminCreateUser, adminUpdateUser, adminSoftDeleteUser, adminActivateUser, adminDeactivateUser, adminListUsers, adminPendingUsers, ListUsers, adminCheckDuplicate, getMyPayments, getUserPayments, getActivity };
+module.exports = { register, login, me, updateMe, deactivateMe, deleteMe, adminCreateUser, adminUpdateUser, adminSoftDeleteUser, adminActivateUser, adminDeactivateUser, adminListUsers, adminPendingUsers, ListUsers, adminCheckDuplicate, getMyPayments, getMyReceiptPDF, getMyInvoicePDF, getUserPayments, getActivity };
