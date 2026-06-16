@@ -24,7 +24,7 @@ function formatDate(date: Date): string {
 }
 
 function formatXOF(amount: number): string {
-  return `${Math.round(amount).toLocaleString('fr-FR')} XOF`;
+  return `${Math.round(amount).toLocaleString('fr-FR')} F CFA`;
 }
 
 export default function Reabonnement() {
@@ -73,9 +73,9 @@ export default function Reabonnement() {
 
   const isYearly = (currentPlan?.billing_interval || '').toLowerCase() === 'yearly';
   const monthlyPrice = isYearly
-    ? Number(currentPlan?.price_cents || 0) / 100 / 12
-    : Number(currentPlan?.price_cents || 0) / 100;
-  const displayPrice = isYearly ? Number(currentPlan?.price_cents || 0) / 100 : monthlyPrice;
+    ? Number(currentPlan?.price_cents || 0) / 12
+    : Number(currentPlan?.price_cents || 0);
+  const displayPrice = isYearly ? Number(currentPlan?.price_cents || 0) : monthlyPrice;
   const currentEndDate = currentPlan?.end_date ? new Date(currentPlan.end_date) : null;
   const baseDate = (currentEndDate && currentEndDate > new Date()) ? currentEndDate : new Date();
 

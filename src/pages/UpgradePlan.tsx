@@ -1,14 +1,32 @@
-// src/pages/UpgradePlan.tsx
-// Design optimisé - code direct en Tailwind, moins de dépendances, rendu plus rapide
-
 import { useEffect, useState } from 'react';
 import { usePlan } from '@/contexts/PlanContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { useAuth } from '@/hooks/useAuth';
+import { Check, Sparkles, Star, Building2, X, Loader2 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
+
+const DURATIONS = [
+  { months: 1,  label: '1 mois', discount: 0 },
+  { months: 3,  label: '3 mois', discount: 15, badge: '-15%' },
+  { months: 12, label: '1 an',   discount: 20, badge: '-20%' },
+] as const;
+
+function addMonths(d: Date, m: number): Date {
+  const r = new Date(d);
+  r.setMonth(r.getMonth() + m);
+  return r;
+}
+
+function formatDate(d: Date): string {
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function formatFCFA(n: number): string {
+  return Math.round(n).toLocaleString('fr-FR') + ' F CFA';
+}
 
 interface Plan {
   id: string;
@@ -18,203 +36,321 @@ interface Plan {
   price_cents: number;
 }
 
+function getPlanFeatures(plan: Plan): string[] {
+  const raw = plan.features || plan.description || '';
+  return Array.isArray(raw)
+    ? raw.map((f: any) => String(f).trim()).filter(Boolean)
+    : String(raw).split(',').map(f => f.trim()).filter(Boolean);
+}
+
+type Tone = 'ink' | 'accent' | 'business';
+
+function getPlanTone(index: number, total: number): Tone {
+  if (total === 1) return 'accent';
+  if (total === 2) return index === 0 ? 'ink' : 'accent';
+  const mid = Math.floor(total / 2);
+  if (index === mid) return 'accent';
+  if (index === total - 1) return 'business';
+  return 'ink';
+}
+
+function PlanCard({ plan, tone, onChoose, isCurrent, canUpgrade }: {
+  plan: Plan; tone: Tone;
+  onChoose: () => void; isCurrent: boolean; canUpgrade: boolean;
+}) {
+  const popular  = tone === 'accent';
+  const features = getPlanFeatures(plan);
+  const priceVal = plan.price_cents.toLocaleString('fr-FR');
+  const PlanIcon = tone === 'business' ? Building2 : tone === 'accent' ? Sparkles : Star;
+
+  return (
+    <div
+      className={`relative flex flex-col rounded-3xl bg-white border p-7 ${popular ? 'border-transparent' : 'border-[#E7E7EA]'}`}
+      style={popular ? { boxShadow: '0 0 0 2px #2E7D32, 0 20px 50px -20px rgba(16,24,40,0.25)' } : undefined}
+    >
+      {popular && (
+        <span
+          className="absolute -top-3 left-1/2 -translate-x-1/2 text-[11px] font-bold uppercase tracking-wide text-white px-3 py-1 rounded-full"
+          style={{ background: '#2E7D32' }}
+        >
+          Le plus populaire
+        </span>
+      )}
+
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-semibold text-[#18181B]">{plan.name}</h3>
+        <PlanIcon
+          size={18}
+          style={tone === 'accent' ? { color: '#1B5E20' } : { color: '#71717A' }}
+        />
+      </div>
+
+      <div className="mt-4 flex items-end gap-1.5">
+        <span className="font-serif text-[#18181B] tracking-tight leading-none" style={{ fontSize: '3.2rem' }}>
+          {priceVal}
+        </span>
+        <span className="text-sm text-[#71717A] mb-1.5">F CFA</span>
+      </div>
+      <p className="text-xs text-[#71717A] mt-1">/mois</p>
+      <p className="text-sm text-[#18181B]/60 mt-4 leading-relaxed">{plan.description || ''}</p>
+
+      {isCurrent ? (
+        <div className="mt-6 h-11 rounded-xl border border-[#E7E7EA] flex items-center justify-center text-sm font-medium text-[#71717A]">
+          Formule actuelle
+        </div>
+      ) : canUpgrade ? (
+        <button
+          onClick={onChoose}
+          className={`mt-6 h-11 rounded-xl text-sm font-semibold transition-colors ${popular ? 'text-white' : tone === 'business' ? 'text-white' : 'text-[#18181B] border border-[#E7E7EA] hover:bg-zinc-50'}`}
+          style={popular ? { background: '#2E7D32' } : tone === 'business' ? { background: '#1B5E20' } : undefined}
+        >
+          Choisir cette formule
+        </button>
+      ) : (
+        <div className="mt-6 h-11 rounded-xl border border-[#E7E7EA] flex items-center justify-center text-sm font-medium text-[#71717A]/50">
+          Inférieur à votre plan
+        </div>
+      )}
+
+      {features.length > 0 && (
+        <ul className="mt-6 space-y-3 pt-6 border-t border-[#E7E7EA]">
+          {features.map((f, i) => (
+            <li key={i} className="flex items-start gap-2.5 text-sm text-[#18181B]/75">
+              <span
+                className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                style={{ background: '#E8F5E9' }}
+              >
+                <Check size={11} style={{ color: '#1B5E20' }} strokeWidth={3} />
+              </span>
+              {f}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const FAQS = [
+  ['Puis-je changer de formule à tout moment ?', 'Oui, vous pouvez passer à une formule supérieure quand vous le souhaitez.'],
+  ['Comment se passe le paiement ?', 'Les paiements sont sécurisés via Wave. Vous recevez une facture après chaque règlement.'],
+  ['Les cartes NFC sont-elles incluses ?', 'La commande des cartes NFC est disponible dès la formule Pro. Le prix unitaire est de 30 000 F CFA.'],
+];
+
 export default function UpgradePlan() {
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
-  const [loading, setLoading] = useState<Record<string, boolean>>({});
-  const { toast } = useToast();
-  const navigate = useNavigate();
+  const [selectedPlan, setSelectedPlan]     = useState<Plan | null>(null);
+  const [durationLoading, setDurationLoading] = useState<number | null>(null);
+  const { toast }       = useToast();
+  const navigate        = useNavigate();
   const { currentPlan } = usePlan();
   const { user, profile, signOut } = useAuth();
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/plans`);
-        if (!res.ok) throw new Error('Erreur chargement formules');
-        const { plans: all = [] } = await res.json();
-
-        const currentPrice = Number(currentPlan?.price_cents || 0);
-        const filtered = all
-          .filter((p: Plan) => Number(p.price_cents || 0) > currentPrice)
-          .sort((a: Plan, b: Plan) => Number(a.price_cents) - Number(b.price_cents));
-
-        setAvailablePlans(filtered);
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: 'Impossible de charger les formules',
-          variant: 'destructive',
-        });
-      }
-    };
-    load();
+    fetch(`${API_BASE}/api/plans`)
+      .then(r => r.json())
+      .then(({ plans: all = [] }) => {
+        setAvailablePlans(all.sort((a: Plan, b: Plan) => Number(a.price_cents) - Number(b.price_cents)));
+      })
+      .catch(() => toast({ title: 'Erreur', description: 'Impossible de charger les formules', variant: 'destructive' }));
   }, [currentPlan, toast]);
 
-  const handleChoose = async (plan: Plan) => {
-    setLoading(prev => ({ ...prev, [plan.id]: true }));
+  const handlePay = async (plan: Plan, months: number) => {
+    setDurationLoading(months);
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        toast({
-          title: 'Connexion requise',
-          description: 'Connectez-vous pour continuer',
-          variant: 'destructive',
-        });
-        navigate('/auth');
-        return;
-      }
+      if (!token) { navigate('/auth'); return; }
 
       const res = await fetch(`${API_BASE}/api/checkout`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ plan_id: plan.id }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ plan_id: plan.id, duration_months: months }),
       });
-
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Erreur paiement');
-
-      if (!json.checkout?.token) throw new Error('Lien de paiement non recu');
+      if (!json.checkout?.token) throw new Error('Lien de paiement non reçu');
       navigate(`/checkout?token=${json.checkout.token}`);
     } catch (err: any) {
-      toast({
-        title: 'Erreur',
-        description: err.message || 'Impossible de demarrer le paiement',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erreur', description: err.message || 'Impossible de démarrer le paiement', variant: 'destructive' });
     } finally {
-      setLoading(prev => ({ ...prev, [plan.id]: false }));
+      setDurationLoading(null);
     }
   };
 
-  const formatPrice = (cents: number) => `${(cents / 100).toLocaleString('fr-FR')} F CFA`;
-
-  const bestPlanId = availablePlans[availablePlans.length - 1]?.id;
+  const currentPrice = Number(currentPlan?.price_cents || 0);
+  const monthlyPrice = selectedPlan ? Number(selectedPlan.price_cents) : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50">
+    <div className="min-h-screen" style={{ background: '#F7F8F8' }}>
       <DashboardNav onSignOut={signOut} profile={profile || user || {}} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-20">
-        {/* Header */}
-        <header className="text-center mb-10 sm:mb-20">
-          <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight mb-4">
-            Passez au niveau superieur
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 py-12 sm:py-16">
+
+        {/* ── Header ── */}
+        <div className="text-center max-w-2xl mx-auto">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#71717A] mb-3">Formules</p>
+          <h1
+            className="font-serif text-[#18181B] leading-[1.02] tracking-tight"
+            style={{ fontSize: 'clamp(2.2rem, 5vw, 3.4rem)' }}
+          >
+            Passez au niveau supérieur
           </h1>
-          <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto">
-            Debloquez cartes NFC illimitees, portfolios personnalises et analytics avances
+          <p className="mt-4 text-[#18181B]/60">
+            Débloquez cartes NFC illimitées, portfolios personnalisés et analytics avancées.
           </p>
-        </header>
+          <div className="mt-3 flex items-center justify-center gap-4 text-sm text-[#71717A]">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+              3 mois → <strong className="text-[#1B5E20]">−15%</strong>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-700" />
+              1 an → <strong className="text-[#1B5E20]">−20%</strong>
+            </span>
+          </div>
+        </div>
 
-        {/* Formule actuelle */}
-        {currentPlan && (
-          <section className="max-w-xl mx-auto mb-8 sm:mb-16">
-            <div className="bg-white/70 backdrop-blur-sm border-2 border-dashed border-slate-300 rounded-2xl p-4 sm:p-6">
-              <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Votre formule actuelle</p>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-2xl font-bold text-slate-900">{currentPlan.name}</p>
-                  <p className="text-sm text-slate-500">{currentPlan.description || 'Formule de base'}</p>
-                </div>
-                <p className="text-2xl font-bold text-emerald-600">{formatPrice(Number(currentPlan.price_cents))}</p>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* Aucune upgrade disponible */}
+        {/* ── Plans grid ── */}
         {availablePlans.length === 0 ? (
-          <section className="text-center py-20">
-            <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
-              <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-              </svg>
+          <div className="text-center py-20">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#E8F5E9', color: '#1B5E20' }}>
+              <Sparkles className="w-7 h-7" />
             </div>
-            <h2 className="text-3xl font-bold text-slate-900 mb-3">Vous etes au sommet !</h2>
-            <p className="text-lg text-slate-600">Vous beneficie deja de la meilleure formule</p>
-          </section>
+            <h2 className="text-xl font-semibold text-[#18181B] mb-2">Vous êtes au sommet !</h2>
+            <p className="text-[#71717A]">Vous bénéficiez déjà de la meilleure formule.</p>
+          </div>
         ) : (
-          /* Grille des formules */
-          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {availablePlans.map((plan) => {
-              const isBest = plan.id === bestPlanId;
-              const rawFeatures = plan.features || plan.description || '';
-              const features: string[] = Array.isArray(rawFeatures)
-                ? rawFeatures.map((f: any) => String(f).trim()).filter(Boolean)
-                : String(rawFeatures).split(',').map((f) => f.trim()).filter(Boolean);
-
+          <div className="grid md:grid-cols-3 gap-6 mt-12 items-start max-w-5xl mx-auto">
+            {availablePlans.map((plan, index) => {
+              const tone = getPlanTone(index, availablePlans.length);
+              const isCurrent  = plan.id === currentPlan?.id || Number(plan.price_cents) === currentPrice;
+              const canUpgrade = Number(plan.price_cents) > currentPrice;
               return (
-                <div
+                <PlanCard
                   key={plan.id}
-                  className={`relative bg-white rounded-3xl p-5 sm:p-8 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ${isBest
-                    ? 'ring-2 ring-emerald-500 shadow-xl bg-gradient-to-b from-emerald-50 to-white'
-                    : 'border border-slate-200 shadow-sm'
-                    }`}
-                >
-                  {isBest && (
-                    <div className="absolute top-4 right-4 bg-emerald-500 text-white px-4 py-1.5 text-xs font-bold rounded-full">
-                      ★ Populaire
-                    </div>
-                  )}
-
-                  {/* En-tete carte */}
-                  <div className="text-center mb-6">
-                    <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center ${isBest ? 'bg-emerald-500' : 'bg-slate-900'
-                      }`}>
-                      <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-2xl font-bold text-slate-900 mb-2">{plan.name}</h3>
-                    <div className="flex items-baseline justify-center gap-1">
-                      <span className="text-4xl font-black text-slate-900">{formatPrice(Number(plan.price_cents))}</span>
-                      <span className="text-slate-500">/mois</span>
-                    </div>
-                  </div>
-
-                  {/* Fonctionnalites */}
-                  <ul className="space-y-3 mb-8">
-                    {features.length > 0
-                      ? features.map((feature, i) => (
-                        <li key={i} className="flex items-start gap-3">
-                          <svg className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                          </svg>
-                          <span className="text-slate-700">{feature}</span>
-                        </li>
-                      ))
-                      : <li className="text-slate-500 italic">Fonctionnalites premium incluses</li>
-                    }
-                  </ul>
-
-                  {/* Bouton */}
-                  <button
-                    onClick={() => handleChoose(plan)}
-                    disabled={loading[plan.id]}
-                    className={`w-full py-3 sm:py-4 px-6 rounded-xl font-bold text-base sm:text-lg transition-all ${isBest
-                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
-                      : 'bg-slate-900 hover:bg-slate-800 text-white'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {loading[plan.id] ? 'Traitement...' : 'Choisir cette formule →'}
-                  </button>
-                </div>
+                  plan={plan}
+                  tone={tone}
+                  onChoose={() => setSelectedPlan(plan)}
+                  isCurrent={isCurrent}
+                  canUpgrade={canUpgrade}
+                />
               );
             })}
-          </section>
+          </div>
         )}
 
-        {/* Footer support */}
-        <footer className="text-center mt-10 sm:mt-20 pt-8 border-t border-slate-200">
-          <p className="text-slate-600">
-            Une question ? <a href="mailto:support@portefolia.com" className="text-emerald-600 font-semibold hover:underline">
-              support@portefolia.com
+        {/* ── FAQ ── */}
+        <div className="max-w-3xl mx-auto mt-20">
+          <h2 className="text-xl font-semibold text-[#18181B] text-center mb-8">Questions fréquentes</h2>
+          <div className="space-y-3">
+            {FAQS.map(([q, a]) => (
+              <div key={q} className="bg-white rounded-2xl border border-[#E7E7EA] p-5">
+                <p className="font-semibold text-[#18181B] text-sm">{q}</p>
+                <p className="mt-1.5 text-sm text-[#18181B]/60 leading-relaxed">{a}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-sm text-[#71717A] mt-8">
+            Une question ?{' '}
+            <a href="mailto:support@portefolia.tech" className="font-semibold hover:underline" style={{ color: '#1B5E20' }}>
+              support@portefolia.tech
             </a>
           </p>
-        </footer>
-      </main>
+        </div>
+      </div>
+
+      {/* ── Duration picker modal ── */}
+      {selectedPlan && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.45)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedPlan(null); }}
+        >
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden">
+
+            {/* Modal header */}
+            <div className="px-7 py-5 border-b border-[#E7E7EA] flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-[#71717A] mb-0.5">Formule sélectionnée</p>
+                <h2 className="text-xl font-bold text-[#18181B]">{selectedPlan.name}</h2>
+                <p className="text-sm text-[#71717A] mt-0.5">{formatFCFA(monthlyPrice)} / mois · Choisissez votre durée</p>
+              </div>
+              <button
+                onClick={() => setSelectedPlan(null)}
+                className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#F7F8F8] transition-colors text-[#71717A]"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Duration cards */}
+            <div className="p-6 grid grid-cols-3 gap-3">
+              {DURATIONS.map(({ months, label, discount, badge }) => {
+                const base    = monthlyPrice * months;
+                const final   = Math.round(base * (1 - discount / 100));
+                const savings = Math.round(base - final);
+                const newEnd  = formatDate(addMonths(new Date(), months));
+                const loading = durationLoading === months;
+                const popular = months === 3;
+
+                return (
+                  <div
+                    key={months}
+                    className={`relative flex flex-col rounded-2xl border-2 p-4 gap-3 transition-all hover:shadow-md hover:-translate-y-0.5 ${
+                      popular ? 'border-[#2E7D32] shadow-sm shadow-green-100' : 'border-[#E7E7EA]'
+                    }`}
+                  >
+                    {badge && (
+                      <span
+                        className={`absolute -top-3 left-1/2 -translate-x-1/2 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                          popular ? 'bg-[#2E7D32]' : 'bg-slate-500'
+                        }`}
+                      >
+                        {badge}
+                      </span>
+                    )}
+
+                    <div className="text-center pt-1">
+                      <p className="text-sm font-bold text-slate-700">{label}</p>
+                      <p className="text-2xl font-black text-[#18181B] mt-1">{formatFCFA(final)}</p>
+                      {discount > 0 ? (
+                        <>
+                          <p className="text-xs text-slate-400 line-through">{formatFCFA(base)}</p>
+                          <p className="text-[11px] font-semibold text-[#2E7D32]">Économie : {formatFCFA(savings)}</p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-slate-400">Sans remise</p>
+                      )}
+                    </div>
+
+                    <div className="bg-[#F7F8F8] rounded-xl px-2 py-1.5 text-center">
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wide font-medium">Accès jusqu'au</p>
+                      <p className="text-[11px] font-bold text-slate-700 mt-0.5 leading-tight">{newEnd}</p>
+                    </div>
+
+                    <button
+                      onClick={() => handlePay(selectedPlan, months)}
+                      disabled={!!durationLoading}
+                      className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed ${
+                        popular
+                          ? 'text-white shadow-lg shadow-green-200'
+                          : 'text-white'
+                      }`}
+                      style={{ background: popular ? '#2E7D32' : '#18181B' }}
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Payer'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className="text-center text-xs text-[#71717A] pb-5">
+              Paiement sécurisé via Wave · Activation sous 24h
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

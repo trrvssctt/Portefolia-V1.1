@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/hooks/useAuth';
 import BusinessNav from '@/components/business/BusinessNav';
@@ -8,11 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ImageUpload } from '@/components/ui/image-upload';
 import { useToast } from '@/hooks/use-toast';
 import {
   Palette, Type, Building2, Globe, Phone, MapPin, FileText,
-  CheckCircle2, Save,
+  CheckCircle2, Save, Upload, Loader2, X,
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
@@ -22,6 +21,120 @@ const FONT_OPTIONS = [
   'Lato', 'Raleway', 'Nunito', 'Playfair Display', 'Merriweather',
   'Space Grotesk', 'DM Sans',
 ];
+
+function LogoUpload({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [urlDraft, setUrlDraft] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Fichier non supporté. Utilisez PNG, JPG ou SVG.');
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`${API_BASE}/api/uploads/cloudinary`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && (json.url || json.secure_url)) {
+        onChange(json.url || json.secure_url);
+        setError(null);
+      } else {
+        setError(json.error || `Erreur upload (${res.status})`);
+        toast({ title: 'Erreur upload', description: json.error || `Statut ${res.status}`, variant: 'destructive' });
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Erreur réseau');
+      toast({ title: 'Erreur réseau', description: err?.message, variant: 'destructive' });
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const handleUrlApply = () => {
+    if (!urlDraft.trim()) return;
+    onChange(urlDraft.trim());
+    setUrlDraft('');
+  };
+
+  return (
+    <div className="space-y-4">
+      {value ? (
+        <div className="relative inline-block">
+          <img
+            src={value}
+            alt="Logo entreprise"
+            className="h-24 w-24 object-contain rounded-xl border border-gray-200 bg-white p-2"
+            onError={e => { (e.target as HTMLImageElement).src = ''; (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      ) : (
+        <div className="h-24 w-24 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
+          <Building2 className="w-8 h-8 text-gray-300" />
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3">
+        <div>
+          <Label className="text-xs text-gray-500 mb-1.5 block">Uploader un fichier</Label>
+          <div className="flex items-center gap-2">
+            <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" disabled={uploading} />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="gap-2"
+            >
+              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              {uploading ? 'Upload en cours…' : 'Choisir une image'}
+            </Button>
+            <span className="text-xs text-gray-400">PNG, JPG ou SVG · max 5 Mo</span>
+          </div>
+          {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+        </div>
+
+        <div>
+          <Label className="text-xs text-gray-500 mb-1.5 block">Ou coller une URL</Label>
+          <div className="flex gap-2">
+            <Input
+              type="url"
+              value={urlDraft}
+              onChange={e => setUrlDraft(e.target.value)}
+              placeholder="https://monentreprise.com/logo.png"
+              className="flex-1 h-9 text-sm"
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleUrlApply(); } }}
+            />
+            <Button type="button" size="sm" variant="outline" onClick={handleUrlApply} disabled={!urlDraft.trim()}>
+              Appliquer
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const BusinessSettings: React.FC = () => {
   const { account, refresh } = useBusiness();
@@ -45,18 +158,17 @@ const BusinessSettings: React.FC = () => {
 
   useEffect(() => {
     if (!account) return;
-    const acc = account as any;
     setForm({
-      company_name: acc.company_name || '',
-      company_logo_url: acc.company_logo_url || '',
-      website_url: acc.website_url || '',
-      description: acc.description || '',
-      address: acc.address || '',
-      phone: acc.phone || '',
-      primary_color: acc.primary_color || '#1a1a2e',
-      secondary_color: acc.secondary_color || '#16213e',
-      accent_color: acc.accent_color || '#0f3460',
-      font_family: acc.font_family || 'Inter',
+      company_name: account.company_name || '',
+      company_logo_url: account.company_logo_url || '',
+      website_url: account.website_url || '',
+      description: account.description || '',
+      address: account.address || '',
+      phone: account.phone || '',
+      primary_color: account.primary_color || '#1a1a2e',
+      secondary_color: account.secondary_color || '#16213e',
+      accent_color: account.accent_color || '#0f3460',
+      font_family: account.font_family || 'Inter',
     });
   }, [account]);
 
@@ -210,15 +322,10 @@ const BusinessSettings: React.FC = () => {
               <CardTitle className="text-base">Logo de l'entreprise</CardTitle>
             </CardHeader>
             <CardContent>
-              <ImageUpload
-                label="Logo"
+              <LogoUpload
                 value={form.company_logo_url}
                 onChange={url => set('company_logo_url', url)}
-                placeholder="https://monentreprise.com/logo.png"
               />
-              <p className="text-xs text-gray-400 mt-2">
-                Format recommandé : PNG transparent ou SVG. Taille optimale : 200×200 px.
-              </p>
             </CardContent>
           </Card>
 

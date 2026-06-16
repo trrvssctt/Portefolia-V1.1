@@ -1,80 +1,13 @@
 import { useEffect, useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  ExternalLink,
-  Search,
-  Download,
-  FileText,
-  RefreshCw,
-  Calendar,
-  User,
-  CreditCard,
-  TrendingUp,
-  Filter,
-  MoreVertical,
-  Eye,
-  Receipt,
-  BarChart3,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  DollarSign,
-  Mail,
-  Copy,
-  Sparkles,
-  Activity,
-  Box,
-  TrendingDown,
-  Layout,
-  Banknote,
-  Navigation,
-  ArrowUpRight,
-  ArrowDownRight,
-  Shield,
-  QrCode
+  Search, Download, FileText, RefreshCw, Calendar, User, CreditCard,
+  TrendingUp, Eye, Receipt, CheckCircle2, XCircle, Clock, Copy, X,
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface Invoice {
   id: number;
   reference: string;
@@ -92,38 +25,55 @@ interface Invoice {
   due_date: string | null;
 }
 
+// ─── Design tokens ─────────────────────────────────────────────────────────────
+const CARD_STYLE = { borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' } as const;
+const ADMIN_GRAD = 'linear-gradient(135deg, #1B5E20, #2E7D32)';
+
+const STATUS_PILL: Record<string, { c: string; bg: string; label: string }> = {
+  paid:    { c: '#2E7D32', bg: '#EAF5EB', label: 'Payée' },
+  pending: { c: '#B45309', bg: '#FEF3E2', label: 'En attente' },
+  overdue: { c: '#C62828', bg: '#FEECEC', label: 'En retard' },
+  draft:   { c: '#52525B', bg: '#F4F4F5', label: 'Brouillon' },
+};
+
+function StatusPill({ status }: { status: string }) {
+  const s = STATUS_PILL[status] ?? { c: '#52525B', bg: '#F4F4F5', label: status };
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full"
+      style={{ color: s.c, background: s.bg }}>
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: s.c }} />
+      {s.label}
+    </span>
+  );
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
 export default function AdminInvoices() {
   const { toast } = useToast();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all');
+
+  const [invoices, setInvoices]           = useState<Invoice[]>([]);
+  const [loading, setLoading]             = useState(true);
+  const [refreshing, setRefreshing]       = useState(false);
+  const [search, setSearch]               = useState('');
+  const [statusFilter, setStatusFilter]   = useState('all');
+  const [dateFilter, setDateFilter]       = useState('all');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen]     = useState(false);
   const [stats, setStats] = useState({
-    total: 0,
-    paid: 0,
-    pending: 0,
-    overdue: 0,
-    totalAmount: 0,
-    avgAmount: 0,
-    thisMonth: 0,
+    total: 0, paid: 0, pending: 0, overdue: 0,
+    totalAmount: 0, avgAmount: 0, thisMonth: 0,
   });
 
+  // ── Load ──────────────────────────────────────────────────────────────────────
   const loadInvoices = async () => {
     setRefreshing(true);
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Token manquant');
-
       const res = await fetch(`${API_BASE}/api/admin/invoices?limit=500`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-
       if (!res.ok) throw new Error('Erreur réseau');
-
       const data = await res.json();
       const items = data.invoices || [];
 
@@ -146,33 +96,15 @@ export default function AdminInvoices() {
 
       setInvoices(normalized);
 
-      // Calculate stats
-      const total = normalized.length;
-      const paid = normalized.filter(i => i.status === 'paid').length;
+      const total   = normalized.length;
+      const paid    = normalized.filter(i => i.status === 'paid').length;
       const pending = normalized.filter(i => i.status === 'pending').length;
       const overdue = normalized.filter(i => i.status === 'overdue').length;
-      const totalAmount = normalized
-        .filter(i => i.status === 'paid')
-        .reduce((acc, i) => acc + i.amount, 0);
-      const avgAmount = paid > 0 ? Math.round(totalAmount / paid) : 0;
+      const totalAmount = normalized.filter(i => i.status === 'paid').reduce((a, i) => a + i.amount, 0);
+      const thisMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const thisMonth = normalized.filter(i => new Date(i.created_at) >= thisMonthStart).length;
 
-      // This month's invoices
-      const thisMonth = new Date();
-      const thisMonthStart = new Date(thisMonth.getFullYear(), thisMonth.getMonth(), 1);
-      const thisMonthCount = normalized.filter(i =>
-        new Date(i.created_at) >= thisMonthStart
-      ).length;
-
-      setStats({
-        total,
-        paid,
-        pending,
-        overdue,
-        totalAmount,
-        avgAmount,
-        thisMonth: thisMonthCount,
-      });
-
+      setStats({ total, paid, pending, overdue, totalAmount, avgAmount: paid > 0 ? Math.round(totalAmount / paid) : 0, thisMonth });
     } catch (e) {
       console.error('Erreur chargement invoices', e);
       setInvoices([]);
@@ -182,812 +114,469 @@ export default function AdminInvoices() {
     }
   };
 
-  useEffect(() => {
-    loadInvoices();
-  }, []);
+  useEffect(() => { loadInvoices(); }, []);
 
+  // ── Filtered list ─────────────────────────────────────────────────────────────
   const filteredInvoices = useMemo(() => {
-    let filtered = [...invoices];
-
-    // Filter by search
+    let list = [...invoices];
     if (search) {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(inv =>
-        inv.reference.toLowerCase().includes(searchLower) ||
-        inv.user_email.toLowerCase().includes(searchLower) ||
-        inv.user_name.toLowerCase().includes(searchLower) ||
-        inv.invoice_number.toLowerCase().includes(searchLower) ||
-        inv.plan_name.toLowerCase().includes(searchLower)
+      const q = search.toLowerCase();
+      list = list.filter(inv =>
+        inv.reference.toLowerCase().includes(q) ||
+        inv.user_email.toLowerCase().includes(q) ||
+        inv.user_name.toLowerCase().includes(q) ||
+        inv.invoice_number.toLowerCase().includes(q) ||
+        inv.plan_name.toLowerCase().includes(q)
       );
     }
-
-    // Filter by status
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(inv => inv.status === statusFilter);
-    }
-
-    // Filter by date
+    if (statusFilter !== 'all') list = list.filter(inv => inv.status === statusFilter);
     if (dateFilter !== 'all') {
-      const now = new Date();
+      const now   = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-      filtered = filtered.filter((inv) => {
-        const invoiceDate = new Date(inv.created_at);
-
-        switch (dateFilter) {
-          case 'today':
-            return invoiceDate >= today;
-          case 'week':
-            const weekAgo = new Date(today);
-            weekAgo.setDate(weekAgo.getDate() - 7);
-            return invoiceDate >= weekAgo;
-          case 'month':
-            const monthAgo = new Date(today);
-            monthAgo.setMonth(monthAgo.getMonth() - 1);
-            return invoiceDate >= monthAgo;
-          case 'year':
-            const yearAgo = new Date(today);
-            yearAgo.setFullYear(yearAgo.getFullYear() - 1);
-            return invoiceDate >= yearAgo;
-          default:
-            return true;
-        }
+      list = list.filter(inv => {
+        const d = new Date(inv.created_at);
+        if (dateFilter === 'today') return d >= today;
+        if (dateFilter === 'week')  { const w = new Date(today); w.setDate(w.getDate() - 7); return d >= w; }
+        if (dateFilter === 'month') { const m = new Date(today); m.setMonth(m.getMonth() - 1); return d >= m; }
+        if (dateFilter === 'year')  { const y = new Date(today); y.setFullYear(y.getFullYear() - 1); return d >= y; }
+        return true;
       });
     }
-
-    return filtered.sort((a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+    return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [invoices, search, statusFilter, dateFilter]);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'paid':
-        return (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-            <CheckCircle2 className="h-3 w-3 mr-1" />
-            Payée
-          </Badge>
-        );
-      case 'pending':
-        return (
-          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-            <Clock className="h-3 w-3 mr-1" />
-            En attente
-          </Badge>
-        );
-      case 'overdue':
-        return (
-          <Badge variant="destructive" className="bg-red-100 text-red-800">
-            <XCircle className="h-3 w-3 mr-1" />
-            En retard
-          </Badge>
-        );
-      case 'draft':
-        return (
-          <Badge variant="outline">
-            Brouillon
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="outline">
-            {status}
-          </Badge>
-        );
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const formatCurrency = (amount: number, currency: string) => {
-    return `${amount.toLocaleString('fr-FR')} ${currency}`;
-  };
-
+  // ── Actions ───────────────────────────────────────────────────────────────────
   const openHtmlInvoice = async (invoice: Invoice) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-
       const res = await fetch(`${API_BASE}/api/admin/invoices/${invoice.id}/html`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-
       if (!res.ok) throw new Error('Impossible de récupérer la facture');
-
       const html = await res.text();
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    } catch (e) {
-      console.error(e);
-    }
+      window.open(URL.createObjectURL(new Blob([html], { type: 'text/html' })), '_blank');
+    } catch (e) { console.error(e); }
   };
 
   const downloadPdfInvoice = async (invoice: Invoice) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-
       const res = await fetch(`${API_BASE}/api/admin/invoices/${invoice.id}/pdf`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-
       if (!res.ok) throw new Error('Impossible de récupérer le PDF');
-
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `facture-${invoice.reference}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error(e);
-    }
+      a.href = url; a.download = `facture-${invoice.reference}.pdf`;
+      document.body.appendChild(a); a.click();
+      a.remove(); URL.revokeObjectURL(url);
+    } catch (e) { console.error(e); }
   };
 
   const exportCsv = async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-
       const res = await fetch(`${API_BASE}/api/admin/invoices/export.csv`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-
       if (!res.ok) throw new Error('Erreur export');
-
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `factures-${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error(e);
-    }
+      a.href = url; a.download = `factures-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a); a.click();
+      a.remove(); URL.revokeObjectURL(url);
+    } catch (e) { console.error(e); }
   };
 
   const copyReference = (reference: string) => {
     navigator.clipboard.writeText(reference);
-    toast({ title: "Référence copiée", description: "La référence a été copiée dans le presse-papier." });
+    toast({ title: 'Référence copiée' });
   };
 
+  const formatDate = (d: string) => {
+    try {
+      return new Date(d).toLocaleDateString('fr-FR', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+    } catch { return d; }
+  };
+
+  const formatCurrency = (n: number, currency: string) =>
+    `${n.toLocaleString('fr-FR')} ${currency}`;
+
+  // ── KPIs ─────────────────────────────────────────────────────────────────────
+  const kpis = [
+    { label: 'CA facturé', value: formatCurrency(stats.totalAmount, 'F CFA'), sub: `${stats.paid} factures payées`, icon: TrendingUp, c: '#2E7D32', bg: '#EAF5EB', pct: 100 },
+    { label: 'Payées', value: stats.paid, sub: `${stats.total > 0 ? Math.round((stats.paid / stats.total) * 100) : 0}% du total`, icon: CheckCircle2, c: '#2E7D32', bg: '#EAF5EB', pct: stats.total > 0 ? (stats.paid / stats.total) * 100 : 0 },
+    { label: 'En attente', value: stats.pending, sub: 'Validation en cours', icon: Clock, c: stats.pending > 0 ? '#B45309' : '#52525B', bg: stats.pending > 0 ? '#FEF3E2' : '#F4F4F5', pct: stats.total > 0 ? (stats.pending / stats.total) * 100 : 0 },
+    { label: 'Ce mois', value: stats.thisMonth, sub: 'Nouvelles factures', icon: Calendar, c: '#1565C0', bg: '#E8F1FD', pct: null },
+  ];
+
+  // ── Status tabs ───────────────────────────────────────────────────────────────
+  const STATUS_TABS = [
+    ['all', 'Toutes'],
+    ['paid', 'Payées'],
+    ['pending', 'En attente'],
+    ['overdue', 'En retard'],
+    ['draft', 'Brouillon'],
+  ] as const;
+
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
+    <div className="min-h-screen" style={{ background: '#F7F8F8' }}>
 
+      {/* ── AdminHeader ─────────────────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden" style={{ background: ADMIN_GRAD }}>
+        <div className="absolute inset-0 opacity-[0.12] pointer-events-none"
+          style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '22px 22px' }} />
+        <div className="relative max-w-[1180px] mx-auto px-5 sm:px-8 py-7 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex items-center gap-3.5 flex-1 min-w-0 pl-10 md:pl-0">
+            <span className="w-12 h-12 rounded-2xl bg-white/[0.12] flex items-center justify-center text-white shrink-0">
+              <Receipt size={24} strokeWidth={1.9} />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-white leading-tight">Factures</h1>
+              <p className="text-white/65 text-sm mt-0.5">
+                {formatCurrency(stats.totalAmount, 'F CFA')} encaissés · {stats.total} factures émises
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={exportCsv}
+              className="h-10 px-4 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-semibold flex items-center gap-1.5 transition-colors">
+              <Download size={15} /> Exporter CSV
+            </button>
+            <button onClick={loadInvoices}
+              className="h-10 w-10 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors">
+              <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
+            </button>
+          </div>
+        </div>
+      </div>
 
-      <main className="flex-1 p-6 lg:p-12 max-w-[1600px] mx-auto w-full space-y-12">
-        {/* ── PREMIUM HEADER ARCHITECTURE ── */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
-          <div className="space-y-4">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 border border-blue-100"
-            >
-              <Sparkles className="h-4 w-4 text-blue-600" />
-              <span className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-700">Facturation Intelligente</span>
-            </motion.div>
-            <h1 className="text-5xl lg:text-7xl font-black text-gray-900 tracking-tight leading-none">
-              Gestion des <span className="text-blue-600 block lg:inline">Factures</span>
-            </h1>
-            <p className="text-xl text-gray-400 font-medium max-w-2xl">
-              Pilotez votre écosystème financier avec une précision chirurgicale et des données en temps réel.
+      {/* ── AdminBody ───────────────────────────────────────────────────────────── */}
+      <div className="max-w-[1180px] mx-auto px-5 sm:px-8 py-7 space-y-7">
+
+        {/* KPI cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {kpis.map(({ label, value, sub, icon: Icon, c, bg, pct }) => (
+            <div key={label} className="bg-white p-5" style={CARD_STYLE}>
+              <div className="flex items-center gap-3.5 mb-3">
+                <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: bg, color: c }}>
+                  <Icon size={18} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-lg font-extrabold text-[#18181B] leading-none tabular-nums truncate">{value}</p>
+                  <p className="text-xs text-zinc-400 mt-1">{label}</p>
+                </div>
+              </div>
+              {pct !== null && (
+                <div className="h-1 w-full bg-zinc-100 rounded-full overflow-hidden mb-2">
+                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: c }} />
+                </div>
+              )}
+              <p className="text-[11px] text-zinc-400">{sub}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Filter toolbar ─────────────────────────────────────────────────────── */}
+        <div className="bg-white p-3 flex flex-col gap-3" style={CARD_STYLE}>
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input placeholder="Rechercher par référence, client, numéro de facture, plan…"
+              value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full h-9 pl-9 pr-3 rounded-lg bg-zinc-50 border border-transparent focus:border-[#E7E7EA] outline-none text-sm text-[#18181B]" />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {STATUS_TABS.map(([k, label]) => (
+              <button key={k} onClick={() => setStatusFilter(k)}
+                className={`px-3 h-9 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${statusFilter === k ? 'text-white' : 'border border-[#E7E7EA] text-zinc-500 hover:bg-zinc-50'}`}
+                style={statusFilter === k ? { background: '#1B5E20' } : undefined}>
+                {label}
+              </button>
+            ))}
+            <div className="ml-auto">
+              <select value={dateFilter} onChange={e => setDateFilter(e.target.value)}
+                className="h-9 px-2 rounded-lg border border-[#E7E7EA] bg-zinc-50 text-xs text-[#18181B] outline-none">
+                <option value="all">Toute période</option>
+                <option value="today">Aujourd'hui</option>
+                <option value="week">Cette semaine</option>
+                <option value="month">Ce mois</option>
+                <option value="year">Cette année</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Count strip */}
+        <div className="flex items-center gap-3">
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0"
+            style={{ background: '#1B5E20' }}>
+            {filteredInvoices.length}
+          </span>
+          <div>
+            <p className="text-sm font-bold text-[#18181B]">Factures</p>
+            <p className="text-xs text-zinc-400">
+              {filteredInvoices.filter(i => i.status === 'paid').length} payées ·{' '}
+              {filteredInvoices.filter(i => i.status === 'pending').length} en attente
+              {filteredInvoices.filter(i => i.status === 'overdue').length > 0 && (
+                <span className="text-[#C62828] ml-1">
+                  · {filteredInvoices.filter(i => i.status === 'overdue').length} en retard
+                </span>
+              )}
             </p>
           </div>
-
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={loadInvoices}
-              disabled={refreshing}
-              className="h-16 px-8 rounded-[2rem] border-2 border-gray-100 bg-white hover:bg-gray-50 text-gray-900 font-black transition-all shadow-sm"
-            >
-              <RefreshCw className={`h-5 w-5 mr-3 ${refreshing ? 'animate-spin' : ''}`} />
-              Actualiser le Flux
-            </Button>
-            <Button
-              onClick={exportCsv}
-              className="h-16 px-8 rounded-[2rem] bg-gray-900 hover:bg-blue-600 text-white font-black transition-all shadow-xl shadow-gray-200"
-            >
-              <Download className="h-5 w-5 mr-3" />
-              Exporter les Données
-            </Button>
-          </div>
         </div>
 
-        {/* ── BENTO METRICS GRID ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Main Revenue Bento */}
-          <Card className="lg:col-span-2 overflow-hidden border-0 bg-gradient-to-br from-blue-600 to-indigo-700 shadow-2xl shadow-blue-200 group">
-            <CardContent className="p-10 relative">
-              <div className="relative z-10 flex flex-col h-full justify-between gap-12">
-                <div className="flex items-start justify-between">
-                  <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
-                    <Banknote className="h-7 w-7 text-white" />
-                  </div>
-                  <Badge className="bg-emerald-400/20 text-emerald-400 border-emerald-400/30 font-black text-[10px] uppercase tracking-widest px-4 py-1">
-                    Performance Mensuelle
-                  </Badge>
+        {/* ── Table ────────────────────────────────────────────────────────────────── */}
+        {loading ? (
+          <div className="bg-white overflow-hidden" style={CARD_STYLE}>
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-[#E7E7EA] last:border-0">
+                <div className="w-9 h-9 rounded-xl bg-zinc-100 animate-pulse shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 bg-zinc-100 rounded w-40 animate-pulse" />
+                  <div className="h-2.5 bg-zinc-100 rounded w-56 animate-pulse" />
                 </div>
-                <div className="space-y-4">
-                  <p className="text-white/60 font-black text-xs uppercase tracking-[0.2em]">Chiffre d'Affaires Facturé</p>
-                  <h3 className="text-5xl lg:text-7xl font-black text-white tracking-tighter">
-                    {formatCurrency(stats.totalAmount, 'F')}<span className="text-2xl ml-2 font-black">CFA</span>
-                  </h3>
-                  <div className="flex items-center gap-3 pt-4">
-                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-400/20 text-emerald-300 font-black text-[10px] uppercase">
-                      <TrendingUp className="h-3 w-3" />
-                      +24% vs mois dernier
-                    </div>
-                    <p className="text-white/40 text-xs font-bold">{stats.thisMonth} nouvelles factures</p>
-                  </div>
-                </div>
+                <div className="h-3 bg-zinc-100 rounded w-20 animate-pulse" />
               </div>
-              {/* Design Elements */}
-              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
-                <TrendingUp className="h-48 w-48 text-white" />
-              </div>
-              <div className="absolute -bottom-12 -left-12 h-64 w-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
-            </CardContent>
-          </Card>
-
-          {/* Status Distribution Bento */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-6 lg:col-span-1">
-            <Card className="border-0 bg-white shadow-xl shadow-gray-100 group overflow-hidden">
-              <CardContent className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="h-12 w-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
-                    <CheckCircle2 className="h-6 w-6" />
-                  </div>
-                  <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Validées</span>
-                </div>
-                <h4 className="text-3xl font-black text-gray-900 tracking-tight mb-1">{stats.paid}</h4>
-                <p className="text-xs font-bold text-gray-400">Factures payées</p>
-                <div className="mt-4 h-1.5 w-full bg-gray-50 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(stats.paid / stats.total) * 100 || 0}%` }}
-                    className="h-full bg-green-500"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 bg-white shadow-xl shadow-gray-100 group overflow-hidden">
-              <CardContent className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="h-12 w-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
-                    <Clock className="h-6 w-6" />
-                  </div>
-                  <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Attente</span>
-                </div>
-                <h4 className="text-3xl font-black text-gray-900 tracking-tight mb-1">{stats.pending}</h4>
-                <p className="text-xs font-bold text-gray-400">Validation en cours</p>
-                <div className="mt-4 h-1.5 w-full bg-gray-50 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(stats.pending / stats.total) * 100 || 0}%` }}
-                    className="h-full bg-orange-400"
-                  />
-                </div>
-              </CardContent>
-            </Card>
+            ))}
           </div>
-
-          {/* Secondary Metrics Bento */}
-          <Card className="border-0 bg-white shadow-xl shadow-gray-100 group overflow-hidden">
-            <CardContent className="p-8 flex flex-col h-full justify-between items-center text-center space-y-8">
-              <div className="space-y-2">
-                <div className="h-16 w-16 rounded-[2rem] bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto shadow-inner">
-                  <Activity className="h-8 w-8" />
-                </div>
-                <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 pt-4">Activité Globale</h5>
-              </div>
-              <div className="space-y-2">
-                <h4 className="text-5xl font-black text-gray-900 tracking-tighter">{stats.total}</h4>
-                <p className="text-xs font-bold text-gray-400">Total Factures Émises</p>
-              </div>
-              <div className="w-full space-y-4">
-                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                  <span className="text-red-500">Alertes ({stats.overdue})</span>
-                  <span className="text-gray-400">Retards</span>
-                </div>
-                <div className="h-1.5 w-full bg-gray-50 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(stats.overdue / stats.total) * 100 || 0}%` }}
-                    className="h-full bg-red-500"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* ── HIGH-DENSITY FILTER ARCHITECTURE ── */}
-        <div className="bg-white p-4 rounded-[2.5rem] shadow-2xl shadow-gray-200/50 border border-gray-100 flex flex-col lg:flex-row items-center gap-4">
-          <div className="relative flex-1 w-full group">
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-            <Input
-              placeholder="Rechercher un flux, une référence, un client..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="h-16 pl-16 pr-8 rounded-[1.5rem] border-0 bg-transparent text-lg font-bold placeholder:text-gray-300 focus-visible:ring-0"
-            />
+        ) : filteredInvoices.length === 0 ? (
+          <div className="bg-white flex flex-col items-center justify-center py-20 text-center" style={CARD_STYLE}>
+            <span className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+              style={{ background: '#E8F5E9', color: '#1B5E20' }}>
+              <Receipt size={24} />
+            </span>
+            <h3 className="font-bold text-[#18181B]">Aucune facture</h3>
+            <p className="text-sm text-zinc-400 mt-1 max-w-xs">Aucune facture ne correspond aux filtres sélectionnés.</p>
           </div>
-
-          <div className="flex items-center gap-3 w-full lg:w-auto p-2 bg-gray-50/50 rounded-[2rem]">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-12 px-6 rounded-[1.5rem] border-0 bg-white shadow-sm font-black text-xs uppercase tracking-widest w-[160px]">
-                <SelectValue placeholder="Statut" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border-gray-100 font-bold">
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="paid">Payée</SelectItem>
-                <SelectItem value="pending">En attente</SelectItem>
-                <SelectItem value="overdue">En retard</SelectItem>
-                <SelectItem value="draft">Brouillon</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger className="h-12 px-6 rounded-[1.5rem] border-0 bg-white shadow-sm font-black text-xs uppercase tracking-widest w-[160px]">
-                <SelectValue placeholder="Période" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border-gray-100 font-bold">
-                <SelectItem value="all">Toute période</SelectItem>
-                <SelectItem value="today">Aujourd'hui</SelectItem>
-                <SelectItem value="week">Cette semaine</SelectItem>
-                <SelectItem value="month">Ce mois</SelectItem>
-                <SelectItem value="year">Cette année</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <div className="h-12 w-12 bg-white rounded-[1.5rem] shadow-sm flex items-center justify-center text-gray-400">
-              <Filter className="h-5 w-5" />
+        ) : (
+          <div className="bg-white overflow-hidden" style={CARD_STYLE}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[780px]">
+                <thead>
+                  <tr className="text-left text-xs font-bold uppercase tracking-wide text-zinc-400 border-b border-[#E7E7EA]">
+                    <th className="py-3 px-5">N° Facture</th>
+                    <th className="py-3 px-3">Client</th>
+                    <th className="py-3 px-3">Plan</th>
+                    <th className="py-3 px-3">Méthode</th>
+                    <th className="py-3 px-3 text-right">Montant</th>
+                    <th className="py-3 px-3">Statut</th>
+                    <th className="py-3 px-3">Date</th>
+                    <th className="py-3 px-5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredInvoices.map(inv => (
+                    <tr key={inv.id}
+                      className="border-b border-[#E7E7EA] last:border-0 hover:bg-zinc-50/70 transition-colors cursor-pointer"
+                      onClick={() => { setSelectedInvoice(inv); setDetailsOpen(true); }}>
+                      <td className="py-3 px-5">
+                        <div className="flex items-center gap-2.5">
+                          {/* Status accent dot */}
+                          <span className="w-2 h-2 rounded-full shrink-0"
+                            style={{ background: (STATUS_PILL[inv.status] ?? STATUS_PILL.draft).c }} />
+                          <div>
+                            <p className="font-mono text-xs font-semibold text-[#18181B]">{inv.invoice_number}</p>
+                            <p className="text-[11px] text-zinc-400 font-mono truncate max-w-[120px]">{inv.reference}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3">
+                        <p className="font-semibold text-[#18181B] whitespace-nowrap">{inv.user_name || '—'}</p>
+                        <p className="text-xs text-zinc-400 truncate max-w-[160px]">{inv.user_email}</p>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="text-sm text-[#18181B]">{inv.plan_name || '—'}</span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="text-xs text-zinc-500 capitalize">{inv.payment_method}</span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <span className="font-bold tabular-nums text-[#18181B] whitespace-nowrap">
+                          {formatCurrency(inv.amount, inv.currency)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3"><StatusPill status={inv.status} /></td>
+                      <td className="py-3 px-3 text-xs text-zinc-500 whitespace-nowrap">
+                        {formatDate(inv.created_at)}
+                      </td>
+                      <td className="py-3 px-5" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-1 justify-end">
+                          <button onClick={() => { setSelectedInvoice(inv); setDetailsOpen(true); }}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                            title="Détails">
+                            <Eye size={14} />
+                          </button>
+                          <button onClick={() => openHtmlInvoice(inv)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                            title="Prévisualiser HTML">
+                            <FileText size={14} />
+                          </button>
+                          <button onClick={() => downloadPdfInvoice(inv)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                            title="Télécharger PDF">
+                            <Download size={14} />
+                          </button>
+                          <button onClick={() => copyReference(inv.reference)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                            title="Copier référence">
+                            <Copy size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* ── TABS ARCHITECTURE ── */}
-        <Tabs defaultValue="list" className="space-y-10">
-          <TabsList className="inline-flex h-14 p-1.5 bg-gray-100/50 rounded-2xl border border-gray-200/50">
-            <TabsTrigger value="list" className="px-8 rounded-xl font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-blue-600 transition-all">
-              Registre Transactionnel
-            </TabsTrigger>
-            <TabsTrigger value="overview" className="px-8 rounded-xl font-black text-xs uppercase tracking-widest data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-blue-600 transition-all">
-              Intelligence Dashboard
-            </TabsTrigger>
-          </TabsList>
+      </div>
 
-          <TabsContent value="list" className="mt-0 outline-none">
-            <div className="grid grid-cols-1 gap-6">
-              {loading ? (
-                <div className="space-y-4">
-                  {[...Array(6)].map((_, i) => (
-                    <Skeleton key={i} className="h-32 w-full rounded-[2rem] bg-white shadow-sm border border-gray-100" />
-                  ))}
-                </div>
-              ) : filteredInvoices.length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-center py-32 bg-white rounded-[3rem] border border-dashed border-gray-200"
-                >
-                  <div className="h-24 w-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Receipt className="h-12 w-12 text-gray-200" />
+      {/* ── Details drawer (slide-in right) ──────────────────────────────────────── */}
+      {detailsOpen && selectedInvoice && (
+        <div className="fixed inset-0 z-[80] flex justify-end" onClick={() => setDetailsOpen(false)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative w-full max-w-md h-full bg-white shadow-2xl flex flex-col"
+            onClick={e => e.stopPropagation()}
+            style={{ animation: 'slideInRight 0.25s cubic-bezier(0.22,1,0.36,1)' }}>
+
+            {/* Drawer header */}
+            <div className="relative overflow-hidden shrink-0" style={{ background: ADMIN_GRAD }}>
+              <div className="absolute inset-0 opacity-[0.12] pointer-events-none"
+                style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '22px 22px' }} />
+              <button onClick={() => setDetailsOpen(false)}
+                className="absolute top-4 right-4 w-9 h-9 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors">
+                <X size={18} />
+              </button>
+              <div className="relative px-6 pt-7 pb-6 flex items-center gap-4">
+                <span className="w-16 h-16 rounded-2xl bg-white/15 flex items-center justify-center text-white shrink-0">
+                  <Receipt size={28} strokeWidth={1.6} />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-xl font-bold text-white truncate">{selectedInvoice.invoice_number}</h2>
+                  <p className="text-white/70 text-sm font-mono truncate">{selectedInvoice.reference}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <StatusPill status={selectedInvoice.status} />
+                    <span className="text-xs font-semibold text-white/80">
+                      {formatCurrency(selectedInvoice.amount, selectedInvoice.currency)}
+                    </span>
                   </div>
-                  <h3 className="text-2xl font-black text-gray-900 mb-2">Néant Transactionnel</h3>
-                  <p className="text-gray-400 font-medium font-mono">Aucun flux n'a été détecté pour ces paramètres.</p>
-                </motion.div>
-              ) : (
-                <AnimatePresence>
-                  {filteredInvoices.map((invoice, index) => (
-                    <motion.div
-                      key={invoice.id}
-                      layout
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="group relative"
-                    >
-                      <div className="relative overflow-hidden bg-white hover:bg-gray-50/50 rounded-[2.5rem] border border-gray-100 hover:border-blue-100 shadow-xl shadow-gray-200/20 hover:shadow-2xl hover:shadow-blue-500/5 transition-all duration-500">
-                        {/* Light Sweep Animation */}
-                        <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 bg-gradient-to-r from-transparent via-blue-500/5 to-transparent pointer-events-none" />
+                </div>
+              </div>
+            </div>
 
-                        <CardContent className="p-8">
-                          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-                            <div className="flex flex-1 items-start gap-8">
-                              <div className="relative">
-                                <div className={`h-16 w-16 rounded-2xl ${invoice.status === 'paid' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'} flex items-center justify-center shadow-lg group-hover:rotate-6 transition-transform duration-500`}>
-                                  <FileText className="h-8 w-8" />
-                                </div>
-                                <div className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full bg-white shadow-md flex items-center justify-center">
-                                  {invoice.status === 'paid' ? <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : <Clock className="h-5 w-5 text-orange-500" />}
-                                </div>
-                              </div>
+            {/* Drawer body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
-                              <div className="flex-1 space-y-4">
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <span className="text-xl font-black text-gray-900 tracking-tight">{invoice.reference}</span>
-                                  <Badge className={`rounded-xl px-4 py-1.5 font-black text-[10px] uppercase tracking-widest border-0 shadow-sm ${invoice.status === 'paid' ? 'bg-emerald-500 text-white' : 'bg-orange-400 text-white'}`}>
-                                    {invoice.status === 'paid' ? 'Payée' : invoice.status === 'pending' ? 'En attente' : invoice.status}
-                                  </Badge>
-                                  {invoice.invoice_number && (
-                                    <span className="text-xs font-mono font-bold text-gray-400">#{invoice.invoice_number}</span>
-                                  )}
-                                </div>
+              {/* Key stats */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  ['Montant',  formatCurrency(selectedInvoice.amount, selectedInvoice.currency)],
+                  ['Plan',     selectedInvoice.plan_name || '—'],
+                  ['Méthode',  selectedInvoice.payment_method || '—'],
+                  ['Créée le', formatDate(selectedInvoice.created_at)],
+                ].map(([l, v]) => (
+                  <div key={l} className="rounded-xl border border-[#E7E7EA] p-3">
+                    <p className="text-[10px] font-bold uppercase text-zinc-400 mb-0.5">{l}</p>
+                    <p className="text-sm font-semibold text-[#18181B] truncate">{v}</p>
+                  </div>
+                ))}
+              </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                  <div>
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 opacity-50">Flux Financier</p>
-                                    <div className="flex items-center gap-2">
-                                      <h4 className="text-lg font-black text-blue-600 tracking-tighter">{formatCurrency(invoice.amount, invoice.currency)}</h4>
-                                      <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{invoice.payment_method}</span>
-                                    </div>
-                                  </div>
+              {/* Client */}
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mb-3">Client</p>
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-3 text-sm">
+                    <User size={15} className="text-zinc-400 shrink-0" />
+                    <span className="text-[#18181B]">{selectedInvoice.user_name || '—'}</span>
+                  </div>
+                  {selectedInvoice.user_email && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <CreditCard size={15} className="text-zinc-400 shrink-0" />
+                      <a href={`mailto:${selectedInvoice.user_email}`}
+                        className="text-[#1565C0] hover:underline break-all"
+                        onClick={e => e.stopPropagation()}>
+                        {selectedInvoice.user_email}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
 
-                                  <div>
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 opacity-50">Propriétaire</p>
-                                    <div className="flex items-center gap-2 h-full">
-                                      <span className="text-sm font-black text-gray-900">{invoice.user_name || 'Inconnu'}</span>
-                                      <span className="text-[10px] font-bold text-gray-400 truncate max-w-[150px]">{invoice.user_email}</span>
-                                    </div>
-                                  </div>
-
-                                  <div>
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 opacity-50">Horodatage</p>
-                                    <div className="flex items-center gap-2">
-                                      <Calendar className="h-3 w-3 text-orange-400" />
-                                      <span className="text-xs font-bold text-gray-600">{formatDate(invoice.created_at)}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <Button
-                                variant="ghost"
-                                onClick={() => { setSelectedInvoice(invoice); setDetailsOpen(true); }}
-                                className="h-14 w-14 rounded-2xl bg-gray-50 text-gray-400 hover:bg-blue-600 hover:text-white transition-all group/btn">
-                                <Eye className="h-6 w-6 group-hover/btn:scale-110 transition-transform" />
-                              </Button>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" className="h-14 w-14 rounded-2xl bg-gray-50 text-gray-400 hover:bg-gray-900 hover:text-white transition-all">
-                                    <MoreVertical className="h-6 w-6" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-64 rounded-2xl border-gray-100 p-2 shadow-2xl">
-                                  <DropdownMenuItem className="rounded-xl font-bold py-3" onClick={() => openHtmlInvoice(invoice)}>
-                                    <Layout className="mr-3 h-4 w-4 text-blue-500" />
-                                    Prévisualiser HTML
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="rounded-xl font-bold py-3" onClick={() => downloadPdfInvoice(invoice)}>
-                                    <Download className="mr-3 h-4 w-4 text-emerald-500" />
-                                    Télécharger PDF
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="rounded-xl font-bold py-3" onClick={() => copyReference(invoice.reference)}>
-                                    <Copy className="mr-3 h-4 w-4 text-orange-500" />
-                                    Copier Référence
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator className="my-2" />
-                                  <DropdownMenuItem className="rounded-xl font-bold py-3 text-blue-600" onClick={() => window.open(`${API_BASE}/api/admin/invoices/${invoice.id}`, '_blank')}>
-                                    <Navigation className="mr-3 h-4 w-4" />
-                                    Ouvrir Endpoint API
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </div>
-                        </CardContent>
-
-                        {/* Status Edge */}
-                        <div className={`absolute top-0 bottom-0 left-0 w-1.5 ${invoice.status === 'paid' ? 'bg-emerald-500' : 'bg-orange-400'}`} />
+              {/* Dates */}
+              {(selectedInvoice.paid_at || selectedInvoice.due_date) && (
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mb-3">Dates</p>
+                  <div className="space-y-2.5">
+                    {selectedInvoice.paid_at && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <CheckCircle2 size={15} className="shrink-0" style={{ color: '#2E7D32' }} />
+                        <div>
+                          <span className="text-[10px] text-zinc-400 block">Payée le</span>
+                          <span className="font-semibold" style={{ color: '#2E7D32' }}>{formatDate(selectedInvoice.paid_at)}</span>
+                        </div>
                       </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
+                    )}
+                    {selectedInvoice.due_date && (
+                      <div className="flex items-center gap-3 text-sm">
+                        <Clock size={15} className="shrink-0" style={{ color: '#C62828' }} />
+                        <div>
+                          <span className="text-[10px] text-zinc-400 block">Échéance</span>
+                          <span className="font-semibold" style={{ color: '#C62828' }}>{formatDate(selectedInvoice.due_date)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              {selectedInvoice.notes && (
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mb-2">Notes</p>
+                  <div className="rounded-xl border border-[#E7E7EA] p-3 text-sm text-zinc-600 leading-relaxed"
+                    style={{ background: '#E8F1FD' }}>
+                    {selectedInvoice.notes}
+                  </div>
+                </div>
               )}
             </div>
-          </TabsContent>
 
-          <TabsContent value="overview" className="mt-0 outline-none">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Intelligence Distribution */}
-              <Card className="lg:col-span-2 border-0 bg-white shadow-2xl shadow-gray-200/50 rounded-[3rem] overflow-hidden group">
-                <CardHeader className="p-10 pb-0 flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-2xl font-black text-gray-900 tracking-tight">Analyse Transactionnelle</CardTitle>
-                    <CardDescription className="text-sm font-bold text-gray-400 font-mono mt-1">Répartition volumétrique par statut</CardDescription>
-                  </div>
-                  <div className="h-12 w-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <BarChart3 className="h-6 w-6" />
-                  </div>
-                </CardHeader>
-                <CardContent className="p-10 space-y-10">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between p-6 bg-emerald-50/50 rounded-[2rem] border border-emerald-100/50 group/item hover:bg-emerald-50 transition-all cursor-default">
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 bg-emerald-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
-                            <CheckCircle2 className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-black text-emerald-700 uppercase tracking-widest">Validées</p>
-                            <p className="text-[10px] font-bold text-emerald-600 text-opacity-60">Flux garantis</p>
-                          </div>
-                        </div>
-                        <h4 className="text-2xl font-black text-emerald-700 tracking-tighter">{stats.paid}</h4>
-                      </div>
-
-                      <div className="flex items-center justify-between p-6 bg-orange-50/50 rounded-[2rem] border border-orange-100/50 group/item hover:bg-orange-50 transition-all cursor-default">
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 bg-orange-400 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-100">
-                            <Clock className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-black text-orange-700 uppercase tracking-widest">Attente</p>
-                            <p className="text-[10px] font-bold text-orange-600 text-opacity-60">En vérification</p>
-                          </div>
-                        </div>
-                        <h4 className="text-2xl font-black text-orange-700 tracking-tighter">{stats.pending}</h4>
-                      </div>
-
-                      <div className="flex items-center justify-between p-6 bg-red-50/50 rounded-[2rem] border border-red-100/50 group/item hover:bg-red-50 transition-all cursor-default">
-                        <div className="flex items-center gap-4">
-                          <div className="h-10 w-10 bg-red-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-red-100">
-                            <XCircle className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-black text-red-700 uppercase tracking-widest">Retards</p>
-                            <p className="text-[10px] font-bold text-red-600 text-opacity-60">Alertes système</p>
-                          </div>
-                        </div>
-                        <h4 className="text-2xl font-black text-red-700 tracking-tighter">{stats.overdue}</h4>
-                      </div>
-                    </div>
-
-                    <div className="relative flex flex-col items-center justify-center p-8 bg-gray-50/50 rounded-[3rem] border border-gray-100">
-                      <div className="relative flex items-center justify-center h-48 w-48">
-                        <svg className="h-full w-full" viewBox="0 0 100 100">
-                          <circle className="text-gray-200 stroke-current" strokeWidth="8" fill="transparent" r="40" cx="50" cy="50" />
-                          <motion.circle
-                            className="text-blue-600 stroke-current"
-                            strokeWidth="8"
-                            strokeLinecap="round"
-                            fill="transparent"
-                            r="40" cx="50" cy="50"
-                            initial={{ strokeDasharray: "0 251", strokeDashoffset: 0 }}
-                            animate={{ strokeDasharray: `${(stats.paid / stats.total) * 251 || 0} 251` }}
-                            transition={{ duration: 1.5, ease: "easeOut" }}
-                          />
-                        </svg>
-                        <div className="absolute flex flex-col items-center text-center">
-                          <span className="text-4xl font-black text-gray-900 tracking-tighter">{Math.round((stats.paid / stats.total) * 100) || 0}%</span>
-                          <span className="text-[10px] font-black text-gray-400 tracking-widest uppercase">Taux Succès</span>
-                        </div>
-                      </div>
-                      <p className="mt-8 text-xs font-bold text-gray-400 text-center leading-relaxed">
-                        L'intelligence système valide automatiquement {Math.round((stats.paid / stats.total) * 100) || 0}% des flux entrants sur la période active.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Financial Pulse */}
-              <Card className="border-0 bg-gray-900 text-white shadow-2xl shadow-gray-400/20 rounded-[3rem] overflow-hidden group">
-                <CardHeader className="p-10 pb-0">
-                  <CardTitle className="text-2xl font-black tracking-tight">Pouls Financier</CardTitle>
-                  <CardDescription className="text-xs font-bold text-gray-400 font-mono mt-1">Indicateurs de performance réseau</CardDescription>
-                </CardHeader>
-                <CardContent className="p-10 space-y-12">
-                  <div className="space-y-8">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-end">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Ticket Moyen Système</p>
-                        <h4 className="text-2xl font-black tracking-tighter text-blue-400">{formatCurrency(stats.avgAmount, 'F')}</h4>
-                      </div>
-                      <div className="h-12 w-full bg-white/5 rounded-2xl flex items-center px-4">
-                        <TrendingUp className="h-5 w-5 text-emerald-400 mr-3" />
-                        <span className="text-xs font-bold">En progression de +8.4%</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Flux Mensuel Actif</p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex gap-1">
-                          {[...Array(8)].map((_, i) => (
-                            <motion.div
-                              key={i}
-                              initial={{ height: 20 }}
-                              animate={{ height: Math.floor(Math.random() * 40) + 10 }}
-                              transition={{ repeat: Infinity, repeatType: "reverse", duration: 0.5, delay: i * 0.1 }}
-                              className="w-3 bg-blue-500 rounded-full"
-                            />
-                          ))}
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-black tracking-tighter">{stats.thisMonth}</p>
-                          <p className="text-[10px] font-bold text-white/40">UNITÉS</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-6">
-                      <Button className="w-full h-14 rounded-2xl bg-white text-gray-900 font-black hover:bg-blue-600 hover:text-white transition-all">
-                        Générer Rapport IA
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-                <div className="absolute -bottom-10 -right-10 h-40 w-40 bg-blue-500/10 rounded-full blur-3xl" />
-              </Card>
+            {/* Drawer footer */}
+            <div className="border-t border-[#E7E7EA] p-4 flex items-center gap-2 shrink-0">
+              <button onClick={() => copyReference(selectedInvoice.reference)}
+                className="h-10 w-10 rounded-lg border border-[#E7E7EA] flex items-center justify-center text-zinc-400 hover:bg-zinc-50 transition-colors shrink-0"
+                title="Copier la référence">
+                <Copy size={14} />
+              </button>
+              <button onClick={() => openHtmlInvoice(selectedInvoice)}
+                className="flex-1 h-10 rounded-lg border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 flex items-center justify-center gap-1.5 transition-colors">
+                <FileText size={14} /> Voir HTML
+              </button>
+              <button onClick={() => downloadPdfInvoice(selectedInvoice)}
+                className="flex-1 h-10 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-1.5"
+                style={{ background: '#2E7D32' }}>
+                <Download size={14} /> PDF
+              </button>
             </div>
-          </TabsContent>
-        </Tabs>
-      </main>
+          </div>
+        </div>
+      )}
 
-
-      {/* ── INVOICE DETAILS INTELLIGENCE ── */}
-      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-4xl bg-white/80 backdrop-blur-2xl border-0 shadow-[0_32px_128px_-16px_rgba(0,0,0,0.1)] rounded-[3rem] p-0 overflow-hidden focus-visible:outline-none">
-          {selectedInvoice && (
-            <div className="flex flex-col h-full">
-              <div className="p-10 lg:p-12 space-y-10">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <Badge variant="outline" className="rounded-full border-blue-100 bg-blue-50 text-blue-600 font-black text-[10px] uppercase tracking-widest px-4 py-1 mb-4">
-                      Financial Intelligence
-                    </Badge>
-                    <h2 className="text-4xl font-black text-gray-900 tracking-tight">Détails de la <span className="text-blue-600">Facture</span></h2>
-                    <p className="text-gray-400 font-bold text-sm mt-2 font-mono">REF: {selectedInvoice.reference}</p>
-                  </div>
-                  <div className={`h-20 w-20 rounded-[2rem] ${selectedInvoice.status === 'paid' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'} flex items-center justify-center shadow-lg transform rotate-6`}>
-                    <Receipt className="h-10 w-10" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  <div className="bg-gray-50/50 p-8 rounded-[2rem] border border-gray-100 group hover:bg-white hover:shadow-xl hover:shadow-gray-100/50 transition-all">
-                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-4 opacity-50">Montant Total</p>
-                    <h4 className="text-3xl font-black text-gray-900 tracking-tighter group-hover:text-blue-600 transition-colors">{formatCurrency(selectedInvoice.amount, selectedInvoice.currency)}</h4>
-                    <p className="text-[10px] font-bold text-emerald-600 uppercase mt-2">Taxes et frais inclus</p>
-                  </div>
-
-                  <div className="bg-gray-50/50 p-8 rounded-[2rem] border border-gray-100">
-                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-4 opacity-50">Numéro Document</p>
-                    <h4 className="text-xl font-mono font-black text-gray-900 tracking-tighter">#{selectedInvoice.invoice_number}</h4>
-                  </div>
-
-                  <div className="bg-gray-50/50 p-8 rounded-[2rem] border border-gray-100">
-                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-4 opacity-50">Statut Actuel</p>
-                    <Badge className={`rounded-xl px-4 py-2 font-black text-[10px] uppercase tracking-widest border-0 shadow-sm ${selectedInvoice.status === 'paid' ? 'bg-emerald-500 text-white' : 'bg-orange-400 text-white'}`}>
-                      {selectedInvoice.status === 'paid' ? 'Payée' : 'En attente'}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3 mb-2">
-                      <User className="h-5 w-5 text-blue-500" />
-                      <h5 className="text-xs font-black uppercase tracking-widest text-gray-900">Informations Client</h5>
-                    </div>
-                    <div className="space-y-4 bg-gray-50/30 p-6 rounded-[1.5rem]">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-400 underline decoration-gray-200 underline-offset-4">Nom Complet</span>
-                        <span className="text-sm font-black text-gray-900">{selectedInvoice.user_name || '—'}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-400 underline decoration-gray-200 underline-offset-4">Email Direct</span>
-                        <span className="text-sm font-black text-gray-900">{selectedInvoice.user_email || '—'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3 mb-2">
-                      <CreditCard className="h-5 w-5 text-orange-400" />
-                      <h5 className="text-xs font-black uppercase tracking-widest text-gray-900">Détails Facturation</h5>
-                    </div>
-                    <div className="space-y-4 bg-gray-50/30 p-6 rounded-[1.5rem]">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-400 underline decoration-gray-200 underline-offset-4">Plan de Souscription</span>
-                        <span className="text-sm font-black text-gray-900">{selectedInvoice.plan_name}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-400 underline decoration-gray-200 underline-offset-4">Méthode de Règlement</span>
-                        <span className="text-sm font-black text-gray-900">{selectedInvoice.payment_method}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  <div>
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 opacity-50">Date de Création</p>
-                    <p className="text-sm font-black text-gray-900">{formatDate(selectedInvoice.created_at)}</p>
-                  </div>
-                  {selectedInvoice.paid_at && (
-                    <div>
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 opacity-50">Date de Règlement</p>
-                      <p className="text-sm font-black text-emerald-600">{formatDate(selectedInvoice.paid_at)}</p>
-                    </div>
-                  )}
-                  {selectedInvoice.due_date && (
-                    <div>
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 opacity-50">Date d'Échéance</p>
-                      <p className="text-sm font-black text-red-500">{formatDate(selectedInvoice.due_date)}</p>
-                    </div>
-                  )}
-                </div>
-
-                {selectedInvoice.notes && (
-                  <div>
-                    <Label className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 block">Notes Administratives</Label>
-                    <div className="p-6 bg-blue-50/50 rounded-[1.5rem] border border-blue-100 border-dashed text-sm font-bold text-blue-900">
-                      {selectedInvoice.notes}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-8 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-4">
-                <div className="flex gap-3">
-                  <Button
-                    variant="ghost"
-                    onClick={() => setDetailsOpen(false)}
-                    className="h-14 px-8 rounded-2xl font-black text-gray-400 hover:text-gray-900 transition-all uppercase tracking-widest text-xs">
-                    Fermer
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => copyReference(selectedInvoice.reference)}
-                    className="h-14 px-8 rounded-2xl font-black text-gray-400 hover:text-blue-600 transition-all uppercase tracking-widest text-xs">
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copier Ref
-                  </Button>
-                </div>
-                <div className="flex gap-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => openHtmlInvoice(selectedInvoice)}
-                    className="h-14 px-8 rounded-2xl font-black border-2 border-gray-100 bg-white hover:bg-gray-50 text-gray-900 shadow-sm transition-all">
-                    <FileText className="mr-3 h-5 w-5 text-blue-500" />
-                    Voir HTML
-                  </Button>
-                  <Button
-                    onClick={() => downloadPdfInvoice(selectedInvoice)}
-                    className="h-14 px-10 rounded-2xl font-black bg-gray-900 text-white shadow-xl shadow-gray-200 hover:bg-blue-600 transition-all">
-                    <Download className="mr-3 h-5 w-5" />
-                    Télécharger PDF
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <style>{`@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
     </div>
   );
 }

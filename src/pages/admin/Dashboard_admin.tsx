@@ -1,44 +1,23 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from '@/components/ui/badge';
 import {
   Users, Briefcase, CreditCard,
   TrendingUp, ShoppingCart, AlertCircle,
   ArrowUpRight, ArrowDownRight, RefreshCw,
-  Banknote, CalendarDays, Zap,
-  UserPlus, Smartphone,
-  Activity, ArrowRight, History, Sparkles,
-  ChevronRight, Clock3
+  Banknote, CalendarDays, Activity, ArrowRight,
+  History, Sparkles, ChevronRight, Clock3,
+  BarChart3, Package, UserPlus, Smartphone,
 } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 
 const API_BASE = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE || 'http://localhost:3000';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 interface Stats {
   total_revenue: number;
   today_revenue: number;
@@ -63,25 +42,30 @@ interface Stats {
   failed_payments_month: number;
 }
 
+// ─── Design tokens ─────────────────────────────────────────────────────────────
+const CARD_STYLE = { borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' } as const;
+const ADMIN_GRAD = 'linear-gradient(135deg, #1B5E20, #2E7D32)';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number, currency = true) => {
   const s = Math.round(n).toLocaleString('fr-FR');
   return currency ? `${s} F` : s;
 };
 
-const GrowthBadge = ({ value, label = "période passée" }: { value: number, label?: string }) => {
-  if (value === 0) return <span className="text-[10px] text-gray-400 font-medium">vs {label}</span>;
+function GrowthBadge({ value, label = 'période passée' }: { value: number; label?: string }) {
+  if (value === 0) return <span className="text-[10px] text-zinc-400">vs {label}</span>;
   const up = value > 0;
   return (
-    <div className={`inline-flex items-center gap-1 py-0.5 px-2 rounded-full text-[11px] font-bold ${up ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-500'
-      }`}>
-      {up ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+    <span className="inline-flex items-center gap-1 py-0.5 px-2 rounded-full text-[11px] font-bold"
+      style={up ? { background: '#EAF5EB', color: '#2E7D32' } : { background: '#FEECEC', color: '#C62828' }}>
+      {up ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
       {Math.abs(value)}%
-    </div>
+    </span>
   );
-};
+}
 
-// Sparkline 40px
-const Sparkline = ({ data, color }: { data: any[], color: string }) => {
+// ─── Sparkline ────────────────────────────────────────────────────────────────
+function Sparkline({ data, color }: { data: any[]; color: string }) {
   if (!data || data.length === 0) return null;
   const safeId = color.replace(/[^a-zA-Z0-9]/g, '');
   return (
@@ -90,159 +74,94 @@ const Sparkline = ({ data, color }: { data: any[], color: string }) => {
         <AreaChart data={data}>
           <defs>
             <linearGradient id={`grad-${safeId}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={color} stopOpacity={0.25} />
+              <stop offset="5%"  stopColor={color} stopOpacity={0.25} />
               <stop offset="95%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <Area
-            type="monotone"
-            dataKey="revenue"
-            stroke={color}
-            strokeWidth={1.5}
-            fillOpacity={1}
-            fill={`url(#grad-${safeId})`}
-            isAnimationActive={false}
-          />
+          <Area type="monotone" dataKey="revenue" stroke={color} strokeWidth={1.5}
+            fillOpacity={1} fill={`url(#grad-${safeId})`} isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
   );
-};
+}
 
-const MainRevenueChart = ({ data }: { data: any[] }) => {
+// ─── Revenue chart ────────────────────────────────────────────────────────────
+function MainRevenueChart({ data }: { data: any[] }) {
   if (!data || data.length === 0) return (
-    <div className="h-64 flex items-center justify-center text-gray-400 text-sm italic">
-      Données de revenus insuffisantes pour afficher le graphique
+    <div className="h-64 flex items-center justify-center text-zinc-400 text-sm italic">
+      Données insuffisantes pour afficher le graphique
     </div>
   );
-
   return (
-    <div className="h-72 w-full mt-4">
+    <div className="h-64 w-full mt-4">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#A5D6A7" stopOpacity={0.6} />
+              <stop offset="5%"  stopColor="#A5D6A7" stopOpacity={0.6} />
               <stop offset="95%" stopColor="#A5D6A7" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="" vertical={false} stroke="#F0F0F0" />
-          <XAxis
-            dataKey="month"
-            axisLine={false}
-            tickLine={false}
-            tick={{ fontSize: 12, fill: '#9E9E9E', fontFamily: 'Inter, sans-serif' }}
-            dy={10}
-          />
-          <YAxis
-            axisLine={false}
-            tickLine={false}
-            tick={{ fontSize: 12, fill: '#9E9E9E', fontFamily: 'Inter, sans-serif' }}
-            tickFormatter={(val) => `${val / 1000}k`}
-          />
+          <CartesianGrid strokeDasharray="" vertical={false} stroke="#F4F4F5" />
+          <XAxis dataKey="month" axisLine={false} tickLine={false}
+            tick={{ fontSize: 11, fill: '#A1A1AA' }} dy={8} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#A1A1AA' }}
+            tickFormatter={(v) => `${v / 1000}k`} />
           <Tooltip
-            contentStyle={{
-              backgroundColor: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
-              padding: '10px 14px',
-              fontFamily: 'Inter, sans-serif',
-            }}
+            contentStyle={{ backgroundColor: '#fff', border: 'none', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.10)', padding: '10px 14px', fontSize: 12 }}
             formatter={(value: number) => [`${Math.round(value).toLocaleString('fr-FR')} FCFA`, 'Revenu']}
-            labelStyle={{ fontWeight: 600, color: '#1A1A2E', marginBottom: '4px', fontSize: '12px' }}
           />
-          <Area
-            type="monotone"
-            dataKey="revenue"
-            stroke="#2E7D32"
-            strokeWidth={2}
-            fillOpacity={1}
-            fill="url(#colorRevenue)"
-          />
+          <Area type="monotone" dataKey="revenue" stroke="#2E7D32" strokeWidth={2}
+            fillOpacity={1} fill="url(#colorRevenue)" />
         </AreaChart>
       </ResponsiveContainer>
     </div>
   );
-};
+}
 
+// ─── Plan distribution chart ──────────────────────────────────────────────────
 const PIE_COLORS = ['#2E7D32', '#43A047', '#66BB6A', '#A5D6A7', '#C8E6C9', '#1565C0'];
 
-const PlanDistributionChart = ({ data }: { data: any[] }) => {
+function PlanDistributionChart({ data }: { data: any[] }) {
   if (!data || data.length === 0) return null;
-
-  const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, name, percent }: any) => {
-    const RADIAN = Math.PI / 180;
-    const radius = innerRadius + (outerRadius - innerRadius) * 1.35;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, name, percent }: any) => {
     if (percent < 0.05) return null;
+    const R = Math.PI / 180;
+    const r = innerRadius + (outerRadius - innerRadius) * 1.35;
+    const x = cx + r * Math.cos(-midAngle * R);
+    const y = cy + r * Math.sin(-midAngle * R);
     return (
-      <text
-        x={x}
-        y={y}
-        fill="#1A1A2E"
-        textAnchor={x > cx ? 'start' : 'end'}
-        dominantBaseline="central"
-        style={{ fontSize: '11px', fontFamily: 'Inter, sans-serif', fontWeight: 600 }}
-      >
+      <text x={x} y={y} fill="#18181B" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central"
+        style={{ fontSize: 11, fontWeight: 600 }}>
         {name} {(percent * 100).toFixed(0)}%
       </text>
     );
   };
-
   return (
-    <div className="h-72 w-full mt-4">
+    <div className="h-64 w-full mt-4">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="45%"
-            innerRadius={60}
-            outerRadius={100}
-            paddingAngle={3}
-            dataKey="users_count"
-            nameKey="name"
-            labelLine={false}
-            label={renderCustomLabel}
-          >
-            {data.map((_, index) => (
-              <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-            ))}
+          <Pie data={data} cx="50%" cy="45%" innerRadius={50} outerRadius={80} paddingAngle={3}
+            dataKey="users_count" nameKey="name" labelLine={false} label={renderLabel}>
+            {data.map((_, i) => <Cell key={`cell-${i}`} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
           </Pie>
-          <Tooltip
-            contentStyle={{
-              backgroundColor: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.10)',
-              fontFamily: 'Inter, sans-serif',
-              fontSize: '12px',
-            }}
-            formatter={(value: number, name: string) => [value + ' clients', name]}
-          />
-          <Legend
-            iconType="circle"
-            iconSize={8}
-            formatter={(value) => (
-              <span style={{ fontSize: '11px', color: '#5C5C5C', fontFamily: 'Inter, sans-serif' }}>{value}</span>
-            )}
-          />
+          <Tooltip contentStyle={{ backgroundColor: '#fff', border: 'none', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.10)', fontSize: 12 }}
+            formatter={(v: number, n: string) => [v + ' clients', n]} />
+          <Legend iconType="circle" iconSize={8}
+            formatter={(v) => <span style={{ fontSize: 11, color: '#71717A' }}>{v}</span>} />
         </PieChart>
       </ResponsiveContainer>
     </div>
   );
-};
+}
 
-// ── Time-travel helpers ──────────────────────────────────────────────────────
+// ─── Time-travel helpers ──────────────────────────────────────────────────────
 type Granularity = 'day' | 'month' | 'quarter' | 'year';
 
 function buildHistDateRange(granularity: Granularity, histDate: string): { from: string; to: string } | null {
   if (!histDate) return null;
-  if (granularity === 'day') {
-    return { from: `${histDate} 00:00:00`, to: `${histDate} 23:59:59` };
-  }
+  if (granularity === 'day') return { from: `${histDate} 00:00:00`, to: `${histDate} 23:59:59` };
   if (granularity === 'month') {
     const [yr, mo] = histDate.split('-').map(Number);
     const last = new Date(yr, mo, 0).getDate();
@@ -255,58 +174,64 @@ function buildHistDateRange(granularity: Granularity, histDate: string): { from:
     const last = new Date(yr, em, 0).getDate();
     return { from: `${yr}-${String(sm).padStart(2,'0')}-01 00:00:00`, to: `${yr}-${String(em).padStart(2,'0')}-${String(last).padStart(2,'0')} 23:59:59` };
   }
-  if (granularity === 'year') {
-    return { from: `${histDate}-01-01 00:00:00`, to: `${histDate}-12-31 23:59:59` };
-  }
+  if (granularity === 'year') return { from: `${histDate}-01-01 00:00:00`, to: `${histDate}-12-31 23:59:59` };
   return null;
 }
 
 function formatHistLabel(granularity: Granularity, histDate: string): string {
   if (!histDate) return '';
-  if (granularity === 'day') {
-    return new Date(histDate + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  }
-  if (granularity === 'month') {
-    const [yr, mo] = histDate.split('-').map(Number);
-    return new Date(yr, mo-1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-  }
-  if (granularity === 'quarter') {
-    const [yr, q] = histDate.split('-Q');
-    return `T${q} ${yr}`;
-  }
+  if (granularity === 'day') return new Date(histDate + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  if (granularity === 'month') { const [yr, mo] = histDate.split('-').map(Number); return new Date(yr, mo-1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }); }
+  if (granularity === 'quarter') { const [yr, q] = histDate.split('-Q'); return `T${q} ${yr}`; }
   return histDate;
 }
 
-// ── Main component ───────────────────────────────────────────────────────────
+// ─── Status colors for paiements ──────────────────────────────────────────────
+const statusPill: Record<string, { c: string; bg: string }> = {
+  confirmed: { c: '#2E7D32', bg: '#EAF5EB' },
+  paid:      { c: '#2E7D32', bg: '#EAF5EB' },
+  'Réussi':  { c: '#2E7D32', bg: '#EAF5EB' },
+  pending:   { c: '#B45309', bg: '#FEF3E2' },
+  failed:    { c: '#C62828', bg: '#FEECEC' },
+  cancelled: { c: '#52525B', bg: '#F4F4F5' },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 const AdminDashboard = () => {
   const { profile } = useAuth();
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [recentUsers, setRecentUsers] = useState<any[]>([]);
+  const { toast }   = useToast();
+
+  const [loading, setLoading]           = useState(true);
+  const [refreshing, setRefreshing]     = useState(false);
+  const [stats, setStats]               = useState<Stats | null>(null);
+  const [recentUsers, setRecentUsers]   = useState<any[]>([]);
   const [recentPaiements, setRecentPaiements] = useState<any[]>([]);
   const [planDistribution, setPlanDistribution] = useState<any[]>([]);
-  const [range, setRange] = useState('month');
-  const [wavePending, setWavePending] = useState(0);
+  const [range, setRange]               = useState('month');
+  const [wavePending, setWavePending]   = useState(0);
   const [expiringSoon, setExpiringSoon] = useState(0);
 
   // Time-travel state
-  const [ttMode, setTtMode] = useState<'live' | 'history'>('live');
+  const [ttMode, setTtMode]             = useState<'live' | 'history'>('live');
   const [ttGranularity, setTtGranularity] = useState<Granularity>('month');
-  const [ttDate, setTtDate] = useState<string>('');
-  const [ttQYear, setTtQYear] = useState<string>(String(new Date().getFullYear() - 1));
-  const [ttQNum, setTtQNum] = useState<string>('1');
+  const [ttDate, setTtDate]             = useState('');
+  const [ttQYear, setTtQYear]           = useState(String(new Date().getFullYear() - 1));
+  const [ttQNum, setTtQNum]             = useState('1');
 
-  const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: currentYear - 2019 }, (_, i) => String(currentYear - 1 - i));
-
+  const currentYear  = new Date().getFullYear();
+  const yearOptions  = Array.from({ length: currentYear - 2019 }, (_, i) => String(currentYear - 1 - i));
   const effectiveHistDate = ttGranularity === 'quarter' ? `${ttQYear}-Q${ttQNum}` : ttDate;
 
+  const rangeLabels: Record<string, string> = { today: 'hier', week: 'semaine passée', month: 'mois passé', year: 'année passée' };
+
+  const isHistoricalView = ttMode === 'history' && !!effectiveHistDate;
+  const histLabel        = isHistoricalView ? formatHistLabel(ttGranularity, effectiveHistDate) : '';
+
+  // ── Load ──────────────────────────────────────────────────────────────────────
   const load = useCallback(async (opts: { range?: string; mode?: 'live'|'history'; date?: string; granularity?: Granularity } = {}) => {
-    const selRange = opts.range ?? range;
-    const selMode = opts.mode ?? ttMode;
-    const selDate = opts.date ?? effectiveHistDate;
+    const selRange       = opts.range       ?? range;
+    const selMode        = opts.mode        ?? ttMode;
+    const selDate        = opts.date        ?? effectiveHistDate;
     const selGranularity = opts.granularity ?? ttGranularity;
 
     setRefreshing(true);
@@ -315,19 +240,17 @@ const AdminDashboard = () => {
       const headers: any = { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' };
       if (token) headers.Authorization = `Bearer ${token}`;
 
-      let statsUrl: string;
-      let usersUrl: string;
-      let paiementsUrl: string;
+      let statsUrl: string, usersUrl: string, paiementsUrl: string;
 
       if (selMode === 'history' && selDate) {
         statsUrl = `${API_BASE}/api/admin/dashboard/stats?mode=history&date=${encodeURIComponent(selDate)}&granularity=${selGranularity}`;
         const dateRange = buildHistDateRange(selGranularity, selDate);
         const rq = dateRange ? `&from=${encodeURIComponent(dateRange.from)}&to=${encodeURIComponent(dateRange.to)}` : '';
-        usersUrl = `${API_BASE}/api/admin/users?limit=5${rq}`;
+        usersUrl     = `${API_BASE}/api/admin/users?limit=5${rq}`;
         paiementsUrl = `${API_BASE}/api/admin/paiements?limit=6${rq}`;
       } else {
-        statsUrl = `${API_BASE}/api/admin/dashboard/stats?range=${selRange}`;
-        usersUrl = `${API_BASE}/api/admin/users?limit=5&sort=created_at:desc`;
+        statsUrl     = `${API_BASE}/api/admin/dashboard/stats?range=${selRange}`;
+        usersUrl     = `${API_BASE}/api/admin/users?limit=5&sort=created_at:desc`;
         paiementsUrl = `${API_BASE}/api/admin/paiements?limit=6`;
       }
 
@@ -338,12 +261,11 @@ const AdminDashboard = () => {
         fetch(`${API_BASE}/api/admin/stats/plans-distribution`, { headers }),
       ]);
 
-      if (statsRes.ok) setStats(await statsRes.json());
-      if (usersRes.ok) { const d = await usersRes.json(); setRecentUsers(d.users || d.data || []); }
-      if (paiementsRes.ok) { const d = await paiementsRes.json(); setRecentPaiements(d.paiements || d.data || []); }
-      if (plansRes.ok) { const d = await plansRes.json(); setPlanDistribution(d.distribution || []); }
+      if (statsRes.ok)    setStats(await statsRes.json());
+      if (usersRes.ok)    { const d = await usersRes.json(); setRecentUsers(d.users || d.data || []); }
+      if (paiementsRes.ok){ const d = await paiementsRes.json(); setRecentPaiements(d.paiements || d.data || []); }
+      if (plansRes.ok)    { const d = await plansRes.json(); setPlanDistribution(d.distribution || []); }
 
-      // Fetch real-time badges
       try {
         const badgesRes = await fetch(`${API_BASE}/api/admin/badges`, { headers });
         if (badgesRes.ok) {
@@ -354,35 +276,13 @@ const AdminDashboard = () => {
       } catch { /* non-bloquant */ }
     } catch {
       toast({ title: 'Erreur de connexion', description: 'Impossible de charger les données', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    } finally { setLoading(false); setRefreshing(false); }
   }, [range, ttMode, effectiveHistDate, ttGranularity]);
 
   useEffect(() => { load(); }, []);
 
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-
-  const statusColor: Record<string, string> = {
-    confirmed: 'bg-emerald-100 text-emerald-700',
-    paid: 'bg-emerald-100 text-emerald-700',
-    'Réussi': 'bg-emerald-100 text-emerald-700',
-    pending: 'bg-amber-100 text-amber-700',
-    failed: 'bg-red-100 text-red-700',
-    cancelled: 'bg-gray-100 text-gray-600',
-  };
-
-  const rangeLabels: Record<string, string> = {
-    today: "hier",
-    week: "semaine passée",
-    month: "mois passé",
-    year: "année passée",
-  };
-
-  const isHistoricalView = ttMode === 'history' && !!effectiveHistDate;
-  const histLabel = isHistoricalView ? formatHistLabel(ttGranularity, effectiveHistDate) : '';
 
   const applyTimeTravel = () => {
     if (!effectiveHistDate) {
@@ -392,583 +292,415 @@ const AdminDashboard = () => {
     load({ mode: 'history', date: effectiveHistDate, granularity: ttGranularity });
   };
 
-  const switchToLive = () => {
-    setTtMode('live');
-    load({ mode: 'live', range });
-  };
+  const switchToLive = () => { setTtMode('live'); load({ mode: 'live', range }); };
 
+  const hasAlerts = !loading && (wavePending > 0 || expiringSoon > 0 || (stats && (stats.pending_upgrades > 0 || stats.failed_payments_month > 0)));
+
+  const GRAN_LABELS: Record<Granularity, string> = { day: 'Jour', month: 'Mois', quarter: 'Trimestre', year: 'Année' };
+
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col bg-[#fdfdfd]">
+    <div className="min-h-screen" style={{ background: '#F7F8F8' }}>
 
-
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-
-        {/* ── Top Bar & Stats Header ── */}
-        <section className="space-y-6">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col lg:flex-row lg:items-end justify-between gap-6"
-          >
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">
-                <span className="bg-blue-50 px-2 py-0.5 rounded-md">Panneau de Contrôle</span>
-                <span className="text-gray-300">/</span>
-                <span className="text-gray-400">Vue Globale</span>
-              </div>
-              <h1 className="text-5xl font-black tracking-tight text-gray-900">
-                Tableau de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Bord</span>
-              </h1>
-              <p className="text-sm text-gray-500 font-medium flex items-center gap-2">
+      {/* ── AdminHeader ─────────────────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden" style={{ background: isHistoricalView ? 'linear-gradient(135deg, #374151, #1F2937)' : ADMIN_GRAD, transition: 'background 0.5s' }}>
+        <div className="absolute inset-0 opacity-[0.12] pointer-events-none"
+          style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '22px 22px' }} />
+        <div className="relative max-w-[1180px] mx-auto px-5 sm:px-8 py-7 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex items-center gap-3.5 flex-1 min-w-0 pl-10 md:pl-0">
+            <span className="w-12 h-12 rounded-2xl bg-white/[0.12] flex items-center justify-center text-white shrink-0">
+              <BarChart3 size={24} strokeWidth={1.9} />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-white leading-tight">Tableau de bord</h1>
+              <p className="text-white/65 text-sm mt-0.5 flex items-center gap-1.5">
                 {isHistoricalView ? (
                   <>
-                    <Clock3 className="h-3.5 w-3.5 text-violet-500" />
-                    <span className="text-violet-600 font-semibold">Données historiques</span>
-                    <ChevronRight className="h-3 w-3 text-gray-300" />
-                    <span>{histLabel}</span>
+                    <Clock3 size={12} />
+                    <span>Historique ·</span>
+                    <span className="font-semibold">{histLabel}</span>
+                    <button onClick={switchToLive} className="ml-2 underline hover:no-underline text-white/80 hover:text-white">Retour live →</button>
                   </>
                 ) : (
                   <>
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/60" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
                     </span>
-                    Système opérationnel · {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    Opérationnel · {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
                   </>
                 )}
               </p>
             </div>
-
-            <div className="flex items-center gap-3">
-              {ttMode === 'live' && (
-                <div className="w-44">
-                  <Select value={range} onValueChange={(val) => { setRange(val); load({ range: val, mode: 'live' }); }}>
-                    <SelectTrigger className="h-12 rounded-2xl border-gray-100 bg-white shadow-xl shadow-gray-100/50 font-bold text-gray-700">
-                      <div className="flex items-center gap-2">
-                        <CalendarDays className="h-4 w-4 text-blue-500" />
-                        <SelectValue placeholder="Période" />
-                      </div>
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl border-gray-100 shadow-2xl">
-                      <SelectItem value="today" className="font-medium">Aujourd'hui</SelectItem>
-                      <SelectItem value="week" className="font-medium">Cette Semaine</SelectItem>
-                      <SelectItem value="month" className="font-medium">Ce Mois</SelectItem>
-                      <SelectItem value="year" className="font-medium">Cette Année</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <Button
-                variant="outline"
-                className="h-12 rounded-2xl border-gray-100 bg-white shadow-xl shadow-gray-100/50 hover:bg-gray-50 transition-all px-5 font-bold text-gray-700"
-                onClick={() => load()}
-                disabled={refreshing}
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 text-blue-500 ${refreshing ? 'animate-spin' : ''}`} />
-                {refreshing ? 'Sync...' : 'Actualiser'}
-              </Button>
-
-              <Button
-                className="h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-200 transition-all px-7 font-black border-none active:scale-95"
-              >
-                <ArrowUpRight className="h-4 w-4 mr-2" />
-                Rapports
-              </Button>
-            </div>
-          </motion.div>
-
-          {/* ── TIME TRAVEL BAR ── */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-          >
-            <div className={`relative overflow-hidden rounded-[1.75rem] border transition-all duration-500 ${
-              isHistoricalView
-                ? 'bg-gradient-to-r from-violet-50 via-indigo-50 to-purple-50 border-violet-200 shadow-lg shadow-violet-100/40'
-                : 'bg-white border-gray-100 shadow-sm'
-            }`}>
-              {/* Decorative orbs when in history mode */}
-              {isHistoricalView && (
-                <>
-                  <div className="pointer-events-none absolute -top-8 -right-8 w-40 h-40 bg-violet-200/30 rounded-full blur-3xl" />
-                  <div className="pointer-events-none absolute -bottom-8 -left-8 w-32 h-32 bg-indigo-200/30 rounded-full blur-3xl" />
-                </>
-              )}
-
-              <div className="relative flex flex-col md:flex-row md:items-center gap-4 p-4">
-                {/* Mode toggle pills */}
-                <div className="flex items-center gap-1 p-1 bg-gray-100/80 rounded-2xl shrink-0">
-                  <button
-                    onClick={switchToLive}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-                      ttMode === 'live'
-                        ? 'bg-white text-gray-800 shadow-md shadow-gray-200/60'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
-                    Live
-                  </button>
-                  <button
-                    onClick={() => setTtMode('history')}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
-                      ttMode === 'history'
-                        ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-300/40'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <History className="h-3.5 w-3.5" />
-                    Retour dans le temps
-                  </button>
-                </div>
-
-                {/* History controls — only shown in history mode */}
-                <AnimatePresence>
-                  {ttMode === 'history' && (
-                    <motion.div
-                      key="history-controls"
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: 'auto' }}
-                      exit={{ opacity: 0, width: 0 }}
-                      className="flex flex-1 flex-col sm:flex-row items-start sm:items-center gap-3 overflow-hidden"
-                    >
-                      {/* Granularity selector */}
-                      <div className="flex items-center gap-1 p-1 bg-white/70 rounded-xl border border-violet-100 shrink-0">
-                        {(['day','month','quarter','year'] as Granularity[]).map((g) => {
-                          const labels: Record<Granularity, string> = { day: 'Jour', month: 'Mois', quarter: 'Trimestre', year: 'Année' };
-                          return (
-                            <button
-                              key={g}
-                              onClick={() => { setTtGranularity(g); setTtDate(''); }}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${
-                                ttGranularity === g
-                                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md'
-                                  : 'text-gray-500 hover:text-violet-700 hover:bg-violet-50'
-                              }`}
-                            >
-                              {labels[g]}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Date input — adapts to granularity */}
-                      <div className="flex items-center gap-2 flex-1">
-                        {ttGranularity === 'day' && (
-                          <input
-                            type="date"
-                            value={ttDate}
-                            max={new Date().toISOString().split('T')[0]}
-                            onChange={e => setTtDate(e.target.value)}
-                            className="h-10 px-4 rounded-xl border border-violet-200 bg-white/80 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all"
-                          />
-                        )}
-                        {ttGranularity === 'month' && (
-                          <input
-                            type="month"
-                            value={ttDate}
-                            max={`${currentYear}-${String(new Date().getMonth() + 1).padStart(2,'0')}`}
-                            onChange={e => setTtDate(e.target.value)}
-                            className="h-10 px-4 rounded-xl border border-violet-200 bg-white/80 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-violet-400 transition-all"
-                          />
-                        )}
-                        {ttGranularity === 'quarter' && (
-                          <div className="flex items-center gap-2">
-                            <Select value={ttQNum} onValueChange={setTtQNum}>
-                              <SelectTrigger className="h-10 w-28 rounded-xl border-violet-200 bg-white/80 font-bold text-gray-700 text-sm">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="rounded-xl shadow-xl">
-                                {['1','2','3','4'].map(q => (
-                                  <SelectItem key={q} value={q} className="font-medium">T{q}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select value={ttQYear} onValueChange={setTtQYear}>
-                              <SelectTrigger className="h-10 w-24 rounded-xl border-violet-200 bg-white/80 font-bold text-gray-700 text-sm">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="rounded-xl shadow-xl">
-                                {yearOptions.map(y => (
-                                  <SelectItem key={y} value={y} className="font-medium">{y}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                        {ttGranularity === 'year' && (
-                          <Select value={ttDate || yearOptions[0]} onValueChange={setTtDate}>
-                            <SelectTrigger className="h-10 w-28 rounded-xl border-violet-200 bg-white/80 font-bold text-gray-700 text-sm">
-                              <SelectValue placeholder="Année" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl shadow-xl">
-                              {yearOptions.map(y => (
-                                <SelectItem key={y} value={y} className="font-medium">{y}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-
-                        <Button
-                          onClick={applyTimeTravel}
-                          disabled={refreshing || !effectiveHistDate}
-                          className="h-10 px-5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white text-sm font-black shadow-lg shadow-violet-300/40 border-none active:scale-95 transition-all"
-                        >
-                          {refreshing ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : (
-                            <><History className="h-3.5 w-3.5 mr-1.5" />Voyager</>
-                          )}
-                        </Button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Active historical snapshot banner */}
-              <AnimatePresence>
-                {isHistoricalView && (
-                  <motion.div
-                    key="hist-banner"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="border-t border-violet-100 bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2.5 flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-2.5 text-white">
-                      <div className="p-1.5 bg-white/20 rounded-lg">
-                        <Clock3 className="h-3.5 w-3.5" />
-                      </div>
-                      <span className="text-xs font-black uppercase tracking-widest opacity-80">Instantané du</span>
-                      <span className="text-sm font-black">{histLabel}</span>
-                    </div>
-                    <button
-                      onClick={switchToLive}
-                      className="text-[11px] font-black text-white/80 hover:text-white underline underline-offset-2 transition-colors"
-                    >
-                      Retour au Live →
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-
-          {/* ── ALERTES ACTIVES ── */}
-          <AnimatePresence>
-            {!loading && (wavePending > 0 || expiringSoon > 0 || (stats && (stats.pending_upgrades > 0 || stats.failed_payments_month > 0))) && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-              >
-                <div
-                  className="rounded-xl p-5"
-                  style={{ backgroundColor: '#FFF8E1', borderLeft: '4px solid #F9A825' }}
-                >
-                  <div className="flex items-center gap-2 mb-4">
-                    <AlertCircle className="h-4 w-4 text-[#F9A825]" />
-                    <span className="text-sm font-bold text-[#1A1A2E]">Alertes actives</span>
-                  </div>
-                  <div className="space-y-3">
-                    {wavePending > 0 && (
-                      <div className="flex items-center justify-between gap-4 bg-white/70 rounded-lg px-4 py-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <Banknote className="h-4 w-4 text-[#F9A825] shrink-0" />
-                          <span className="text-sm text-[#1A1A2E]">
-                            <strong>{wavePending}</strong> paiement{wavePending > 1 ? 's' : ''} Wave en attente de validation
-                          </span>
-                        </div>
-                        <Link
-                          to="/admin/wave-validation"
-                          className="text-xs font-bold text-[#2E7D32] hover:underline whitespace-nowrap flex items-center gap-1"
-                        >
-                          Valider <ArrowRight className="h-3 w-3" />
-                        </Link>
-                      </div>
-                    )}
-                    {expiringSoon > 0 && (
-                      <div className="flex items-center justify-between gap-4 bg-white/70 rounded-lg px-4 py-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <CalendarDays className="h-4 w-4 text-[#F9A825] shrink-0" />
-                          <span className="text-sm text-[#1A1A2E]">
-                            <strong>{expiringSoon}</strong> abonnement{expiringSoon > 1 ? 's' : ''} expirent dans 5 jours
-                          </span>
-                        </div>
-                        <Link
-                          to="/admin/users?filter=expired"
-                          className="text-xs font-bold text-[#2E7D32] hover:underline whitespace-nowrap flex items-center gap-1"
-                        >
-                          Voir <ArrowRight className="h-3 w-3" />
-                        </Link>
-                      </div>
-                    )}
-                    {stats && stats.pending_upgrades > 0 && (
-                      <div className="flex items-center justify-between gap-4 bg-white/70 rounded-lg px-4 py-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <TrendingUp className="h-4 w-4 text-[#F9A825] shrink-0" />
-                          <span className="text-sm text-[#1A1A2E]">
-                            <strong>{stats.pending_upgrades}</strong> upgrade{stats.pending_upgrades > 1 ? 's' : ''} en attente d'approbation
-                          </span>
-                        </div>
-                        <Link
-                          to="/admin/upgrades"
-                          className="text-xs font-bold text-[#2E7D32] hover:underline whitespace-nowrap flex items-center gap-1"
-                        >
-                          Gérer <ArrowRight className="h-3 w-3" />
-                        </Link>
-                      </div>
-                    )}
-                    {stats && stats.failed_payments_month > 0 && (
-                      <div className="flex items-center justify-between gap-4 bg-white/70 rounded-lg px-4 py-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
-                          <span className="text-sm text-[#1A1A2E]">
-                            <strong>{stats.failed_payments_month}</strong> paiement{stats.failed_payments_month > 1 ? 's' : ''} échoué{stats.failed_payments_month > 1 ? 's' : ''} ce mois
-                          </span>
-                        </div>
-                        <Link
-                          to="/admin/paiements"
-                          className="text-xs font-bold text-[#2E7D32] hover:underline whitespace-nowrap flex items-center gap-1"
-                        >
-                          Voir <ArrowRight className="h-3 w-3" />
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {ttMode === 'live' && (
+              <select value={range} onChange={e => { setRange(e.target.value); load({ range: e.target.value, mode: 'live' }); }}
+                className="h-10 px-3 rounded-lg bg-white/15 hover:bg-white/20 text-white text-sm font-medium outline-none border border-white/20">
+                <option value="today"  className="text-[#18181B]">Aujourd'hui</option>
+                <option value="week"   className="text-[#18181B]">Cette semaine</option>
+                <option value="month"  className="text-[#18181B]">Ce mois</option>
+                <option value="year"   className="text-[#18181B]">Cette année</option>
+              </select>
             )}
-          </AnimatePresence>
-        </section>
+            <button onClick={() => load()} disabled={refreshing}
+              className="h-10 px-4 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-semibold flex items-center gap-1.5 transition-colors">
+              <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+              {refreshing ? 'Sync…' : 'Actualiser'}
+            </button>
+            <button className="h-10 px-4 rounded-lg bg-white text-[#1B5E20] text-sm font-bold flex items-center gap-1.5 hover:bg-white/90 transition-colors">
+              <ArrowUpRight size={14} /> Rapport
+            </button>
+          </div>
+        </div>
+      </div>
 
-        {/* ── KPI CARDS ── */}
+      {/* ── AdminBody ───────────────────────────────────────────────────────────── */}
+      <div className="max-w-[1180px] mx-auto px-5 sm:px-8 py-7 space-y-6">
+
+        {/* ── Time-travel bar ───────────────────────────────────────────────────── */}
+        <div className="bg-white overflow-hidden" style={CARD_STYLE}>
+          <div className="flex flex-col md:flex-row md:items-center gap-3 p-3">
+            {/* Mode toggle */}
+            <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-lg shrink-0">
+              <button onClick={switchToLive}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold transition-colors ${ttMode === 'live' ? 'bg-white text-[#18181B] shadow-sm' : 'text-zinc-500 hover:text-[#18181B]'}`}>
+                <Sparkles size={12} className="text-[#2E7D32]" /> Live
+              </button>
+              <button onClick={() => setTtMode('history')}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold transition-colors ${ttMode === 'history' ? 'bg-[#18181B] text-white shadow-sm' : 'text-zinc-500 hover:text-[#18181B]'}`}>
+                <History size={12} /> Historique
+              </button>
+            </div>
+
+            {/* History controls */}
+            {ttMode === 'history' && (
+              <div className="flex flex-1 flex-col sm:flex-row items-start sm:items-center gap-2">
+                {/* Granularity pills */}
+                <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded-lg shrink-0">
+                  {(['day','month','quarter','year'] as Granularity[]).map(g => (
+                    <button key={g} onClick={() => { setTtGranularity(g); setTtDate(''); }}
+                      className={`px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors ${ttGranularity === g ? 'bg-[#18181B] text-white' : 'text-zinc-500 hover:text-[#18181B]'}`}>
+                      {GRAN_LABELS[g]}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Date picker */}
+                <div className="flex items-center gap-2 flex-1">
+                  {ttGranularity === 'day' && (
+                    <input type="date" value={ttDate} max={new Date().toISOString().split('T')[0]}
+                      onChange={e => setTtDate(e.target.value)}
+                      className="h-9 px-3 rounded-lg border border-[#E7E7EA] bg-zinc-50 text-sm text-[#18181B] outline-none focus:border-[#18181B]" />
+                  )}
+                  {ttGranularity === 'month' && (
+                    <input type="month" value={ttDate}
+                      max={`${currentYear}-${String(new Date().getMonth()+1).padStart(2,'0')}`}
+                      onChange={e => setTtDate(e.target.value)}
+                      className="h-9 px-3 rounded-lg border border-[#E7E7EA] bg-zinc-50 text-sm text-[#18181B] outline-none focus:border-[#18181B]" />
+                  )}
+                  {ttGranularity === 'quarter' && (
+                    <div className="flex items-center gap-2">
+                      <select value={ttQNum} onChange={e => setTtQNum(e.target.value)}
+                        className="h-9 px-2 rounded-lg border border-[#E7E7EA] bg-zinc-50 text-sm text-[#18181B] outline-none">
+                        {['1','2','3','4'].map(q => <option key={q} value={q}>T{q}</option>)}
+                      </select>
+                      <select value={ttQYear} onChange={e => setTtQYear(e.target.value)}
+                        className="h-9 px-2 rounded-lg border border-[#E7E7EA] bg-zinc-50 text-sm text-[#18181B] outline-none">
+                        {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {ttGranularity === 'year' && (
+                    <select value={ttDate || yearOptions[0]} onChange={e => setTtDate(e.target.value)}
+                      className="h-9 px-2 rounded-lg border border-[#E7E7EA] bg-zinc-50 text-sm text-[#18181B] outline-none">
+                      {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                  )}
+                  <button onClick={applyTimeTravel} disabled={refreshing || !effectiveHistDate}
+                    className="h-9 px-4 rounded-lg text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+                    style={{ background: '#18181B' }}>
+                    {refreshing ? <RefreshCw size={12} className="animate-spin" /> : <><History size={12} /> Voyager</>}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Historical banner */}
+          {isHistoricalView && (
+            <div className="border-t border-[#E7E7EA] px-5 py-2.5 flex items-center justify-between"
+              style={{ background: '#18181B' }}>
+              <div className="flex items-center gap-2 text-white text-xs">
+                <Clock3 size={13} className="opacity-70" />
+                <span className="font-bold uppercase tracking-widest opacity-60 text-[10px]">Instantané du</span>
+                <span className="font-bold">{histLabel}</span>
+              </div>
+              <button onClick={switchToLive}
+                className="text-[11px] font-bold text-white/70 hover:text-white underline underline-offset-2 transition-colors">
+                Retour au Live →
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── Alertes actives ───────────────────────────────────────────────────── */}
+        {hasAlerts && (
+          <div className="bg-white overflow-hidden" style={CARD_STYLE}>
+            <div className="flex items-center gap-2.5 px-5 py-3 border-b border-[#E7E7EA]">
+              <AlertCircle size={16} style={{ color: '#B45309' }} />
+              <span className="text-sm font-bold text-[#18181B] flex-1">Actions requises</span>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#FEF3E2', color: '#B45309' }}>
+                {[wavePending, expiringSoon, stats?.pending_upgrades ?? 0, stats?.failed_payments_month ?? 0].filter(Boolean).length} urgentes
+              </span>
+            </div>
+            <div className="divide-y divide-[#E7E7EA]">
+              {wavePending > 0 && (
+                <div className="flex items-center gap-3 px-5 py-3 hover:bg-zinc-50/60 transition-colors">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wide" style={{ color: '#B45309', background: '#FEF3E2' }}>Attention</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold text-[#18181B]"><strong>{wavePending}</strong> paiement{wavePending > 1 ? 's' : ''} Wave en attente</p>
+                    <p className="text-[11px] text-zinc-400">Validation manuelle requise</p>
+                  </div>
+                  <Link to="/admin/wave-validation" className="shrink-0 text-[12px] font-bold hover:underline whitespace-nowrap flex items-center gap-1" style={{ color: '#B45309' }}>
+                    Valider <ArrowRight size={11} />
+                  </Link>
+                </div>
+              )}
+              {expiringSoon > 0 && (
+                <div className="flex items-center gap-3 px-5 py-3 hover:bg-zinc-50/60 transition-colors">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 uppercase" style={{ color: '#B45309', background: '#FEF3E2' }}>Attention</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold text-[#18181B]"><strong>{expiringSoon}</strong> abonnement{expiringSoon > 1 ? 's' : ''} expirent dans 5 jours</p>
+                  </div>
+                  <Link to="/admin/users?filter=expired" className="shrink-0 text-[12px] font-bold hover:underline whitespace-nowrap flex items-center gap-1" style={{ color: '#B45309' }}>
+                    Voir <ArrowRight size={11} />
+                  </Link>
+                </div>
+              )}
+              {stats && stats.pending_upgrades > 0 && (
+                <div className="flex items-center gap-3 px-5 py-3 hover:bg-zinc-50/60 transition-colors">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 uppercase" style={{ color: '#1565C0', background: '#E8F1FD' }}>Info</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold text-[#18181B]"><strong>{stats.pending_upgrades}</strong> upgrade{stats.pending_upgrades > 1 ? 's' : ''} en attente d'approbation</p>
+                  </div>
+                  <Link to="/admin/upgrades" className="shrink-0 text-[12px] font-bold hover:underline whitespace-nowrap flex items-center gap-1" style={{ color: '#1565C0' }}>
+                    Gérer <ArrowRight size={11} />
+                  </Link>
+                </div>
+              )}
+              {stats && stats.failed_payments_month > 0 && (
+                <div className="flex items-center gap-3 px-5 py-3 hover:bg-zinc-50/60 transition-colors">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 uppercase" style={{ color: '#C62828', background: '#FEECEC' }}>Critique</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold text-[#18181B]"><strong>{stats.failed_payments_month}</strong> paiement{stats.failed_payments_month > 1 ? 's' : ''} échoué{stats.failed_payments_month > 1 ? 's' : ''} ce mois</p>
+                  </div>
+                  <Link to="/admin/paiements" className="shrink-0 text-[12px] font-bold hover:underline whitespace-nowrap flex items-center gap-1" style={{ color: '#C62828' }}>
+                    Voir <ArrowRight size={11} />
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── KPI financiers ────────────────────────────────────────────────────── */}
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400 mb-3">Indicateurs financiers</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { label: 'Revenus',      color: '#2E7D32', value: stats?.month_revenue ?? 0,         growth: stats?.revenue_growth ?? 0, isCurrency: true,  icon: Banknote,     data: stats?.monthly_revenue || [] },
+              { label: 'Inscriptions', color: '#1565C0', value: stats?.users_this_month ?? 0,      growth: stats?.user_growth ?? 0,    isCurrency: false, icon: UserPlus,     data: [{ revenue: stats?.users_last_month ?? 0 }, { revenue: stats?.users_this_month ?? 0 }] },
+              { label: 'Conversions',  color: '#E65100', value: stats?.commandes_this_month ?? 0,  growth: stats?.order_growth ?? 0,   isCurrency: false, icon: ShoppingCart, data: [{ revenue: stats?.commandes_last_month ?? 0 }, { revenue: stats?.commandes_this_month ?? 0 }] },
+              { label: 'Portfolios',   color: '#7B1FA2', value: stats?.total_portfolios ?? 0,      growth: 0,                          isCurrency: false, icon: Activity,     data: [{ revenue: 10 }, { revenue: 15 }, { revenue: 12 }, { revenue: 18 }] },
+            ].map(kpi => (
+              <div key={kpi.label} className="bg-white overflow-hidden"
+                style={{ ...CARD_STYLE, borderLeft: `4px solid ${kpi.color}` }}>
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ background: kpi.color + '1F', color: kpi.color }}>
+                      <kpi.icon size={17} />
+                    </div>
+                    <GrowthBadge value={kpi.growth} label={isHistoricalView ? 'période précédente' : (rangeLabels[range] ?? 'période passée')} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-zinc-500 mb-0.5">{kpi.label}</p>
+                    {loading
+                      ? <div className="h-8 w-24 bg-zinc-100 rounded animate-pulse" />
+                      : <p className="text-2xl font-bold text-[#18181B] tabular-nums leading-none">{fmt(kpi.value, kpi.isCurrency)}</p>
+                    }
+                  </div>
+                  <Sparkline data={kpi.data} color={kpi.color} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── KPI plateforme ────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            {
-              label: 'Revenus',
-              value: stats?.month_revenue ?? 0,
-              growth: stats?.revenue_growth ?? 0,
-              icon: Banknote,
-              color: '#2E7D32',
-              isCurrency: true,
-              data: stats?.monthly_revenue || [],
-            },
-            {
-              label: 'Inscriptions',
-              value: stats?.users_this_month ?? 0,
-              growth: stats?.user_growth ?? 0,
-              icon: UserPlus,
-              color: '#1565C0',
-              isCurrency: false,
-              data: [
-                { revenue: stats?.users_last_month ?? 0 },
-                { revenue: stats?.users_this_month ?? 0 }
-              ],
-            },
-            {
-              label: 'Conversions',
-              value: stats?.commandes_this_month ?? 0,
-              growth: stats?.order_growth ?? 0,
-              icon: ShoppingCart,
-              color: '#E65100',
-              isCurrency: false,
-              data: [
-                { revenue: stats?.commandes_last_month ?? 0 },
-                { revenue: stats?.commandes_this_month ?? 0 }
-              ],
-            },
-            {
-              label: 'Engagement',
-              value: stats?.total_portfolios ?? 0,
-              growth: 0,
-              icon: Activity,
-              color: '#7B1FA2',
-              isCurrency: false,
-              data: [{ revenue: 10 }, { revenue: 15 }, { revenue: 12 }, { revenue: 18 }],
-            },
-          ].map((kpi, idx) => (
-            <motion.div
-              key={kpi.label}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.08 * idx }}
-              className="bg-white rounded-xl shadow-sm overflow-hidden"
-              style={{ borderLeft: `4px solid ${kpi.color}` }}
-            >
-              <div className="p-5 space-y-3">
-                {/* Header row */}
-                <div className="flex items-center justify-between">
-                  <div
-                    className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0"
-                    style={{ backgroundColor: `${kpi.color}26`, color: kpi.color }}
-                  >
-                    <kpi.icon className="h-5 w-5" />
-                  </div>
-                  <GrowthBadge value={kpi.growth} label={isHistoricalView ? 'période précédente' : (rangeLabels[range] ?? 'période passée')} />
-                </div>
-
-                {/* Value + label */}
-                <div>
-                  <p className="text-sm text-[#5C5C5C] mb-0.5" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400 }}>{kpi.label}</p>
-                  {loading ? <Skeleton className="h-9 w-28 rounded" /> : (
-                    <p className="text-[#1A1A2E] leading-none" style={{ fontSize: '32px', fontWeight: 700, fontFamily: 'Inter, sans-serif' }}>
-                      {fmt(kpi.value, kpi.isCurrency)}
-                    </p>
-                  )}
-                </div>
-
-                {/* Sparkline */}
-                <Sparkline data={kpi.data} color={kpi.color} />
+            { label: 'Utilisateurs totaux',  value: stats?.total_users ?? 0,       icon: Users,       c: '#1565C0', bg: '#E8F1FD', delta: stats?.user_growth ? `+${stats.user_growth}%` : '—' },
+            { label: 'Commandes totales',    value: stats?.total_commandes ?? 0,   icon: ShoppingCart,c: '#B45309', bg: '#FEF3E2', delta: stats?.order_growth ? `+${stats.order_growth}%` : '—' },
+            { label: 'Cartes NFC actives',   value: stats?.cartes_active ?? 0,     icon: CreditCard,  c: '#2E7D32', bg: '#EAF5EB', delta: '—' },
+            { label: 'Upgrades en attente',  value: stats?.pending_upgrades ?? 0,  icon: TrendingUp,  c: '#6D28D9', bg: '#EDE9FE', delta: '—' },
+          ].map(k => (
+            <div key={k.label} className="bg-white p-4" style={CARD_STYLE}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: k.bg, color: k.c }}>
+                  <k.icon size={16} />
+                </span>
+                <span className="text-xs font-bold px-1.5 py-0.5 rounded-md" style={{ color: '#2E7D32', background: '#2E7D3215' }}>{k.delta}</span>
               </div>
-            </motion.div>
+              {loading
+                ? <div className="h-7 w-20 bg-zinc-100 rounded animate-pulse mt-2" />
+                : <p className="text-2xl font-extrabold text-[#18181B] leading-none tabular-nums mt-1">{typeof k.value === 'number' ? k.value.toLocaleString('fr-FR') : k.value}</p>
+              }
+              <p className="text-xs text-zinc-500 mt-1.5">{k.label}</p>
+            </div>
           ))}
         </div>
 
-        {/* ── MAIN CHARTS SECTION ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Revenue Evolution */}
-          <Card className="lg:col-span-2 border-0 shadow-sm bg-white p-6">
-            <div className="flex items-center justify-between mb-6">
+        {/* ── Revenue chart + Plan distribution ─────────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 bg-white p-5" style={CARD_STYLE}>
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Évolution des revenus</h3>
-                <p className="text-sm text-gray-500">
+                <h3 className="text-sm font-bold text-[#18181B]">Évolution des revenus</h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
                   {isHistoricalView ? `Instantané — ${histLabel}` : `Flux de trésorerie (${rangeLabels[range] ?? range})`}
                 </p>
               </div>
-              <div className="flex gap-2">
-                <span className="flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-100">
-                  <Activity className="h-3 w-3" /> Revenu (F)
-                </span>
-              </div>
+              <span className="flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full" style={{ background: '#EAF5EB', color: '#2E7D32' }}>
+                <Activity size={11} /> Revenu (F)
+              </span>
             </div>
-            {loading ? <Skeleton className="h-72 w-full" /> : (
-              <MainRevenueChart data={stats?.monthly_revenue || []} />
-            )}
-          </Card>
-
-          {/* Plan Distribution */}
-          <Card className="border-0 shadow-sm bg-white p-6">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">Distribution par pack</h3>
-              <p className="text-sm text-gray-500">Popularité des offres SaaS</p>
-            </div>
-            {loading ? <Skeleton className="h-72 w-full" /> : (
-              <PlanDistributionChart data={planDistribution} />
-            )}
-          </Card>
+            {loading
+              ? <div className="h-64 bg-zinc-100 rounded-xl animate-pulse mt-4" />
+              : <MainRevenueChart data={stats?.monthly_revenue || []} />
+            }
+          </div>
+          <div className="bg-white p-5" style={CARD_STYLE}>
+            <h3 className="text-sm font-bold text-[#18181B]">Distribution par plan</h3>
+            <p className="text-xs text-zinc-400 mt-0.5">Popularité des offres</p>
+            {loading
+              ? <div className="h-64 bg-zinc-100 rounded-xl animate-pulse mt-4" />
+              : <PlanDistributionChart data={planDistribution} />
+            }
+          </div>
         </div>
 
-        {/* ── ACTIVITY FEED SECTION ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Payments */}
-          <Card className={`border-0 shadow-sm bg-white overflow-hidden transition-all duration-500 ${isHistoricalView ? 'ring-1 ring-violet-200' : ''}`}>
-            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-emerald-500" />
+        {/* ── Activity feed ─────────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* Recent paiements */}
+          <div className="bg-white overflow-hidden" style={CARD_STYLE}>
+            <div className="px-5 py-4 border-b border-[#E7E7EA] flex items-center justify-between">
+              <h3 className="font-bold text-[#18181B] text-sm flex items-center gap-2">
+                <CreditCard size={15} style={{ color: '#2E7D32' }} />
                 {isHistoricalView ? `Transactions — ${histLabel}` : 'Dernières transactions'}
               </h3>
-              <Link to="/admin/paiements" className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 group">
-                Voir tout <ArrowRight className="h-3 w-3 group-hover:translate-x-1 transition-transform" />
+              <Link to="/admin/paiements" className="text-xs font-bold flex items-center gap-1 hover:underline" style={{ color: '#2E7D32' }}>
+                Voir tout <ArrowRight size={11} />
               </Link>
             </div>
-            <div className="p-0 overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-gray-50/50 text-[11px] uppercase tracking-wider text-gray-400">
-                  <tr>
-                    <th className="px-6 py-3 font-semibold">Client / Email</th>
-                    <th className="px-6 py-3 font-semibold">Montant</th>
-                    <th className="px-6 py-3 font-semibold text-right">Statut</th>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="text-[11px] font-bold uppercase tracking-wide text-zinc-400 bg-zinc-50/60">
+                    <th className="px-5 py-2.5 font-semibold">Client</th>
+                    <th className="px-5 py-2.5 font-semibold">Montant</th>
+                    <th className="px-5 py-2.5 font-semibold text-right">Statut</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-[#E7E7EA]">
                   {loading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <tr key={i}><td colSpan={3} className="px-6 py-4"><Skeleton className="h-10 w-full" /></td></tr>
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <tr key={i}><td colSpan={3} className="px-5 py-3"><div className="h-8 bg-zinc-100 rounded animate-pulse" /></td></tr>
                     ))
                   ) : recentPaiements.length === 0 ? (
-                    <tr><td colSpan={3} className="px-6 py-8 text-center text-gray-400 text-sm">Aucune transaction</td></tr>
+                    <tr><td colSpan={3} className="px-5 py-8 text-center text-zinc-400 text-sm">Aucune transaction</td></tr>
                   ) : (
-                    recentPaiements.map((p) => (
-                      <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs font-bold">
-                              {p.user_email?.[0].toUpperCase() || 'P'}
+                    recentPaiements.map(p => {
+                      const sp = statusPill[p.statut] ?? { c: '#52525B', bg: '#F4F4F5' };
+                      return (
+                        <tr key={p.id} className="hover:bg-zinc-50/50 transition-colors">
+                          <td className="px-5 py-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                                style={{ background: '#EAF5EB', color: '#2E7D32' }}>
+                                {(p.user_email?.[0] || 'P').toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-medium text-[#18181B] truncate max-w-[130px]">{p.user_email || `#${p.id}`}</p>
+                                <p className="text-[10px] text-zinc-400">{formatDate(p.created_at)}</p>
+                              </div>
                             </div>
-                            <div className="max-w-[150px]">
-                              <p className="text-sm font-semibold text-gray-800 truncate">{p.user_email || p.email || `#${p.id}`}</p>
-                              <p className="text-[10px] text-gray-400">{formatDate(p.created_at)}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 font-bold text-gray-900 text-sm">
-                          {fmt(Number(p.montant || 0))}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <Badge variant="outline" className={`rounded-full border-0 px-2 py-0.5 text-[10px] capitalize ${statusColor[p.statut] || 'bg-gray-100 text-gray-600'
-                            }`}>
-                            {p.statut}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                          <td className="px-5 py-3 font-bold text-[#18181B] tabular-nums whitespace-nowrap">{fmt(Number(p.montant || 0))}</td>
+                          <td className="px-5 py-3 text-right">
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full capitalize"
+                              style={{ color: sp.c, background: sp.bg }}>
+                              {p.statut}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
-          </Card>
+          </div>
 
-          {/* Recent Users */}
-          <Card className={`border-0 shadow-sm bg-white overflow-hidden transition-all duration-500 ${isHistoricalView ? 'ring-1 ring-violet-200' : ''}`}>
-            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                <Users className="h-5 w-5 text-blue-500" />
+          {/* Recent users */}
+          <div className="bg-white overflow-hidden" style={CARD_STYLE}>
+            <div className="px-5 py-4 border-b border-[#E7E7EA] flex items-center justify-between">
+              <h3 className="font-bold text-[#18181B] text-sm flex items-center gap-2">
+                <Users size={15} style={{ color: '#1565C0' }} />
                 {isHistoricalView ? `Inscrits — ${histLabel}` : 'Nouveaux inscrits'}
               </h3>
-              <Link to="/admin/users" className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 group">
-                Gérer utilisateurs <ArrowRight className="h-3 w-3 group-hover:translate-x-1 transition-transform" />
+              <Link to="/admin/users" className="text-xs font-bold flex items-center gap-1 hover:underline" style={{ color: '#1565C0' }}>
+                Gérer <ArrowRight size={11} />
               </Link>
             </div>
-            <div className="p-0 overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-gray-50/50 text-[11px] uppercase tracking-wider text-gray-400">
-                  <tr>
-                    <th className="px-6 py-3 font-semibold">Utilisateur</th>
-                    <th className="px-6 py-3 font-semibold">Plan</th>
-                    <th className="px-6 py-3 font-semibold text-right">Inscription</th>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="text-[11px] font-bold uppercase tracking-wide text-zinc-400 bg-zinc-50/60">
+                    <th className="px-5 py-2.5 font-semibold">Utilisateur</th>
+                    <th className="px-5 py-2.5 font-semibold">Plan</th>
+                    <th className="px-5 py-2.5 font-semibold text-right">Inscription</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-[#E7E7EA]">
                   {loading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <tr key={i}><td colSpan={3} className="px-6 py-4"><Skeleton className="h-10 w-full" /></td></tr>
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <tr key={i}><td colSpan={3} className="px-5 py-3"><div className="h-8 bg-zinc-100 rounded animate-pulse" /></td></tr>
                     ))
                   ) : recentUsers.length === 0 ? (
-                    <tr><td colSpan={3} className="px-6 py-8 text-center text-gray-400 text-sm">Aucun nouvel utilisateur</td></tr>
+                    <tr><td colSpan={3} className="px-5 py-8 text-center text-zinc-400 text-sm">Aucun nouvel utilisateur</td></tr>
                   ) : (
-                    recentUsers.map((u) => (
-                      <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-bold">
-                              {u.first_name?.[0]?.toUpperCase() || 'U'}
+                    recentUsers.map(u => (
+                      <tr key={u.id} className="hover:bg-zinc-50/50 transition-colors">
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                              style={{ background: '#E8F1FD', color: '#1565C0' }}>
+                              {(u.first_name?.[0] || u.prenom?.[0] || 'U').toUpperCase()}
                             </div>
-                            <div>
-                              <p className="text-sm font-semibold text-gray-800">{u.first_name || u.prenom} {u.last_name || u.nom}</p>
-                              <p className="text-[10px] text-gray-400">{u.email}</p>
+                            <div className="min-w-0">
+                              <p className="font-medium text-[#18181B]">{u.first_name || u.prenom} {u.last_name || u.nom}</p>
+                              <p className="text-[10px] text-zinc-400 truncate max-w-[130px]">{u.email}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          {u.plan_name ? (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold tracking-tight">
-                              {u.plan_name}
-                            </span>
-                          ) : <span className="text-gray-300">-</span>}
+                        <td className="px-5 py-3">
+                          {u.plan_name
+                            ? <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: '#EDE9FE', color: '#6D28D9' }}>{u.plan_name}</span>
+                            : <span className="text-zinc-300">—</span>}
                         </td>
-                        <td className="px-6 py-4 text-right text-[11px] text-gray-500 font-medium">
+                        <td className="px-5 py-3 text-right text-[11px] text-zinc-500">
                           {formatDate(u.created_at).split(' ')[0]}
                         </td>
                       </tr>
@@ -977,41 +709,34 @@ const AdminDashboard = () => {
                 </tbody>
               </table>
             </div>
-          </Card>
+          </div>
         </div>
 
-        {/* ── QUICK NAVIGATION SECTION ── */}
-        <div className="pt-4">
-          <h4 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-6 px-1">Actions Rapides</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        {/* ── Actions rapides ───────────────────────────────────────────────────── */}
+        <div>
+          <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest mb-4">Actions rapides</p>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
             {[
-              { label: 'Utilisateurs', icon: Users, to: '/admin/users', bg: 'bg-white hover:bg-blue-50 border border-gray-100 hover:border-blue-200 text-blue-700' },
-              { label: 'Portfolios', icon: Briefcase, to: '/admin/portfolios', bg: 'bg-white hover:bg-violet-50 border border-gray-100 hover:border-violet-200 text-violet-700' },
-              { label: 'Commandes', icon: ShoppingCart, to: '/admin/commandes', bg: 'bg-white hover:bg-orange-50 border border-gray-100 hover:border-orange-200 text-orange-700' },
-              { label: 'Paiements', icon: Banknote, to: '/admin/paiements', bg: 'bg-white hover:bg-emerald-50 border border-gray-100 hover:border-emerald-200 text-emerald-700' },
-              { label: 'Analytique', icon: TrendingUp, to: '/admin/stats', bg: 'bg-white hover:bg-teal-50 border border-gray-100 hover:border-teal-200 text-teal-700' },
-              { label: 'Paramètres', icon: Smartphone, to: '/admin/settings', bg: 'bg-white hover:bg-gray-50 border border-gray-100 text-gray-700' },
-            ].map((item, idx) => (
-              <motion.div
-                key={item.label}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 + (idx * 0.05) }}
-                whileHover={{ y: -6 }}
-              >
-                <Link to={item.to} className="group/nav flex flex-col items-center gap-4 p-8 bg-white rounded-[2.5rem] border border-transparent hover:border-blue-100 hover:shadow-2xl hover:shadow-blue-100/20 transition-all duration-300">
-                  <div className={`h-16 w-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-500 shadow-xl shadow-gray-100 group-hover/nav:shadow-${item.color}-100 bg-${item.color}-50 text-${item.color}-600 group-hover/nav:scale-110`}>
-                    <item.icon className="h-8 w-8 stroke-[1.5]" />
-                  </div>
-                  <span className="text-xs font-black text-gray-700 tracking-tight">{item.label}</span>
-                </Link>
-              </motion.div>
+              { label: 'Utilisateurs', icon: Users,       to: '/admin/users',      c: '#1565C0', bg: '#E8F1FD' },
+              { label: 'Portfolios',   icon: Briefcase,   to: '/admin/portfolios', c: '#6D28D9', bg: '#EDE9FE' },
+              { label: 'Commandes',    icon: ShoppingCart,to: '/admin/commandes',  c: '#B45309', bg: '#FEF3E2' },
+              { label: 'Paiements',    icon: Banknote,    to: '/admin/paiements',  c: '#2E7D32', bg: '#EAF5EB' },
+              { label: 'Statistiques', icon: TrendingUp,  to: '/admin/stats',      c: '#0D7490', bg: '#E0F2FE' },
+              { label: 'Paramètres',   icon: Smartphone,  to: '/admin/settings',   c: '#52525B', bg: '#F4F4F5' },
+            ].map(item => (
+              <Link key={item.label} to={item.to}
+                className="flex flex-col items-center gap-2.5 p-4 bg-white rounded-xl border border-transparent hover:border-[#E7E7EA] hover:shadow-sm transition-all"
+                style={CARD_STYLE}>
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: item.bg, color: item.c }}>
+                  <item.icon size={20} strokeWidth={1.8} />
+                </div>
+                <span className="text-xs font-semibold text-[#18181B] text-center leading-tight">{item.label}</span>
+              </Link>
             ))}
           </div>
         </div>
 
-      </main>
-
+      </div>
     </div>
   );
 };

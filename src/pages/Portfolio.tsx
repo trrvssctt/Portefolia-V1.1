@@ -4,6 +4,7 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
 import { ModernPortfolioTemplate } from "@/components/portfolio/ModernPortfolioTemplate";
 import { useToast } from "@/hooks/use-toast";
 import { isTokenExpired } from '@/utils/authUtils';
+import { templateById } from '@/components/portfolio/portfolioTemplates';
 
 const Portfolio = () => {
   const { slug } = useParams();
@@ -97,10 +98,29 @@ const Portfolio = () => {
         banner_type: p.banner_type || p.banniere_type || (p.banner_image_url ? 'image' : 'color'),
         banner_image_url: p.banner_image_url || p.banniere_image_url || p.bannerImageUrl || p.banner || '',
         banner_color: p.banner_color || p.couleur_banniere || p.theme || '#1e293b',
-        theme_color: p.theme_color || p.theme || '#28A745',
+        theme_color: (() => {
+          if (p.theme_color && p.theme_color !== '#28A745') return p.theme_color;
+          const tid = (p.template_id || p.template || '').toString();
+          if (/^t\d+$/.test(tid)) return templateById(tid).primary;
+          return p.theme_color || p.theme || '#28A745';
+        })(),
         cv_url: p.cv_url || p.resume_url || p.cv || '',
         est_public: p.est_public !== undefined ? p.est_public : (p.is_public !== undefined ? p.is_public : true),
         business: p.business || null,
+        role: p.role || p.titre_professionnel || p.profession || p.poste || '',
+        template_family: (() => {
+          // If backend returns template_family directly, use it
+          if (p.template_family) return p.template_family;
+          // If template_id matches catalog format (t1, t2, …), resolve via catalog
+          const tid = (p.template_id || p.template || '').toString();
+          if (/^t\d+$/.test(tid)) return templateById(tid).family;
+          // Fallback: infer from slug/name
+          const slug = tid.toLowerCase();
+          if (slug.includes('classique') || slug.includes('classic')) return 'classique';
+          if (slug.includes('minimal')   || slug.includes('minima'))  return 'minimal';
+          if (slug.includes('sombre')    || slug.includes('dark') || slug.includes('creative')) return 'sombre';
+          return 'editorial';
+        })(),
       };
       
       console.log('Mapped portfolio data:', portfolioData);

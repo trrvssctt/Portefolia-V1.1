@@ -554,7 +554,7 @@ export default function DetailsUsers() {
                   <>
                     <h3 className="text-4xl font-black tracking-tight">{activePlan.name}</h3>
                     <div className="text-3xl font-light text-white/70 mt-4 leading-none">
-                      <span className="text-white font-black">{(activePlan.price_cents || 0) / 100}</span>
+                      <span className="text-white font-black">{(activePlan.price_cents || 0).toLocaleString('fr-FR')}</span>
                       <span className="text-lg font-bold ml-2">{activePlan.currency || 'F CFA'}</span>
                     </div>
                   </>

@@ -1,28 +1,15 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { isTokenExpired } from '@/utils/authUtils';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlan } from '@/contexts/PlanContext';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import {
-  User, Camera, Shield, Mail, Phone, Edit3, Check, X, Eye, EyeOff,
-  LogOut, CreditCard, FolderOpen, TrendingUp, Calendar, Star, Zap,
-  Sparkles, Crown, AlertTriangle, ArrowRight, Lock, CheckCircle2,
-  Upload,
-} from 'lucide-react';
+import BusinessNav from '@/components/business/BusinessNav';
+import { User, Shield, Sliders, Eye, EyeOff, Sparkles, Star, Zap, Crown } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const getPasswordStrength = (pwd: string): { score: number; label: string; color: string } => {
   if (!pwd) return { score: 0, label: '', color: '' };
   let score = 0;
@@ -31,18 +18,18 @@ const getPasswordStrength = (pwd: string): { score: number; label: string; color
   if (/[A-Z]/.test(pwd)) score++;
   if (/[0-9]/.test(pwd)) score++;
   if (/[^A-Za-z0-9]/.test(pwd)) score++;
-  if (score <= 1) return { score, label: 'Très faible', color: 'bg-red-500' };
-  if (score === 2) return { score, label: 'Faible', color: 'bg-orange-500' };
-  if (score === 3) return { score, label: 'Moyen', color: 'bg-amber-500' };
-  if (score === 4) return { score, label: 'Fort', color: 'bg-blue-500' };
-  return { score, label: 'Très fort', color: 'bg-green-500' };
+  if (score <= 1) return { score, label: 'Très faible', color: '#EF4444' };
+  if (score === 2) return { score, label: 'Faible', color: '#F97316' };
+  if (score === 3) return { score, label: 'Moyen', color: '#F59E0B' };
+  if (score === 4) return { score, label: 'Fort', color: '#3B82F6' };
+  return { score, label: 'Très fort', color: '#22C55E' };
 };
 
-const planMeta: Record<string, { label: string; icon: React.ReactNode; bg: string; text: string }> = {
-  free:     { label: 'Gratuit',  icon: <Star className="w-3 h-3" />,     bg: 'bg-gray-100',   text: 'text-gray-600' },
-  starter:  { label: 'Starter',  icon: <Zap className="w-3 h-3" />,      bg: 'bg-blue-100',   text: 'text-blue-700' },
-  pro:      { label: 'Pro',      icon: <Sparkles className="w-3 h-3" />,  bg: 'bg-purple-100', text: 'text-purple-700' },
-  business: { label: 'Business', icon: <Crown className="w-3 h-3" />,    bg: 'bg-amber-100',  text: 'text-amber-700' },
+const planMeta: Record<string, { label: string; icon: React.ReactNode }> = {
+  free:     { label: 'Gratuit',  icon: <Star className="w-3 h-3" /> },
+  starter:  { label: 'Starter',  icon: <Zap className="w-3 h-3" /> },
+  pro:      { label: 'Pro',      icon: <Sparkles className="w-3 h-3" /> },
+  business: { label: 'Business', icon: <Crown className="w-3 h-3" /> },
 };
 
 function getPlanKey(plan: any): string {
@@ -54,58 +41,104 @@ function getPlanKey(plan: any): string {
   return 'free';
 }
 
-// ─── Sous-composants ──────────────────────────────────────────────────────────
-function StatMini({ icon, label, value, accent }: {
-  icon: React.ReactNode; label: string; value: string | number; accent: string;
+function Field({ label, value, editing, onChange }: {
+  label: string; value: string; editing?: boolean; onChange?: (v: string) => void;
 }) {
   return (
-    <div className={`${accent} rounded-xl p-3 flex items-center gap-3`}>
-      <div className="p-2 bg-white/60 rounded-lg shrink-0">{icon}</div>
-      <div className="min-w-0">
-        <p className="text-xs opacity-70 font-medium truncate">{label}</p>
-        <p className="text-lg font-bold leading-none mt-0.5">{value}</p>
+    <div>
+      <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide">{label}</label>
+      {editing && onChange ? (
+        <input
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          className="mt-1.5 w-full h-11 px-3.5 rounded-xl border border-[#E7E7EA] bg-white text-sm text-[#18181B] outline-none focus:border-[#2E7D32] transition-colors"
+        />
+      ) : (
+        <div className="mt-1.5 h-11 px-3.5 rounded-xl border border-[#E7E7EA] bg-white flex items-center text-sm text-[#18181B]">
+          {value || <span className="text-[#71717A]">—</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PwdField({ label, value, onChange, show, onToggle }: {
+  label: string; value: string; onChange: (v: string) => void; show: boolean; onToggle: () => void;
+}) {
+  return (
+    <div>
+      <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide">{label}</label>
+      <div className="relative mt-1.5">
+        <input
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="••••••••"
+          autoComplete="new-password"
+          className="w-full h-11 px-3.5 pr-10 rounded-xl border border-[#E7E7EA] bg-white text-sm text-[#18181B] outline-none focus:border-[#2E7D32] transition-colors"
+        />
+        <button type="button" onClick={onToggle}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-[#18181B]">
+          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
       </div>
     </div>
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0">
-      <span className="text-sm text-gray-500">{label}</span>
-      <span className="text-sm font-medium text-gray-900">{value}</span>
-    </div>
+    <button
+      type="button"
+      onClick={() => onChange(!on)}
+      className="relative w-12 h-7 rounded-full transition-colors shrink-0"
+      style={{ background: on ? '#2E7D32' : '#D4D4D8' }}
+    >
+      <span
+        className="absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all"
+        style={{ left: on ? '26px' : '4px' }}
+      />
+    </button>
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function ProfilsUserPage() {
   const { user, profile, loading, refreshProfile, signOut } = useAuth();
   const { currentPlan } = usePlan();
-  const planKey = getPlanKey(currentPlan);
-  const currentPlanMeta = planMeta[planKey];
+  const role = (profile?.role || '').toString().toLowerCase();
+  const isBusiness = role === 'business_admin' || role === 'business_member';
+  const planKey = isBusiness ? 'business' : getPlanKey(currentPlan);
+  const planInfo = planMeta[planKey];
+
+  const [tab, setTab]             = useState<'infos' | 'security' | 'prefs'>('infos');
+  const [isEditing, setIsEditing] = useState(false);
 
   const [form, setForm] = useState({
     prenom: '', nom: '', telephone: '',
     photo_profil: '', biographie: '', email: '',
+    localisation: '', metier: '',
   });
-  const [password, setPassword]           = useState('');
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [password, setPassword]               = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPwd, setShowPwd]             = useState(false);
-  const [showConfirm, setShowConfirm]     = useState(false);
-  const [isEditing, setIsEditing]         = useState(false);
-  const [isChangingPwd, setIsChangingPwd] = useState(false);
-  const [saving, setSaving]               = useState(false);
-  const [uploading, setUploading]         = useState(false);
-  const [abonnements, setAbonnements]     = useState<any[]>([]);
+  const [showCurrent, setShowCurrent]         = useState(false);
+  const [showPwd, setShowPwd]                 = useState(false);
+  const [showConfirm, setShowConfirm]         = useState(false);
+  const [saving, setSaving]                   = useState(false);
+  const [uploading, setUploading]             = useState(false);
+  const [abonnements, setAbonnements]         = useState<any[]>([]);
   const [portfoliosCount, setPortfoliosCount] = useState<number | null>(null);
-  const [totalViews, setTotalViews]       = useState<number | null>(null);
+  const [totalViews, setTotalViews]           = useState<number | null>(null);
+  const [prefs, setPrefs] = useState({
+    emailsPerf: true, nouveauxContacts: true, indexable: false, newsletter: false,
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const { toast } = useToast();
-  const navigate  = useNavigate();
-
-  const pwdStrength = getPasswordStrength(password);
+  const { toast }    = useToast();
+  const navigate     = useNavigate();
+  const pwdStrength  = getPasswordStrength(password);
 
   // ── Auth guard ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -125,12 +158,14 @@ export default function ProfilsUserPage() {
   useEffect(() => {
     if (profile) {
       setForm({
-        prenom:      profile.prenom      || '',
-        nom:         profile.nom         || '',
-        telephone:   profile.phone       || '',
+        prenom:       profile.prenom      || '',
+        nom:          profile.nom         || '',
+        telephone:    profile.phone       || '',
         photo_profil: profile.photo_profil || profile.avatar_url || '',
-        biographie:  profile.biographie  || profile.bio || '',
-        email:       profile.email       || user?.email || '',
+        biographie:   profile.biographie  || profile.bio || '',
+        email:        profile.email       || user?.email || '',
+        localisation: (profile as any).location    || (profile as any).localisation || '',
+        metier:       (profile as any).job_title   || (profile as any).metier || (profile as any).profession || '',
       });
     }
   }, [profile, user]);
@@ -189,17 +224,19 @@ export default function ProfilsUserPage() {
   const cancelEdit = () => {
     setIsEditing(false);
     if (profile) setForm({
-      prenom:      profile.prenom      || '',
-      nom:         profile.nom         || '',
-      telephone:   profile.phone       || '',
+      prenom:       profile.prenom      || '',
+      nom:          profile.nom         || '',
+      telephone:    profile.phone       || '',
       photo_profil: profile.photo_profil || profile.avatar_url || '',
-      biographie:  profile.biographie  || profile.bio || '',
-      email:       profile.email       || user?.email || '',
+      biographie:   profile.biographie  || profile.bio || '',
+      email:        profile.email       || user?.email || '',
+      localisation: (profile as any).location    || (profile as any).localisation || '',
+      metier:       (profile as any).job_title   || (profile as any).metier || (profile as any).profession || '',
     });
   };
 
   const cancelPwd = () => {
-    setIsChangingPwd(false);
+    setCurrentPassword('');
     setPassword('');
     setConfirmPassword('');
   };
@@ -303,16 +340,16 @@ export default function ProfilsUserPage() {
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50">
-        <div className="h-16 bg-white border-b" />
-        <div className="max-w-7xl mx-auto px-4 py-10 space-y-6">
-          <Skeleton className="h-48 rounded-2xl" />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Skeleton className="lg:col-span-2 h-80 rounded-2xl" />
-            <div className="space-y-4">
-              <Skeleton className="h-48 rounded-2xl" />
-              <Skeleton className="h-32 rounded-2xl" />
+      <div className="min-h-screen" style={{ background: '#F7F8F8' }}>
+        <div className="h-16 bg-white border-b border-[#E7E7EA]" />
+        <div className="max-w-5xl mx-auto px-5 sm:px-8 py-10 space-y-6">
+          <div className="h-9 w-44 rounded-xl bg-zinc-100 animate-pulse" />
+          <div className="grid lg:grid-cols-[280px_1fr] gap-6 lg:gap-8">
+            <div className="space-y-5">
+              <div className="h-60 rounded-2xl bg-zinc-100 animate-pulse" />
+              <div className="h-32 rounded-2xl bg-zinc-100 animate-pulse" />
             </div>
+            <div className="h-96 rounded-2xl bg-zinc-100 animate-pulse" />
           </div>
         </div>
       </div>
@@ -321,495 +358,215 @@ export default function ProfilsUserPage() {
 
   if (!user) return null;
 
+  // suppress unused-variable warnings for preserved business logic
+  void abonnements; void portfoliosCount; void totalViews; void handlePayAbonnement;
+
+  const navTabs = [
+    { key: 'infos'    as const, label: 'Informations', icon: <User className="w-4 h-4" /> },
+    { key: 'security' as const, label: 'Sécurité',     icon: <Shield className="w-4 h-4" /> },
+    { key: 'prefs'    as const, label: 'Préférences',  icon: <Sliders className="w-4 h-4" /> },
+  ];
+
   // ── Rendu ────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50">
-      <DashboardNav onSignOut={signOut} profile={profile} />
+    <div className="min-h-screen" style={{ background: '#F7F8F8' }}>
+      {isBusiness
+        ? <BusinessNav onSignOut={signOut} />
+        : <DashboardNav onSignOut={signOut} profile={profile} />
+      }
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+        <h1 className="text-2xl sm:text-[28px] font-bold text-[#18181B] tracking-tight">Mon profil</h1>
+        <p className="text-[#71717A] text-sm mt-1">Gérez vos informations personnelles et la sécurité de votre compte.</p>
 
-        {/* ── Hero card ── */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-          {/* Bandeau */}
-          <div className="h-28 bg-gradient-to-r from-[#28A745] via-emerald-500 to-teal-500 relative">
-            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-          </div>
+        <div className="grid lg:grid-cols-[280px_1fr] gap-6 lg:gap-8 mt-8 items-start">
 
-          <div className="px-6 pb-6">
-            {/* Avatar + infos principales */}
-            <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-12 mb-4">
-              {/* Avatar avec bouton upload */}
-              <div className="relative shrink-0">
-                <div className="w-24 h-24 rounded-2xl border-4 border-white shadow-lg bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
-                  {form.photo_profil
-                    ? <img src={form.photo_profil} alt="Avatar" className="w-full h-full object-cover" />
-                    : getInitials()
-                  }
-                </div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                  className="absolute -bottom-1.5 -right-1.5 w-8 h-8 bg-white border-2 border-gray-200 rounded-full flex items-center justify-center shadow hover:bg-gray-50 transition-colors"
-                  title="Changer la photo"
-                >
-                  {uploading
-                    ? <Upload className="w-3.5 h-3.5 text-gray-400 animate-pulse" />
-                    : <Camera className="w-3.5 h-3.5 text-gray-600" />
-                  }
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={e => handleUploadPhoto(e.target.files?.[0] ?? null)}
-                />
-              </div>
-
-              {/* Nom + email + plan */}
-              <div className="flex-1 sm:mb-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl font-bold text-gray-900">
-                    {form.prenom || form.nom
-                      ? `${form.prenom} ${form.nom}`.trim()
-                      : 'Mon profil'}
-                  </h1>
-                  <Badge className={`${currentPlanMeta.bg} ${currentPlanMeta.text} border-0 flex items-center gap-1 text-xs font-semibold`}>
-                    {currentPlanMeta.icon} {currentPlanMeta.label}
-                  </Badge>
-                </div>
-                <p className="text-sm text-gray-500 mt-0.5">{form.email}</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Membre depuis {profile?.date_inscription
-                    ? format(new Date(profile.date_inscription), 'MMMM yyyy', { locale: fr })
-                    : '—'}
-                </p>
-              </div>
-            </div>
-
-            {/* Stats rapides */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatMini
-                icon={<FolderOpen className="w-4 h-4 text-green-600" />}
-                label="Portfolios"
-                value={portfoliosCount ?? '—'}
-                accent="bg-green-50 text-green-900"
-              />
-              <StatMini
-                icon={<TrendingUp className="w-4 h-4 text-blue-600" />}
-                label="Vues totales"
-                value={totalViews !== null ? totalViews.toLocaleString('fr-FR') : '—'}
-                accent="bg-blue-50 text-blue-900"
-              />
-              <StatMini
-                icon={<Calendar className="w-4 h-4 text-purple-600" />}
-                label="Connexion"
-                value={profile?.dernier_login
-                  ? format(new Date(profile.dernier_login), 'dd MMM', { locale: fr })
-                  : '—'}
-                accent="bg-purple-50 text-purple-900"
-              />
-              <StatMini
-                icon={<CreditCard className="w-4 h-4 text-amber-600" />}
-                label="Abonnements"
-                value={abonnements.length}
-                accent="bg-amber-50 text-amber-900"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* ── Contenu ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-          {/* ── Colonne gauche : formulaires ── */}
-          <div className="lg:col-span-2 space-y-5">
-
-            {/* Informations personnelles */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-1.5 bg-green-100 rounded-lg">
-                    <User className="w-4 h-4 text-green-600" />
-                  </div>
-                  <h2 className="font-semibold text-gray-900 text-sm">Informations personnelles</h2>
-                </div>
-                {!isEditing ? (
-                  <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-1.5 h-8 text-xs">
-                    <Edit3 className="w-3.5 h-3.5" /> Modifier
-                  </Button>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={cancelEdit} className="h-8 text-xs gap-1">
-                      <X className="w-3.5 h-3.5" /> Annuler
-                    </Button>
-                    <Button size="sm" onClick={handleSaveProfile} disabled={saving}
-                      className="bg-[#28A745] hover:bg-green-600 text-white h-8 text-xs gap-1">
-                      {saving
-                        ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        : <Check className="w-3.5 h-3.5" />
-                      }
-                      Enregistrer
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-6 space-y-5">
-                {/* Prénom + Nom */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Prénom</Label>
-                    {isEditing ? (
-                      <Input value={form.prenom} onChange={e => setForm(s => ({ ...s, prenom: e.target.value }))} className="h-10 text-sm" placeholder="Votre prénom" />
-                    ) : (
-                      <div className="h-10 flex items-center px-3 bg-gray-50 rounded-lg text-sm text-gray-900">
-                        {form.prenom || <span className="text-gray-400 italic">Non renseigné</span>}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Nom</Label>
-                    {isEditing ? (
-                      <Input value={form.nom} onChange={e => setForm(s => ({ ...s, nom: e.target.value }))} className="h-10 text-sm" placeholder="Votre nom" />
-                    ) : (
-                      <div className="h-10 flex items-center px-3 bg-gray-50 rounded-lg text-sm text-gray-900">
-                        {form.nom || <span className="text-gray-400 italic">Non renseigné</span>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Email (non modifiable) */}
-                <div>
-                  <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Adresse email</Label>
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <div className="h-10 flex items-center pl-9 pr-3 bg-gray-50 rounded-lg text-sm text-gray-600 border border-gray-200">
-                        {form.email}
-                      </div>
-                    </div>
-                    <Badge className="bg-green-100 text-green-700 border-0 gap-1 text-xs shrink-0">
-                      <CheckCircle2 className="w-3 h-3" /> Vérifié
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1.5">L'adresse email ne peut pas être modifiée.</p>
-                </div>
-
-                {/* Téléphone */}
-                <div>
-                  <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Téléphone</Label>
-                  {isEditing ? (
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <Input
-                        value={form.telephone}
-                        onChange={e => setForm(s => ({ ...s, telephone: e.target.value }))}
-                        className="pl-9 h-10 text-sm"
-                        placeholder="+221 77 000 00 00"
-                        type="tel"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-10 flex items-center gap-2 px-3 bg-gray-50 rounded-lg text-sm">
-                      <Phone className="w-4 h-4 text-gray-400 shrink-0" />
-                      <span className="text-gray-900">{form.telephone || <span className="text-gray-400 italic">Non renseigné</span>}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Biographie */}
-                <div>
-                  <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Biographie</Label>
-                  {isEditing ? (
-                    <>
-                      <Textarea
-                        value={form.biographie}
-                        onChange={e => setForm(s => ({ ...s, biographie: e.target.value }))}
-                        placeholder="Parlez de votre parcours, vos compétences, ce qui vous distingue..."
-                        rows={4}
-                        className="text-sm resize-none"
-                      />
-                      <p className="text-xs text-gray-400 mt-1.5">Apparaît sur vos portfolios publics.</p>
-                    </>
-                  ) : (
-                    <div className="min-h-[80px] p-3 bg-gray-50 rounded-lg text-sm text-gray-900 leading-relaxed">
-                      {form.biographie || <span className="text-gray-400 italic">Aucune biographie renseignée</span>}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Sécurité */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-1.5 bg-blue-100 rounded-lg">
-                    <Shield className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <h2 className="font-semibold text-gray-900 text-sm">Sécurité</h2>
-                </div>
-                {!isChangingPwd ? (
-                  <Button variant="outline" size="sm" onClick={() => setIsChangingPwd(true)} className="gap-1.5 h-8 text-xs">
-                    <Lock className="w-3.5 h-3.5" /> Changer le mot de passe
-                  </Button>
-                ) : (
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={cancelPwd} className="h-8 text-xs gap-1">
-                      <X className="w-3.5 h-3.5" /> Annuler
-                    </Button>
-                    <Button size="sm" onClick={handleSavePassword} disabled={saving}
-                      className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs gap-1">
-                      {saving
-                        ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        : <Check className="w-3.5 h-3.5" />
-                      }
-                      Confirmer
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-6">
-                {!isChangingPwd ? (
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-gray-100 rounded-xl">
-                      <Shield className="w-5 h-5 text-gray-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Mot de passe configuré</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        Défini le {profile?.date_inscription
-                          ? format(new Date(profile.date_inscription), 'dd MMMM yyyy', { locale: fr })
-                          : '—'}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Nouveau mot de passe */}
-                    <div>
-                      <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Nouveau mot de passe</Label>
-                      <div className="relative">
-                        <Input
-                          type={showPwd ? 'text' : 'password'}
-                          value={password}
-                          onChange={e => setPassword(e.target.value)}
-                          placeholder="Minimum 8 caractères"
-                          className="pr-10 h-10 text-sm"
-                          autoComplete="new-password"
-                        />
-                        <button type="button" onClick={() => setShowPwd(v => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                          {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      {/* Barre de force */}
-                      {password && (
-                        <div className="mt-2 space-y-1">
-                          <div className="flex gap-1">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <div key={i} className={`flex-1 h-1.5 rounded-full transition-all duration-300 ${i < pwdStrength.score ? pwdStrength.color : 'bg-gray-100'}`} />
-                            ))}
-                          </div>
-                          <p className={`text-xs font-medium ${
-                            pwdStrength.score <= 1 ? 'text-red-600' :
-                            pwdStrength.score === 2 ? 'text-orange-600' :
-                            pwdStrength.score === 3 ? 'text-amber-600' :
-                            pwdStrength.score === 4 ? 'text-blue-600' : 'text-green-600'
-                          }`}>{pwdStrength.label}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Confirmation */}
-                    <div>
-                      <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Confirmer le mot de passe</Label>
-                      <div className="relative">
-                        <Input
-                          type={showConfirm ? 'text' : 'password'}
-                          value={confirmPassword}
-                          onChange={e => setConfirmPassword(e.target.value)}
-                          placeholder="Retapez le mot de passe"
-                          className={`pr-10 h-10 text-sm ${confirmPassword && confirmPassword !== password ? 'border-red-400 focus:ring-red-400' : ''}`}
-                          autoComplete="new-password"
-                        />
-                        <button type="button" onClick={() => setShowConfirm(v => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                          {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      {confirmPassword && confirmPassword !== password && (
-                        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                          <X className="w-3 h-3" /> Les mots de passe ne correspondent pas
-                        </p>
-                      )}
-                      {confirmPassword && confirmPassword === password && password.length >= 8 && (
-                        <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> Les mots de passe correspondent
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 space-y-1">
-                      <p className="font-semibold">Conseils pour un bon mot de passe :</p>
-                      <ul className="space-y-0.5 text-blue-600">
-                        {[
-                          ['Au moins 8 caractères', password.length >= 8],
-                          ['Au moins une majuscule', /[A-Z]/.test(password)],
-                          ['Au moins un chiffre', /[0-9]/.test(password)],
-                          ['Au moins un symbole (!@#...)', /[^A-Za-z0-9]/.test(password)],
-                        ].map(([tip, ok]) => (
-                          <li key={tip as string} className="flex items-center gap-1.5">
-                            {ok
-                              ? <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0" />
-                              : <div className="w-3 h-3 rounded-full border border-blue-300 shrink-0" />
-                            }
-                            {tip as string}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ── Colonne droite ── */}
+          {/* ── Colonne gauche ── */}
           <div className="space-y-5">
 
-            {/* Abonnements */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-1.5 bg-purple-100 rounded-lg">
-                    <CreditCard className="w-4 h-4 text-purple-600" />
-                  </div>
-                  <h2 className="font-semibold text-gray-900 text-sm">Mes abonnements</h2>
+            {/* Carte identité */}
+            <div className="bg-white rounded-2xl border border-[#E7E7EA] p-6 text-center">
+              <div
+                className="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-white text-2xl font-bold overflow-hidden"
+                style={{ background: 'linear-gradient(140deg, #2E7D32, #1B5E20)' }}
+              >
+                {form.photo_profil
+                  ? <img src={form.photo_profil} alt="Avatar" className="w-full h-full object-cover" />
+                  : getInitials()
+                }
+              </div>
+              <h2 className="mt-4 font-semibold text-[#18181B] text-lg">
+                {(form.prenom || form.nom) ? `${form.prenom} ${form.nom}`.trim() : 'Mon profil'}
+              </h2>
+              <p className="text-sm text-[#71717A]">{form.email}</p>
+              <span
+                className="inline-flex items-center gap-1.5 mt-3 px-2.5 py-1 rounded-full text-xs font-semibold"
+                style={{ background: '#E8F5E9', color: '#1B5E20' }}
+              >
+                {planInfo.icon} Formule {planInfo.label}
+              </span>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="mt-5 w-full h-10 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors flex items-center justify-center gap-1.5"
+              >
+                {uploading && (
+                  <span className="w-3.5 h-3.5 border-2 border-[#71717A] border-t-transparent rounded-full animate-spin" />
+                )}
+                Changer la photo
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => handleUploadPhoto(e.target.files?.[0] ?? null)}
+              />
+            </div>
+
+            {/* Navigation onglets */}
+            <div className="bg-white rounded-2xl border border-[#E7E7EA] p-2">
+              {navTabs.map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`w-full flex items-center gap-2.5 h-10 px-3 rounded-xl text-sm font-medium transition-colors ${tab !== t.key ? 'text-[#18181B]/70 hover:bg-zinc-50' : ''}`}
+                  style={tab === t.key ? { background: '#E8F5E9', color: '#1B5E20' } : undefined}
+                >
+                  {t.icon} {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Panneau de contenu ── */}
+          <div className="bg-white rounded-2xl border border-[#E7E7EA] p-6 sm:p-7">
+
+            {/* Onglet Informations */}
+            {tab === 'infos' && (
+              <div>
+                <h3 className="font-semibold text-[#18181B]">Informations personnelles</h3>
+                <p className="text-sm text-[#71717A] mt-0.5 mb-6">Ces informations apparaissent sur vos portfolios.</p>
+                <div className="grid sm:grid-cols-2 gap-5">
+                  <Field label="Prénom"       value={form.prenom}       editing={isEditing} onChange={v => setForm(s => ({ ...s, prenom: v }))} />
+                  <Field label="Nom"          value={form.nom}          editing={isEditing} onChange={v => setForm(s => ({ ...s, nom: v }))} />
+                  <Field label="Email"        value={form.email} />
+                  <Field label="Téléphone"    value={form.telephone}    editing={isEditing} onChange={v => setForm(s => ({ ...s, telephone: v }))} />
+                  <Field label="Localisation" value={form.localisation} editing={isEditing} onChange={v => setForm(s => ({ ...s, localisation: v }))} />
+                  <Field label="Métier"       value={form.metier}       editing={isEditing} onChange={v => setForm(s => ({ ...s, metier: v }))} />
+                </div>
+                <div className="flex justify-end gap-2 mt-7 pt-6 border-t border-[#E7E7EA]">
+                  {isEditing ? (
+                    <>
+                      <button
+                        onClick={cancelEdit}
+                        className="h-10 px-4 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        onClick={handleSaveProfile}
+                        disabled={saving}
+                        className="h-10 px-5 rounded-[10px] text-sm font-semibold text-white flex items-center gap-2 disabled:opacity-60 transition-colors"
+                        style={{ background: '#2E7D32' }}
+                      >
+                        {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                        Enregistrer
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="h-10 px-5 rounded-[10px] text-sm font-semibold text-white transition-colors"
+                      style={{ background: '#2E7D32' }}
+                    >
+                      Modifier
+                    </button>
+                  )}
                 </div>
               </div>
+            )}
 
-              <div className="p-4">
-                {abonnements.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                      <CreditCard className="w-6 h-6 text-gray-400" />
+            {/* Onglet Sécurité */}
+            {tab === 'security' && (
+              <div>
+                <h3 className="font-semibold text-[#18181B]">Sécurité</h3>
+                <p className="text-sm text-[#71717A] mt-0.5 mb-6">Modifiez votre mot de passe et gérez la connexion.</p>
+                <div className="space-y-5 max-w-md">
+                  <PwdField label="Mot de passe actuel"      value={currentPassword} onChange={setCurrentPassword} show={showCurrent} onToggle={() => setShowCurrent(v => !v)} />
+                  <PwdField label="Nouveau mot de passe"     value={password}        onChange={setPassword}        show={showPwd}     onToggle={() => setShowPwd(v => !v)} />
+                  {password && (
+                    <div className="space-y-1.5">
+                      <div className="flex gap-1">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <div key={i} className="flex-1 h-1.5 rounded-full"
+                            style={{ background: i < pwdStrength.score ? pwdStrength.color : '#F4F4F5' }} />
+                        ))}
+                      </div>
+                      <p className="text-xs font-medium" style={{ color: pwdStrength.color }}>{pwdStrength.label}</p>
                     </div>
-                    <p className="text-sm text-gray-500 mb-4">Aucun abonnement actif</p>
-                    <Button size="sm" variant="outline" onClick={() => navigate('/upgrade')}
-                      className="text-[#28A745] border-[#28A745] hover:bg-green-50 gap-1.5 text-xs font-semibold">
-                      Voir les formules <ArrowRight className="w-3.5 h-3.5" />
-                    </Button>
+                  )}
+                  <PwdField label="Confirmer le mot de passe" value={confirmPassword} onChange={setConfirmPassword} show={showConfirm} onToggle={() => setShowConfirm(v => !v)} />
+                </div>
+                <div className="mt-7 pt-6 border-t border-[#E7E7EA] space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                        style={{ background: '#E8F5E9', color: '#1B5E20' }}>
+                        <Shield className="w-4 h-4" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium text-[#18181B]">Double authentification</p>
+                        <p className="text-xs text-[#71717A]">Recommandée pour sécuriser votre compte</p>
+                      </div>
+                    </div>
+                    <Toggle on={false} onChange={() => {}} />
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {abonnements.map(a => {
-                      const isActive  = a.statut === 'active';
-                      const isPending = a.statut === 'pending';
-                      return (
-                        <div key={a.id} className={`rounded-xl border p-4 ${isActive ? 'border-green-200 bg-green-50/50' : isPending ? 'border-amber-200 bg-amber-50/50' : 'border-gray-200 bg-gray-50'}`}>
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-gray-900 truncate">
-                                {a.plan?.name || `Plan #${a.plan_id}`}
-                              </p>
-                              <Badge className={`mt-1 text-xs ${isActive ? 'bg-green-100 text-green-700' : isPending ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'} border-0`}>
-                                {isActive ? '● Actif' : isPending ? '⏱ En attente' : a.statut}
-                              </Badge>
-                            </div>
-                            {a.montant > 0 && (
-                              <p className="text-sm font-bold text-gray-900 shrink-0">
-                                {Number(a.montant).toLocaleString('fr-FR')} {a.currency || 'F CFA'}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="mt-3 space-y-1 text-xs text-gray-500">
-                            {a.start_date && (
-                              <div className="flex justify-between">
-                                <span>Début</span>
-                                <span className="font-medium text-gray-700">
-                                  {format(new Date(a.start_date), 'dd MMM yyyy', { locale: fr })}
-                                </span>
-                              </div>
-                            )}
-                            {a.end_date && (
-                              <div className="flex justify-between">
-                                <span>Échéance</span>
-                                <span className="font-medium text-gray-700">
-                                  {format(new Date(a.end_date), 'dd MMM yyyy', { locale: fr })}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          {isPending && (
-                            <div className="mt-3 pt-3 border-t border-amber-200">
-                              <div className="flex items-start gap-2 mb-2">
-                                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                                <p className="text-xs text-amber-700">Paiement requis pour activer cet abonnement.</p>
-                              </div>
-                              <Button size="sm" onClick={() => handlePayAbonnement(a)}
-                                className="w-full bg-amber-500 hover:bg-amber-600 text-white h-8 text-xs font-semibold">
-                                Payer maintenant
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    <Button size="sm" variant="outline" onClick={() => navigate('/upgrade')}
-                      className="w-full text-xs gap-1.5 border-dashed text-gray-500 hover:text-[#28A745] hover:border-[#28A745]">
-                      <ArrowRight className="w-3.5 h-3.5" /> Voir toutes les formules
-                    </Button>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={cancelPwd}
+                      className="h-10 px-4 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={handleSavePassword}
+                      disabled={saving}
+                      className="h-10 px-5 rounded-[10px] text-sm font-semibold text-white flex items-center gap-2 disabled:opacity-60"
+                      style={{ background: '#2E7D32' }}
+                    >
+                      {saving && <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                      Enregistrer
+                    </button>
                   </div>
-                )}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Compte */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100">
-                <h2 className="font-semibold text-gray-900 text-sm">À propos du compte</h2>
+            {/* Onglet Préférences */}
+            {tab === 'prefs' && (
+              <div>
+                <h3 className="font-semibold text-[#18181B]">Préférences</h3>
+                <p className="text-sm text-[#71717A] mt-0.5 mb-6">Notifications et confidentialité.</p>
+                <div className="divide-y divide-[#E7E7EA]">
+                  {([
+                    ['emailsPerf',       'Emails de performance', 'Recevoir un résumé hebdomadaire des vues'],
+                    ['nouveauxContacts', 'Nouveaux contacts',     'Être notifié quand un contact est collecté'],
+                    ['indexable',        'Profil indexable',      'Autoriser les moteurs de recherche'],
+                    ['newsletter',       'Newsletter Portefolia', 'Conseils et nouveautés produit'],
+                  ] as [keyof typeof prefs, string, string][]).map(([key, title, subtitle]) => (
+                    <div key={key} className="flex items-center justify-between py-4">
+                      <div>
+                        <p className="text-sm font-medium text-[#18181B]">{title}</p>
+                        <p className="text-xs text-[#71717A]">{subtitle}</p>
+                      </div>
+                      <Toggle on={prefs[key]} onChange={v => setPrefs(s => ({ ...s, [key]: v }))} />
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="p-4">
-                <InfoRow label="Membre depuis" value={profile?.date_inscription ? format(new Date(profile.date_inscription), 'dd MMM yyyy', { locale: fr }) : '—'} />
-                <InfoRow label="Dernière connexion" value={profile?.dernier_login ? format(new Date(profile.dernier_login), 'dd MMM yyyy', { locale: fr }) : '—'} />
-                <InfoRow label="Portfolios" value={portfoliosCount !== null ? String(portfoliosCount) : '—'} />
-                <InfoRow label="Vues totales" value={totalViews !== null ? totalViews.toLocaleString('fr-FR') : '—'} />
-                <InfoRow label="Plan actuel" value={currentPlanMeta.label} />
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100">
-                <h2 className="font-semibold text-gray-900 text-sm">Actions rapides</h2>
-              </div>
-              <div className="p-4 space-y-2">
-                <Button variant="outline" className="w-full justify-start h-9 text-sm gap-2" onClick={() => navigate('/dashboard')}>
-                  <FolderOpen className="w-4 h-4 text-gray-400" /> Tableau de bord
-                </Button>
-                <Button variant="outline" className="w-full justify-start h-9 text-sm gap-2" onClick={() => navigate('/dashboard/portfolios')}>
-                  <FolderOpen className="w-4 h-4 text-gray-400" /> Mes portfolios
-                </Button>
-                <Button variant="outline" className="w-full justify-start h-9 text-sm gap-2" onClick={() => navigate('/upgrade')}>
-                  <Sparkles className="w-4 h-4 text-gray-400" /> Changer de formule
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start h-9 text-sm gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                  onClick={signOut}
-                >
-                  <LogOut className="w-4 h-4" /> Se déconnecter
-                </Button>
-              </div>
-            </div>
+            )}
 
           </div>
         </div>

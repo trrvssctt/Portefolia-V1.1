@@ -19,7 +19,7 @@ import {
   Download, Search, Filter, Eye, FileText, CreditCard, CheckCircle,
   XCircle, Clock, RefreshCw, ChevronDown, ChevronUp, Calendar,
   TrendingUp, Receipt, BarChart3, Bell, ArrowRight,
-  Copy, Printer, AlertTriangle, Wallet, ExternalLink,
+  Copy, AlertTriangle, Wallet, ExternalLink, Loader2,
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
@@ -40,8 +40,11 @@ interface Paiement {
   invoice_id?: string | number | null;
   invoice_url?: string | null;
   metadata?: any;
-  plan_name?: string;
+  plan_name?: string | null;
   abonnement_id?: number | null;
+  duree_mois?: number | null;
+  date_echeance?: string | null;
+  reference_wave?: string | null;
   notes?: string | null;
 }
 
@@ -58,10 +61,11 @@ interface Abonnement {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const normalizeStatus = (raw: any): string => {
-  if (!raw) return 'unknown';
+  if (!raw) return 'pending';
   try {
     const s = raw.toString().normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-    if (/reuss|reussie|paid|confirmed|success|succeeded|completed/.test(s)) return 'completed';
+    if (/reuss|reussie|paid|confirmed|success|succeeded|completed|approved/.test(s)) return 'completed';
+    if (s === 'pending_admin' || s === 'pending_validation') return 'pending_admin';
     if (/en_attente|pending|attente/.test(s)) return 'pending';
     if (/echou|echec|failed|fail/.test(s)) return 'failed';
     if (/rembours|refunded/.test(s)) return 'refunded';
@@ -79,64 +83,6 @@ const fmt = (date: string | null | undefined, pattern = 'dd MMM yyyy') => {
 
 const fmtMoney = (n: number, currency = 'F CFA') =>
   `${n.toLocaleString('fr-FR')} ${currency}`;
-
-// ─── Génération de reçu imprimable ───────────────────────────────────────────
-function printReceipt(p: Paiement, userName: string) {
-  const win = window.open('', '_blank', 'width=600,height=700');
-  if (!win) return;
-  const ref = p.reference_transaction || p.reference || `#${p.id}`;
-  win.document.write(`<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8"/>
-  <title>Reçu ${ref}</title>
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family: 'Helvetica Neue', Arial, sans-serif; background:#f5f5f5; display:flex; justify-content:center; padding:40px 20px; }
-    .receipt { background:#fff; width:100%; max-width:480px; border-radius:12px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,.12); }
-    .header { background:linear-gradient(135deg,#28A745,#20c954); color:#fff; padding:28px 24px; text-align:center; }
-    .header h1 { font-size:22px; font-weight:700; letter-spacing:-.3px; }
-    .header p { font-size:13px; opacity:.85; margin-top:4px; }
-    .status-badge { display:inline-flex; align-items:center; gap:6px; margin-top:14px; background:rgba(255,255,255,.2); border-radius:20px; padding:5px 14px; font-size:13px; font-weight:600; }
-    .body { padding:24px; }
-    .amount-block { text-align:center; padding:20px 0; border-bottom:1px dashed #e5e7eb; margin-bottom:20px; }
-    .amount-block .label { font-size:12px; color:#6b7280; text-transform:uppercase; letter-spacing:.5px; }
-    .amount-block .amount { font-size:36px; font-weight:800; color:#111827; margin-top:4px; }
-    .amount-block .currency { font-size:14px; color:#6b7280; margin-top:2px; }
-    .row { display:flex; justify-content:space-between; align-items:flex-start; padding:9px 0; border-bottom:1px solid #f3f4f6; }
-    .row .key { font-size:13px; color:#6b7280; }
-    .row .val { font-size:13px; font-weight:600; color:#111827; text-align:right; max-width:55%; word-break:break-all; }
-    .footer { text-align:center; padding:18px 24px; background:#f9fafb; font-size:11px; color:#9ca3af; border-top:1px solid #f3f4f6; }
-    @media print { body { background:#fff; padding:0; } .receipt { box-shadow:none; border-radius:0; } }
-  </style>
-</head>
-<body>
-  <div class="receipt">
-    <div class="header">
-      <h1>Portefolia</h1>
-      <p>Reçu de paiement</p>
-      <div class="status-badge">✓ ${p.statut === 'completed' ? 'Paiement confirmé' : p.statut}</div>
-    </div>
-    <div class="body">
-      <div class="amount-block">
-        <div class="label">Montant payé</div>
-        <div class="amount">${p.montant.toLocaleString('fr-FR')}</div>
-        <div class="currency">${p.currency || 'F CFA'}</div>
-      </div>
-      <div class="row"><span class="key">Référence</span><span class="val">${ref}</span></div>
-      <div class="row"><span class="key">Client</span><span class="val">${userName}</span></div>
-      ${p.plan_name ? `<div class="row"><span class="key">Plan</span><span class="val">${p.plan_name}</span></div>` : ''}
-      <div class="row"><span class="key">Date</span><span class="val">${fmt(p.created_at, 'dd MMMM yyyy à HH:mm')}</span></div>
-      ${p.payment_method ? `<div class="row"><span class="key">Méthode</span><span class="val">${p.payment_method}</span></div>` : ''}
-      ${p.payment_gateway ? `<div class="row"><span class="key">Plateforme</span><span class="val">${p.payment_gateway}</span></div>` : ''}
-    </div>
-    <div class="footer">Ce reçu est généré automatiquement par Portefolia. Conservez-le pour vos archives.</div>
-  </div>
-  <script>window.onload=()=>{window.print();}<\/script>
-</body>
-</html>`);
-  win.document.close();
-}
 
 // ─── Export CSV ───────────────────────────────────────────────────────────────
 function exportCSV(paiements: Paiement[]) {
@@ -165,6 +111,8 @@ function StatusBadge({ statut }: { statut: string | null | undefined }) {
   switch (statut) {
     case 'completed':
       return <Badge className="bg-green-100 text-green-800 hover:bg-green-100 gap-1 font-medium"><CheckCircle className="w-3 h-3" />Payé</Badge>;
+    case 'pending_admin':
+      return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 gap-1 font-medium"><Clock className="w-3 h-3" />En cours de vérification</Badge>;
     case 'pending':
       return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 gap-1 font-medium"><Clock className="w-3 h-3" />En attente</Badge>;
     case 'failed':
@@ -174,7 +122,7 @@ function StatusBadge({ statut }: { statut: string | null | undefined }) {
     case 'cancelled':
       return <Badge variant="outline" className="text-gray-500 gap-1"><XCircle className="w-3 h-3" />Annulé</Badge>;
     default:
-      return <Badge variant="outline">{statut || '—'}</Badge>;
+      return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 gap-1 font-medium"><Clock className="w-3 h-3" />En attente</Badge>;
   }
 }
 
@@ -209,6 +157,8 @@ export default function HistoriqueUserPaiement() {
   const [selectedPaiement, setSelectedPaiement] = useState<Paiement | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [copying, setCopying] = useState<number | null>(null);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<number | null>(null);
 
   const navigate = useNavigate();
   const { user, profile, loading: authLoading, signOut } = useAuth();
@@ -264,14 +214,22 @@ export default function HistoriqueUserPaiement() {
         statut: normalizeStatus(item.statut || item.status || ''),
         created_at: item.created_at || item.date_paiement || null,
         updated_at: item.updated_at || null,
-        moyen_paiement: item.moyen_paiement || null,
-        payment_method: item.payment_method || item.moyen_paiement || (item.metadata?.payment_method) || null,
+        moyen_paiement: item.moyen_paiement || item.type_flux || null,
+        payment_method: item.payment_method
+          || item.moyen_paiement
+          || item.type_flux
+          || (item.reference_wave ? 'wave' : null)
+          || (item.metadata?.payment_method)
+          || null,
         payment_gateway: item.payment_gateway || null,
         invoice_id: item.invoice_id || item.metadata?.invoice_id || null,
         invoice_url: item.invoice_url || null,
         metadata: item.metadata || null,
         plan_name: item.plan_name || item.plan?.name || null,
         abonnement_id: item.abonnement_id || item.subscription_id || null,
+        duree_mois: item.duree_mois ?? null,
+        date_echeance: item.date_echeance || null,
+        reference_wave: item.reference_wave || null,
         notes: item.notes || null,
       }));
       setPaiements(items);
@@ -318,7 +276,13 @@ export default function HistoriqueUserPaiement() {
   // Filtrage & tri
   const filtered = useMemo(() => {
     let list = [...paiements];
-    if (statusFilter !== 'all') list = list.filter(p => p.statut === statusFilter);
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'pending') {
+        list = list.filter(p => p.statut === 'pending' || p.statut === 'pending_admin');
+      } else {
+        list = list.filter(p => p.statut === statusFilter);
+      }
+    }
     if (periodFilter !== 'all') {
       const cutoff = new Date();
       if (periodFilter === '30d') cutoff.setDate(cutoff.getDate() - 30);
@@ -347,7 +311,8 @@ export default function HistoriqueUserPaiement() {
 
   // Stats
   const completed = useMemo(() => paiements.filter(p => p.statut === 'completed'), [paiements]);
-  const pending = useMemo(() => paiements.filter(p => p.statut === 'pending'), [paiements]);
+
+  const pending = useMemo(() => paiements.filter(p => p.statut === 'pending' || p.statut === 'pending_admin'), [paiements]);
   const totalRevenue = useMemo(() => completed.reduce((s, p) => s + p.montant, 0), [completed]);
   const monthRevenue = useMemo(() => {
     const start = new Date(); start.setDate(1); start.setHours(0, 0, 0, 0);
@@ -366,6 +331,78 @@ export default function HistoriqueUserPaiement() {
     setCopying(p.id);
     toast({ title: 'Référence copiée' });
     setTimeout(() => setCopying(null), 1500);
+  };
+
+  const downloadReceiptPDF = async (p: Paiement) => {
+    if (downloadingId === p.id) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    setDownloadingId(p.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/users/me/paiements/${p.id}/receipt`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: 'Erreur', description: (err as any).error || 'Impossible de générer le reçu', variant: 'destructive' });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const ref = p.reference_transaction || p.reference || String(p.id);
+      a.href = url;
+      a.download = `recu-portefolia-${ref}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: 'Reçu téléchargé' });
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de télécharger le reçu', variant: 'destructive' });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const downloadInvoicePDF = async (p: Paiement) => {
+    const invoiceId = p.invoice_id;
+    if (!invoiceId || downloadingInvoiceId === Number(invoiceId)) return;
+    if (p.invoice_url) { window.open(p.invoice_url, '_blank'); return; }
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    setDownloadingInvoiceId(Number(invoiceId));
+    try {
+      const res = await fetch(`${API_BASE}/api/users/me/invoices/${invoiceId}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: 'Erreur', description: (err as any).error || 'Impossible de télécharger la facture', variant: 'destructive' });
+        return;
+      }
+      const contentType = res.headers.get('Content-Type') || '';
+      if (contentType.includes('pdf')) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `facture-portefolia-${invoiceId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast({ title: 'Facture téléchargée' });
+      } else {
+        const html = await res.text();
+        const win = window.open('', '_blank');
+        if (win) { win.document.write(html); win.document.close(); }
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de télécharger la facture', variant: 'destructive' });
+    } finally {
+      setDownloadingInvoiceId(null);
+    }
   };
 
   const handleSignOut = async () => { await signOut(); };
@@ -688,15 +725,30 @@ export default function HistoriqueUserPaiement() {
                         <Eye className="w-3.5 h-3.5" /> Détails
                       </Button>
                       {p.statut === 'completed' && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-green-700" onClick={() => printReceipt(p, userName)}>
-                          <Printer className="w-3.5 h-3.5" /> Reçu
+                        <Button
+                          size="sm" variant="ghost"
+                          className="h-7 text-xs gap-1 text-green-700"
+                          onClick={() => downloadReceiptPDF(p)}
+                          disabled={downloadingId === p.id}
+                        >
+                          {downloadingId === p.id
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Download className="w-3.5 h-3.5" />}
+                          Reçu PDF
                         </Button>
                       )}
                       {(p.invoice_id || p.invoice_url) && (
-                        <a href={p.invoice_url || `${API_BASE}/api/admin/invoices/${p.invoice_id}/pdf`} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 h-7 px-2">
-                          <FileText className="w-3.5 h-3.5" /> Facture
-                        </a>
+                        <Button
+                          size="sm" variant="ghost"
+                          className="h-7 text-xs gap-1 text-blue-700"
+                          onClick={() => downloadInvoicePDF(p)}
+                          disabled={downloadingInvoiceId === Number(p.invoice_id)}
+                        >
+                          {downloadingInvoiceId === Number(p.invoice_id)
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <FileText className="w-3.5 h-3.5" />}
+                          Facture
+                        </Button>
                       )}
                       {p.statut === 'pending' && (() => {
                         const ab = abonnements.find(a => a.id === p.abonnement_id);
@@ -749,31 +801,44 @@ export default function HistoriqueUserPaiement() {
                         <TableCell>
                           <div className="flex items-center gap-1.5 text-sm text-gray-600">
                             <CreditCard className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                            <span className="truncate max-w-[90px]">{p.payment_method || p.moyen_paiement || '—'}</span>
+                            <span className="truncate max-w-[90px]">
+                              {(() => {
+                                const m = p.payment_method || p.moyen_paiement || '';
+                                if (!m) return '—';
+                                return m.toLowerCase() === 'wave' ? 'Wave Money' : m.charAt(0).toUpperCase() + m.slice(1);
+                              })()}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell className="pr-5">
                           <div className="flex items-center justify-end gap-1.5">
-                            {/* Reçu pour paiements complétés */}
+                            {/* Reçu PDF pour paiements validés */}
                             {p.statut === 'completed' && (
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => printReceipt(p, userName)}
+                                onClick={() => downloadReceiptPDF(p)}
+                                disabled={downloadingId === p.id}
                                 className="h-7 px-2.5 text-xs gap-1 text-green-700 border-green-200 hover:bg-green-50"
                               >
-                                <Printer className="w-3.5 h-3.5" /> Reçu
+                                {downloadingId === p.id
+                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  : <Download className="w-3.5 h-3.5" />}
+                                Reçu PDF
                               </Button>
                             )}
                             {/* Facture si disponible */}
                             {(p.invoice_id || p.invoice_url) && (
-                              <Button size="sm" variant="outline" asChild
+                              <Button
+                                size="sm" variant="outline"
+                                onClick={() => downloadInvoicePDF(p)}
+                                disabled={downloadingInvoiceId === Number(p.invoice_id)}
                                 className="h-7 px-2.5 text-xs gap-1 text-blue-700 border-blue-200 hover:bg-blue-50"
                               >
-                                <a href={p.invoice_url || `${API_BASE}/api/admin/invoices/${p.invoice_id}/pdf`}
-                                  target="_blank" rel="noopener noreferrer">
-                                  <FileText className="w-3.5 h-3.5" /> Facture
-                                </a>
+                                {downloadingInvoiceId === Number(p.invoice_id)
+                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  : <FileText className="w-3.5 h-3.5" />}
+                                Facture
                               </Button>
                             )}
                             {/* Copier la référence */}
@@ -835,7 +900,7 @@ export default function HistoriqueUserPaiement() {
                 {[
                   { label: 'Date de paiement', value: fmt(selectedPaiement.created_at, 'dd MMM yyyy à HH:mm') },
                   { label: 'Mise à jour', value: fmt(selectedPaiement.updated_at, 'dd MMM yyyy à HH:mm') },
-                  { label: 'Méthode', value: selectedPaiement.payment_method || selectedPaiement.moyen_paiement || '—' },
+                  { label: 'Méthode', value: (() => { const m = selectedPaiement.payment_method || selectedPaiement.moyen_paiement || ''; if (!m) return '—'; return m.toLowerCase() === 'wave' ? 'Wave Money' : m.charAt(0).toUpperCase() + m.slice(1); })() },
                   { label: 'Plateforme', value: selectedPaiement.payment_gateway || '—' },
                   ...(selectedPaiement.plan_name ? [{ label: 'Plan', value: selectedPaiement.plan_name }] : []),
                 ].map(({ label, value }) => (
@@ -855,15 +920,29 @@ export default function HistoriqueUserPaiement() {
               {/* Actions dans le modal */}
               <div className="flex flex-wrap gap-2 pt-2 border-t">
                 {selectedPaiement.statut === 'completed' && (
-                  <Button size="sm" variant="outline" onClick={() => printReceipt(selectedPaiement, userName)} className="gap-1.5">
-                    <Printer className="w-3.5 h-3.5" /> Imprimer le reçu
+                  <Button
+                    size="sm" variant="outline"
+                    onClick={() => downloadReceiptPDF(selectedPaiement)}
+                    disabled={downloadingId === selectedPaiement.id}
+                    className="gap-1.5 text-green-700 border-green-200 hover:bg-green-50"
+                  >
+                    {downloadingId === selectedPaiement.id
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Download className="w-3.5 h-3.5" />}
+                    Télécharger le reçu PDF
                   </Button>
                 )}
                 {(selectedPaiement.invoice_id || selectedPaiement.invoice_url) && (
-                  <Button size="sm" variant="outline" asChild className="gap-1.5">
-                    <a href={selectedPaiement.invoice_url || `${API_BASE}/api/admin/invoices/${selectedPaiement.invoice_id}/pdf`} target="_blank" rel="noopener noreferrer">
-                      <FileText className="w-3.5 h-3.5" /> Voir la facture
-                    </a>
+                  <Button
+                    size="sm" variant="outline"
+                    onClick={() => downloadInvoicePDF(selectedPaiement)}
+                    disabled={downloadingInvoiceId === Number(selectedPaiement.invoice_id)}
+                    className="gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50"
+                  >
+                    {downloadingInvoiceId === Number(selectedPaiement.invoice_id)
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <FileText className="w-3.5 h-3.5" />}
+                    Télécharger la facture
                   </Button>
                 )}
                 <Button size="sm" variant="ghost" onClick={() => copyRef(selectedPaiement)} className="gap-1.5 ml-auto">

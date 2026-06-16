@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Download, UserPlus } from 'lucide-react';
+import { Download } from 'lucide-react';
 import ClientsListView from '@/components/admin/clients/ClientsListView';
 import ClientProfil360 from '@/components/admin/clients/ClientProfil360';
 import { downloadClientsCSV } from '@/hooks/useClients';
@@ -42,7 +42,7 @@ export default function ClientsPage() {
         <div className="flex gap-2">
           <button
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 text-white text-xs px-3 py-1.5 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 text-white text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-white/25"
             style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
           >
             <Download size={13} />
@@ -62,7 +62,7 @@ export default function ClientsPage() {
 
         {/* Profil 360° inline sous la liste */}
         {selectedClientId !== null && (
-          <div className="mt-4" id="profil-360">
+          <div className="mt-6 border-t-[3px] border-[#2E7D32] pt-5" id="profil-360">
             <ClientProfil360
               clientId={selectedClientId}
               onClose={() => setSelectedClientId(null)}

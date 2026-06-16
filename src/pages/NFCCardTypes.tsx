@@ -82,17 +82,7 @@ export default function NFCCardTypes() {
 
   const formatPrice = (centsOrMajor: any) => {
     const n = Number(centsOrMajor ?? 0);
-    // Format numbers as XOF currency without decimals (e.g. "1 000 XOF")
-    try {
-      return new Intl.NumberFormat('fr-FR', {
-        style: 'currency',
-        currency: 'XOF',
-        maximumFractionDigits: 0,
-      }).format(n);
-    } catch (e) {
-      // Fallback to a simple thousands separator + XOF
-      return n.toLocaleString('fr-FR') + ' XOF';
-    }
+    return n.toLocaleString('fr-FR') + ' F CFA';
   };
 
   // Chargement des cartes NFC depuis le backend

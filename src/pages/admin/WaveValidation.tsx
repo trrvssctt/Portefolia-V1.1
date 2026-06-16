@@ -1,29 +1,14 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, Fragment } from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import { Button }  from '@/components/ui/button';
-import { Badge }   from '@/components/ui/badge';
-import { Input }   from '@/components/ui/input';
-import { Label }   from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
-} from '@/components/ui/dialog';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 import {
   RefreshCw, Clock, CheckCircle2, XCircle, AlertTriangle, Copy, Check,
   Eye, ChevronLeft, ChevronRight, Download, Search, Filter, Waves,
-  Loader2, Shield, User,
+  Loader2, Shield, X, Banknote,
 } from 'lucide-react';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
+// ─── Constants ──────────────────────────────────────────────────────────────────
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
 const REFRESH_INTERVAL = 60_000;
 
@@ -35,8 +20,7 @@ const MOTIF_PRESETS = [
   'Informations du compte Wave ne correspondent pas',
 ];
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
+// ─── Types ──────────────────────────────────────────────────────────────────────
 interface PendingPayment {
   id: number;
   utilisateur_id: number;
@@ -69,10 +53,14 @@ interface HistoryItem {
   heures_attente: number;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Design tokens ───────────────────────────────────────────────────────────────
+const CARD_STYLE = { borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' } as const;
+const ADMIN_GRAD = 'linear-gradient(135deg, #1B5E20, #2E7D32)';
+const WAVE_GRAD  = 'linear-gradient(140deg, #1DC1F2, #0A9FCC)';
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────────
 const fmtXOF = (n: number | null) =>
-  n != null ? `${Math.round(n).toLocaleString('fr-FR')} FCFA` : '—';
+  n != null ? `${Math.round(n).toLocaleString('fr-FR')} F CFA` : '—';
 
 const fmtDate = (d: string | null) =>
   d ? format(new Date(d), 'dd MMM yyyy, HH:mm', { locale: fr }) : '—';
@@ -96,30 +84,81 @@ const authHeaders = () => ({
   'Content-Type': 'application/json',
 });
 
-// ─── KPI Card ─────────────────────────────────────────────────────────────────
+// ─── Statut config ────────────────────────────────────────────────────────────────
+const STATUT_CONFIG: Record<string, { label: string; c: string; bg: string }> = {
+  ACTIVE:          { label: 'Validé',     c: '#2E7D32', bg: '#EAF5EB' },
+  PENDING_PAYMENT: { label: 'En attente', c: '#B45309', bg: '#FEF3E2' },
+  SUSPENDED:       { label: 'Refusé',     c: '#C62828', bg: '#FEECEC' },
+  EXPIRED:         { label: 'Expiré',     c: '#52525B', bg: '#F4F4F5' },
+};
 
-function KpiCard({
-  label, value, icon: Icon, color, bg, description,
-}: {
-  label: string; value: number | string; icon: any;
-  color: string; bg: string; description?: string;
-}) {
+function StatutPill({ statut }: { statut: string }) {
+  const s = STATUT_CONFIG[statut] ?? { label: statut, c: '#52525B', bg: '#F4F4F5' };
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${bg}`}>
-        <Icon className={`w-6 h-6 ${color}`} />
-      </div>
-      <div>
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
-        <p className="text-3xl font-black text-gray-900 leading-none mt-0.5">{value}</p>
-        {description && <p className="text-xs text-gray-400 mt-1">{description}</p>}
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full"
+      style={{ color: s.c, background: s.bg }}>
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: s.c }} />
+      {s.label}
+    </span>
+  );
+}
+
+// ─── Modal shell ──────────────────────────────────────────────────────────────────
+function ModalShell({
+  icon: Icon, title, subtitle, tone = 'accent', size = 'md', onClose, children, footer,
+}: {
+  icon: React.ElementType;
+  title: string;
+  subtitle?: string;
+  tone?: 'accent' | 'danger' | 'wave';
+  size?: 'sm' | 'md' | 'lg';
+  onClose: () => void;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+}) {
+  const widths = { sm: 'sm:max-w-md', md: 'sm:max-w-lg', lg: 'sm:max-w-3xl' };
+  const tones = {
+    accent: { bg: '#E8F5E9', fg: '#1B5E20' },
+    danger: { bg: '#FEE2E2', fg: '#DC2626' },
+    wave:   { bg: '#E0F2FE', fg: '#0284C7' },
+  };
+  const tn = tones[tone];
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4"
+      style={{ background: 'rgba(16,24,40,0.55)', backdropFilter: 'blur(4px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className={`bg-white w-full ${widths[size]} sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col max-h-[94vh] sm:max-h-[90vh] overflow-hidden`}>
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-[#E7E7EA] shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: tn.bg, color: tn.fg }}>
+              <Icon size={18} />
+            </span>
+            <div className="min-w-0">
+              <h2 className="font-semibold text-[#18181B] text-sm leading-tight">{title}</h2>
+              {subtitle && <p className="text-xs text-[#71717A] mt-0.5 truncate">{subtitle}</p>}
+            </div>
+          </div>
+          <button onClick={onClose}
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-[#71717A] hover:text-[#18181B] hover:bg-zinc-100 transition-colors shrink-0">
+            <X size={18} />
+          </button>
+        </div>
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        {/* Footer */}
+        {footer && (
+          <div className="px-6 py-4 border-t border-[#E7E7EA] shrink-0 flex items-center justify-end gap-2">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// ─── Pending Payment Card ────────────────────────────────────────────────────
-
+// ─── Pending payment card ──────────────────────────────────────────────────────────
 function PendingCard({
   payment, onValidate, onReject, onPreview,
 }: {
@@ -138,104 +177,93 @@ function PendingCard({
     });
   };
 
-  const accentColor = payment.urgent ? 'bg-red-500' : 'bg-orange-400';
-
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex">
-      {/* Accent bar */}
-      <div className={`w-1.5 shrink-0 ${accentColor}`} />
+    <div className="bg-white flex" style={CARD_STYLE}>
+      {/* Urgency bar */}
+      <div className="w-1 shrink-0 rounded-l-[12px]"
+        style={{ background: payment.urgent ? '#C62828' : '#B45309' }} />
 
       <div className="flex-1 p-5">
         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-
           {/* Avatar + info */}
           <div className="flex items-start gap-3 flex-1 min-w-0">
-            <div className="w-11 h-11 rounded-xl bg-[#2E7D32] text-white flex items-center justify-center font-bold text-sm shrink-0">
-              {initials(payment.prenom, payment.nom)}
-            </div>
+            <span className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0"
+              style={{ background: WAVE_GRAD }}>
+              <Waves size={18} />
+            </span>
             <div className="min-w-0">
-              <p className="font-bold text-gray-900 text-sm">
-                {payment.prenom} {payment.nom}
-              </p>
-              <p className="text-xs text-gray-500 truncate">{payment.email}</p>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {payment.plan_name || '—'} · {fmtDuree(payment.duree_mois)}
-              </p>
+              <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                <p className="font-bold text-[#18181B] text-sm">{payment.prenom} {payment.nom}</p>
+                {payment.plan_name && (
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-md"
+                    style={{ background: '#E8F5E9', color: '#2E7D32' }}>
+                    {payment.plan_name}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[#71717A] truncate">{payment.email}</p>
+              <p className="text-xs text-zinc-400 mt-0.5">{fmtDuree(payment.duree_mois)} · {fmtDate(payment.created_at)}</p>
             </div>
           </div>
 
-          {/* Montant + time badge */}
+          {/* Amount + urgency */}
           <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-1 shrink-0">
-            <p className="text-xl font-black text-[#2E7D32]">{fmtXOF(payment.montant_paye)}</p>
+            <p className="text-xl font-extrabold text-[#18181B] leading-none tabular-nums">{fmtXOF(payment.montant_paye)}</p>
             {payment.urgent ? (
-              <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-full">
-                <AlertTriangle className="w-3 h-3" />
-                {payment.heures_attente}h — URGENT
+              <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
+                style={{ background: '#FEECEC', color: '#C62828' }}>
+                <AlertTriangle size={11} /> {payment.heures_attente}h — URGENT
               </span>
             ) : (
-              <span className="text-xs text-gray-400">{timeAgo(payment.created_at)}</span>
+              <span className="text-xs text-zinc-400">{timeAgo(payment.created_at)}</span>
             )}
           </div>
         </div>
 
-        {/* Wave reference + proof */}
+        {/* Reference + proof */}
         <div className="flex flex-wrap items-center gap-2 mt-4">
           {payment.reference_wave ? (
-            <button
-              onClick={copyRef}
-              className="inline-flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-mono font-semibold px-3 py-1.5 rounded-lg transition-colors"
-              title="Copier la référence"
-            >
-              {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+            <button onClick={copyRef}
+              className="inline-flex items-center gap-1.5 text-xs font-mono font-semibold px-3 py-1.5 rounded-lg transition-colors"
+              style={{ background: '#E0F2FE', color: '#0284C7' }}
+              title="Copier la référence">
+              {copied ? <Check size={12} /> : <Copy size={12} />}
               {payment.reference_wave}
             </button>
           ) : (
-            <span className="text-xs text-gray-400">Aucune référence</span>
+            <span className="text-xs text-zinc-400 italic">Aucune référence</span>
           )}
-
           {payment.preuve_paiement && (
-            <button
-              onClick={() => onPreview(payment.preuve_paiement!)}
-              className="inline-flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-            >
-              <Eye className="w-3 h-3" />
-              Voir la preuve
+            <button onClick={() => onPreview(payment.preuve_paiement!)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-[#E7E7EA] text-zinc-600 hover:bg-zinc-50 transition-colors">
+              <Eye size={12} /> Voir la preuve
             </button>
           )}
         </div>
 
         {/* Actions */}
         <div className="flex gap-2 mt-4">
-          <Button
-            size="sm"
-            onClick={() => onValidate(payment)}
-            className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white font-bold rounded-lg gap-1.5 h-9"
-          >
-            <CheckCircle2 className="w-4 h-4" />
-            Valider
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onReject(payment)}
-            className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 font-bold rounded-lg gap-1.5 h-9"
-          >
-            <XCircle className="w-4 h-4" />
-            Refuser
-          </Button>
+          <button onClick={() => onValidate(payment)}
+            className="h-9 px-4 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5"
+            style={{ background: '#2E7D32' }}>
+            <CheckCircle2 size={15} /> Valider
+          </button>
+          <button onClick={() => onReject(payment)}
+            className="h-9 px-3 rounded-lg border text-sm font-semibold flex items-center gap-1.5 transition-colors hover:bg-red-50"
+            style={{ borderColor: '#C62828', color: '#C62828' }}>
+            <XCircle size={15} /> Refuser
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Validate Dialog ─────────────────────────────────────────────────────────
-
-function ValidateDialog({
-  item, open, onClose, onSuccess,
+// ─── Validate modal ────────────────────────────────────────────────────────────────
+function ValidateModal({
+  item, onClose, onSuccess,
 }: {
-  item: PendingPayment | null;
-  open: boolean;
+  item: PendingPayment;
   onClose: () => void;
   onSuccess: (email: string) => void;
 }) {
@@ -244,10 +272,8 @@ function ValidateDialog({
   const [confirmed, setConfirmed] = useState(false);
   const [loading,   setLoading]   = useState(false);
 
-  useEffect(() => { if (!open) { setComment(''); setConfirmed(false); } }, [open]);
-
   const handleConfirm = async () => {
-    if (!item || !confirmed) return;
+    if (!confirmed) return;
     setLoading(true);
     try {
       const res = await fetch(`${API_BASE}/api/admin/wave/validate/${item.id}`, {
@@ -266,88 +292,67 @@ function ValidateDialog({
     }
   };
 
-  if (!item) return null;
-
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md rounded-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-[#2E7D32]">
-            <CheckCircle2 className="w-5 h-5" />
-            Confirmer la validation
-          </DialogTitle>
-          <DialogDescription>
-            Vérifiez les informations avant de valider ce paiement.
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Récapitulatif */}
-        <div className="bg-[#E8F5E9] rounded-xl p-4 space-y-2 text-sm">
-          {[
-            ['Utilisateur', `${item.prenom} ${item.nom}`],
-            ['Email',       item.email],
-            ['Plan',        item.plan_name || '—'],
-            ['Durée',       fmtDuree(item.duree_mois)],
-            ['Montant',     fmtXOF(item.montant_paye)],
-            ['Réf. Wave',   item.reference_wave || '—'],
-          ].map(([l, v]) => (
-            <div key={l} className="flex justify-between">
-              <span className="text-gray-500">{l}</span>
-              <span className="font-semibold text-gray-900 text-right max-w-[60%] truncate">{v}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="comment" className="text-sm font-semibold text-gray-700">
-            Commentaire interne <span className="text-gray-400 font-normal">(optionnel)</span>
-          </Label>
-          <Textarea
-            id="comment"
-            value={comment}
-            onChange={e => setComment(e.target.value)}
-            placeholder="Note visible uniquement par les admins..."
-            className="rounded-xl resize-none text-sm"
-            rows={2}
-          />
-        </div>
-
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
-          <Checkbox
-            id="confirm-check"
-            checked={confirmed}
-            onCheckedChange={v => setConfirmed(!!v)}
-            className="mt-0.5 data-[state=checked]:bg-[#2E7D32] data-[state=checked]:border-[#2E7D32]"
-          />
-          <Label htmlFor="confirm-check" className="text-sm text-amber-800 cursor-pointer leading-snug">
-            Je confirme avoir vérifié ce paiement Wave sur le compte Wave de Portefolia.
-          </Label>
-        </div>
-
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onClose} className="rounded-xl" disabled={loading}>
+    <ModalShell icon={CheckCircle2} title="Confirmer la validation" subtitle="Vérifiez les informations avant de valider." tone="accent" size="sm"
+      onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose} disabled={loading}
+            className="h-10 px-4 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors">
             Annuler
-          </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={!confirmed || loading}
-            className="bg-[#2E7D32] hover:bg-[#1B5E20] text-white font-bold rounded-xl gap-2"
-          >
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Validation…</> : 'Confirmer la validation'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </button>
+          <button onClick={handleConfirm} disabled={!confirmed || loading}
+            className="h-10 px-5 rounded-[10px] text-sm font-semibold text-white flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+            style={{ background: '#2E7D32' }}>
+            {loading ? <><Loader2 size={14} className="animate-spin" /> Validation…</> : 'Confirmer'}
+          </button>
+        </>
+      }>
+      {/* Summary */}
+      <div className="rounded-xl p-4 space-y-2 text-sm mb-4" style={{ background: '#E8F5E9' }}>
+        {[
+          ['Utilisateur', `${item.prenom} ${item.nom}`],
+          ['Email',       item.email],
+          ['Plan',        item.plan_name || '—'],
+          ['Durée',       fmtDuree(item.duree_mois)],
+          ['Montant',     fmtXOF(item.montant_paye)],
+          ['Réf. Wave',   item.reference_wave || '—'],
+        ].map(([l, v]) => (
+          <div key={l} className="flex justify-between">
+            <span className="text-zinc-500">{l}</span>
+            <span className="font-semibold text-[#18181B] text-right max-w-[60%] truncate">{v}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Comment */}
+      <div className="space-y-1.5 mb-4">
+        <label className="text-xs font-semibold text-[#18181B] uppercase tracking-wide">
+          Commentaire <span className="text-zinc-400 font-normal normal-case">(optionnel)</span>
+        </label>
+        <textarea value={comment} onChange={e => setComment(e.target.value)} rows={2}
+          placeholder="Note visible uniquement par les admins..."
+          className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E7EA] outline-none text-sm text-[#18181B] resize-none focus:border-[#18181B]/30" />
+      </div>
+
+      {/* Confirm checkbox */}
+      <div className="flex items-start gap-3 rounded-xl border p-3" style={{ background: '#FFFBEB', borderColor: '#FDE68A' }}>
+        <input type="checkbox" id="val-confirm" checked={confirmed}
+          onChange={e => setConfirmed(e.target.checked)}
+          className="mt-0.5 accent-[#2E7D32] w-4 h-4 shrink-0 cursor-pointer" />
+        <label htmlFor="val-confirm" className="text-sm cursor-pointer leading-snug" style={{ color: '#92400E' }}>
+          Je confirme avoir vérifié ce paiement Wave sur le compte Wave de Portefolia.
+        </label>
+      </div>
+    </ModalShell>
   );
 }
 
-// ─── Reject Dialog ────────────────────────────────────────────────────────────
-
-function RejectDialog({
-  item, open, onClose, onSuccess,
+// ─── Reject modal ──────────────────────────────────────────────────────────────────
+function RejectModal({
+  item, onClose, onSuccess,
 }: {
-  item: PendingPayment | null;
-  open: boolean;
+  item: PendingPayment;
   onClose: () => void;
   onSuccess: () => void;
 }) {
@@ -355,10 +360,8 @@ function RejectDialog({
   const [motif,   setMotif]   = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { if (!open) setMotif(''); }, [open]);
-
   const handleConfirm = async () => {
-    if (!item || motif.trim().length < 20) {
+    if (motif.trim().length < 20) {
       toast({ title: 'Motif trop court', description: 'Minimum 20 caractères requis.', variant: 'destructive' });
       return;
     }
@@ -380,119 +383,82 @@ function RejectDialog({
     }
   };
 
-  if (!item) return null;
   const tooShort = motif.trim().length < 20;
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md rounded-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-red-600">
-            <XCircle className="w-5 h-5" />
-            Refuser le paiement
-          </DialogTitle>
-          <DialogDescription>
-            {item.prenom} {item.nom} — {fmtXOF(item.montant_paye)}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-3">
-          <div>
-            <Label className="text-sm font-semibold text-gray-700 mb-2 block">
-              Motif prédéfini <span className="text-gray-400 font-normal">(optionnel)</span>
-            </Label>
-            <Select onValueChange={v => setMotif(v)}>
-              <SelectTrigger className="rounded-xl text-sm">
-                <SelectValue placeholder="Choisir un motif..." />
-              </SelectTrigger>
-              <SelectContent>
-                {MOTIF_PRESETS.map(m => (
-                  <SelectItem key={m} value={m} className="text-sm">{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="motif-text" className="text-sm font-semibold text-gray-700 flex items-center justify-between mb-1.5">
-              <span>Motif de refus <span className="text-red-500">*</span></span>
-              <span className={`text-xs font-normal ${tooShort ? 'text-red-400' : 'text-gray-400'}`}>
-                {motif.trim().length}/20 min
-              </span>
-            </Label>
-            <Textarea
-              id="motif-text"
-              value={motif}
-              onChange={e => setMotif(e.target.value)}
-              placeholder="Expliquez clairement le motif du refus à l'utilisateur..."
-              className="rounded-xl resize-none text-sm"
-              rows={4}
-            />
-            {tooShort && motif.length > 0 && (
-              <p className="text-xs text-red-500 mt-1">Le motif doit faire au moins 20 caractères.</p>
-            )}
-          </div>
-        </div>
-
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onClose} className="rounded-xl" disabled={loading}>
+    <ModalShell icon={XCircle} title="Refuser le paiement"
+      subtitle={`${item.prenom} ${item.nom} — ${fmtXOF(item.montant_paye)}`}
+      tone="danger" size="sm" onClose={onClose}
+      footer={
+        <>
+          <button onClick={onClose} disabled={loading}
+            className="h-10 px-4 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors">
             Annuler
-          </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={tooShort || loading}
-            variant="destructive"
-            className="rounded-xl gap-2 font-bold"
-          >
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Refus…</> : 'Confirmer le refus'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
+          </button>
+          <button onClick={handleConfirm} disabled={tooShort || loading}
+            className="h-10 px-5 rounded-[10px] text-sm font-semibold text-white flex items-center gap-1.5 disabled:opacity-50"
+            style={{ background: '#C62828' }}>
+            {loading ? <><Loader2 size={14} className="animate-spin" /> Refus…</> : 'Confirmer le refus'}
+          </button>
+        </>
+      }>
+      {/* Preset select */}
+      <div className="space-y-1.5 mb-4">
+        <label className="text-xs font-semibold text-[#18181B] uppercase tracking-wide">
+          Motif prédéfini <span className="text-zinc-400 font-normal normal-case">(optionnel)</span>
+        </label>
+        <select onChange={e => setMotif(e.target.value)} value=""
+          className="w-full h-10 px-3 rounded-xl border border-[#E7E7EA] bg-zinc-50 outline-none text-sm text-[#18181B]">
+          <option value="">Choisir un motif…</option>
+          {MOTIF_PRESETS.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+      </div>
 
-// ─── Proof Preview Modal ─────────────────────────────────────────────────────
-
-function PreviewModal({ url, onClose }: { url: string | null; onClose: () => void }) {
-  return (
-    <Dialog open={!!url} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl rounded-2xl p-2">
-        <DialogHeader className="px-4 pt-2">
-          <DialogTitle className="text-sm font-bold text-gray-700">Preuve de paiement Wave</DialogTitle>
-        </DialogHeader>
-        {url && (
-          <img
-            src={url}
-            alt="Preuve de paiement"
-            className="w-full rounded-xl object-contain max-h-[70vh]"
-          />
+      {/* Free text */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <label htmlFor="motif-text" className="text-xs font-semibold text-[#18181B] uppercase tracking-wide">
+            Motif de refus <span className="text-red-500">*</span>
+          </label>
+          <span className={`text-xs font-normal ${tooShort ? 'text-red-400' : 'text-zinc-400'}`}>
+            {motif.trim().length}/20 min
+          </span>
+        </div>
+        <textarea id="motif-text" value={motif} onChange={e => setMotif(e.target.value)} rows={4}
+          placeholder="Expliquez clairement le motif du refus à l'utilisateur..."
+          className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E7EA] outline-none text-sm text-[#18181B] resize-none focus:border-[#18181B]/30" />
+        {tooShort && motif.length > 0 && (
+          <p className="text-xs text-red-500">Le motif doit faire au moins 20 caractères.</p>
         )}
-      </DialogContent>
-    </Dialog>
+      </div>
+
+      <div className="mt-4 flex items-center gap-1.5 text-xs text-zinc-500">
+        <Shield size={13} /> L'utilisateur sera notifié par email avec ce motif.
+      </div>
+    </ModalShell>
   );
 }
 
-// ─── History Table ────────────────────────────────────────────────────────────
-
-const STATUT_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  ACTIVE:          { label: 'Validé',     bg: 'bg-green-100',  text: 'text-green-800' },
-  PENDING_PAYMENT: { label: 'En attente', bg: 'bg-orange-100', text: 'text-orange-800' },
-  SUSPENDED:       { label: 'Refusé',     bg: 'bg-red-100',    text: 'text-red-800' },
-  EXPIRED:         { label: 'Expiré',     bg: 'bg-gray-100',   text: 'text-gray-700' },
-};
-
-function StatutBadge({ statut }: { statut: string }) {
-  const conf = STATUT_CONFIG[statut] ?? { label: statut, bg: 'bg-gray-100', text: 'text-gray-700' };
+// ─── Proof preview modal ───────────────────────────────────────────────────────────
+function PreviewModal({ url, onClose }: { url: string; onClose: () => void }) {
   return (
-    <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold ${conf.bg} ${conf.text}`}>
-      {conf.label}
-    </span>
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+      style={{ background: 'rgba(16,24,40,0.75)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}>
+      <div className="relative max-w-2xl w-full" onClick={e => e.stopPropagation()}>
+        <button onClick={onClose}
+          className="absolute -top-3 -right-3 z-10 w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-lg text-zinc-600 hover:text-[#18181B]">
+          <X size={17} />
+        </button>
+        <p className="text-xs font-bold text-white/70 mb-2 px-1">Preuve de paiement Wave</p>
+        <img src={url} alt="Preuve de paiement"
+          className="w-full rounded-2xl object-contain max-h-[80vh] shadow-2xl" />
+      </div>
+    </div>
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
+// ─── Main component ───────────────────────────────────────────────────────────────
 export default function WaveValidation() {
   const { toast } = useToast();
 
@@ -511,22 +477,19 @@ export default function WaveValidation() {
   const [rejectTarget,   setRejectTarget]   = useState<PendingPayment | null>(null);
 
   // History filters
-  const [search,     setSearch]     = useState('');
-  const [statut,     setStatut]     = useState('');
-  const [dateDeb,    setDateDeb]    = useState('');
-  const [dateFin,    setDateFin]    = useState('');
-  const [histPage,   setHistPage]   = useState(1);
+  const [search,   setSearch]   = useState('');
+  const [statut,   setStatut]   = useState('');
+  const [dateDeb,  setDateDeb]  = useState('');
+  const [dateFin,  setDateFin]  = useState('');
+  const [histPage, setHistPage] = useState(1);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Fetch pending ─────────────────────────────────────────────────────────
-
+  // ── Fetch pending ───────────────────────────────────────────────────────────────
   const loadPending = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/admin/wave/pending`, {
-        headers: authHeaders(),
-      });
+      const res = await fetch(`${API_BASE}/api/admin/wave/pending`, { headers: authHeaders() });
       if (!res.ok) throw new Error('Erreur de chargement');
       const data = await res.json();
       setPending(data.pending || []);
@@ -537,8 +500,7 @@ export default function WaveValidation() {
     }
   }, []);
 
-  // ── Fetch validated today ─────────────────────────────────────────────────
-
+  // ── Fetch validated today ────────────────────────────────────────────────────────
   const loadValidatedToday = useCallback(async () => {
     const today = new Date().toISOString().slice(0, 10);
     try {
@@ -551,8 +513,7 @@ export default function WaveValidation() {
     } catch { /* non-bloquant */ }
   }, []);
 
-  // ── Fetch history ─────────────────────────────────────────────────────────
-
+  // ── Fetch history ────────────────────────────────────────────────────────────────
   const loadHistory = useCallback(async () => {
     setHistLoading(true);
     try {
@@ -563,9 +524,7 @@ export default function WaveValidation() {
         ...(dateFin && { date_fin: dateFin }),
         ...(search  && { search }),
       });
-      const res = await fetch(`${API_BASE}/api/admin/wave/history?${params}`, {
-        headers: authHeaders(),
-      });
+      const res = await fetch(`${API_BASE}/api/admin/wave/history?${params}`, { headers: authHeaders() });
       const data = await res.json();
       setHistory(data.history || []);
       setPagination(data.pagination || { page: 1, limit: 20, total: 0, pages: 1 });
@@ -576,20 +535,12 @@ export default function WaveValidation() {
     }
   }, [histPage, statut, dateDeb, dateFin, search]);
 
-  // ── Init + auto-refresh ───────────────────────────────────────────────────
-
+  // ── Init + auto-refresh ──────────────────────────────────────────────────────────
   useEffect(() => {
     loadPending();
     loadValidatedToday();
-
-    timerRef.current = setInterval(() => {
-      loadPending(true);
-      loadValidatedToday();
-    }, REFRESH_INTERVAL);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    timerRef.current = setInterval(() => { loadPending(true); loadValidatedToday(); }, REFRESH_INTERVAL);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
   useEffect(() => {
@@ -602,8 +553,7 @@ export default function WaveValidation() {
     if (tab === 'history') loadHistory();
   };
 
-  // ── Callbacks after action ────────────────────────────────────────────────
-
+  // ── Callbacks ────────────────────────────────────────────────────────────────────
   const onValidated = (email: string) => {
     toast({ title: '✓ Paiement validé', description: `Email d'activation envoyé à ${email}.` });
     loadPending(true);
@@ -617,8 +567,7 @@ export default function WaveValidation() {
     if (tab === 'history') loadHistory();
   };
 
-  // ── CSV Export ────────────────────────────────────────────────────────────
-
+  // ── CSV Export ───────────────────────────────────────────────────────────────────
   const exportCSV = () => {
     const headers = ['Date', 'Nom', 'Email', 'Plan', 'Montant (FCFA)', 'Durée', 'Référence Wave', 'Statut'];
     const rows = history.map(h => [
@@ -636,123 +585,109 @@ export default function WaveValidation() {
       .join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url  = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href     = url;
-    link.download = `wave-payments-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `wave-payments-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
     URL.revokeObjectURL(url);
   };
 
-  // ── KPIs ─────────────────────────────────────────────────────────────────
-
+  // ── KPIs ─────────────────────────────────────────────────────────────────────────
   const urgentCount = pending.filter(p => p.urgent).length;
+  const totalAmount = pending.reduce((s, p) => s + (p.montant_paye || 0), 0);
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  const kpis = [
+    { label: 'Montant en attente', value: loading ? '—' : fmtXOF(totalAmount), icon: Banknote, c: '#B45309', bg: '#FEF3E2', sub: 'À encaisser' },
+    { label: 'Paiements à valider', value: loading ? '—' : pending.length, icon: Clock, c: pending.length > 0 ? '#1565C0' : '#52525B', bg: pending.length > 0 ? '#E8F1FD' : '#F4F4F5', sub: 'En attente de traitement' },
+    { label: 'Urgents (> 24h)', value: loading ? '—' : urgentCount, icon: AlertTriangle, c: urgentCount > 0 ? '#C62828' : '#52525B', bg: urgentCount > 0 ? '#FEECEC' : '#F4F4F5', sub: 'Soumis depuis +24h' },
+    { label: 'Validés aujourd\'hui', value: validatedToday, icon: CheckCircle2, c: '#2E7D32', bg: '#EAF5EB', sub: format(new Date(), 'HH:mm', { locale: fr }) },
+  ];
 
+  // ── Render ────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#F8F9FA' }}>
+    <div className="min-h-screen" style={{ background: '#F7F8F8' }}>
 
-
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-8 space-y-6">
-
-        {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="bg-[#2E7D32] rounded-2xl px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center shrink-0">
-              <Waves className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-white leading-tight">
-                Validation des Paiements Wave
-              </h1>
-              <p className="text-sm text-white/75 font-medium">Trésorerie &amp; Opérations Comptables</p>
+      {/* ── AdminHeader ─────────────────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden" style={{ background: ADMIN_GRAD }}>
+        <div className="absolute inset-0 opacity-[0.12] pointer-events-none"
+          style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '22px 22px' }} />
+        <div className="relative max-w-[1180px] mx-auto px-5 sm:px-8 py-7 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex items-center gap-3.5 flex-1 min-w-0 pl-10 md:pl-0">
+            <span className="w-12 h-12 rounded-2xl bg-white/[0.12] flex items-center justify-center text-white shrink-0">
+              <Waves size={24} strokeWidth={1.9} />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-white leading-tight">Validation Wave</h1>
+              <p className="text-white/65 text-sm mt-0.5">
+                Confirmez les paiements mobile money reçus
+                {pending.length > 0 && (
+                  <span className="ml-2 text-xs font-bold bg-white/20 px-2 py-0.5 rounded-full">
+                    {pending.length} en attente
+                  </span>
+                )}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 self-start sm:self-auto">
-            {pending.length > 0 && (
-              <span className="bg-white text-[#2E7D32] text-sm font-black px-3 py-1 rounded-full">
-                {pending.length} en attente
-              </span>
-            )}
-            <Button
-              onClick={handleRefresh}
-              size="sm"
-              className="bg-white/20 hover:bg-white/30 text-white border-0 font-bold rounded-xl gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Actualiser
-            </Button>
-          </div>
+          <button onClick={handleRefresh}
+            className="h-10 px-4 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-semibold flex items-center gap-1.5 transition-colors shrink-0 self-start sm:self-auto">
+            <RefreshCw size={15} /> Actualiser
+          </button>
         </div>
+      </div>
 
-        {/* ── KPI Row ────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <KpiCard
-            label="En attente"
-            value={loading ? '—' : pending.length}
-            icon={Clock}
-            color={pending.length > 0 ? 'text-orange-600' : 'text-gray-400'}
-            bg={pending.length > 0 ? 'bg-orange-100' : 'bg-gray-100'}
-            description="Paiements non encore validés"
-          />
-          <KpiCard
-            label="Urgents (> 24h)"
-            value={loading ? '—' : urgentCount}
-            icon={AlertTriangle}
-            color={urgentCount > 0 ? 'text-red-600' : 'text-gray-400'}
-            bg={urgentCount > 0 ? 'bg-red-100' : 'bg-gray-100'}
-            description="Soumis depuis plus de 24 heures"
-          />
-          <KpiCard
-            label="Validés aujourd'hui"
-            value={validatedToday}
-            icon={CheckCircle2}
-            color="text-[#2E7D32]"
-            bg="bg-green-100"
-            description={`Mise à jour : ${format(new Date(), 'HH:mm', { locale: fr })}`}
-          />
-        </div>
+      {/* ── AdminBody ───────────────────────────────────────────────────────────── */}
+      <div className="max-w-[1180px] mx-auto px-5 sm:px-8 py-7 space-y-7">
 
-        {/* ── Tabs ───────────────────────────────────────────────────────── */}
-        <div className="flex gap-1 bg-white rounded-xl p-1.5 border border-gray-200 w-fit shadow-sm">
-          {(['pending', 'history'] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-5 py-2 rounded-lg text-sm font-bold transition-all ${
-                tab === t
-                  ? 'bg-[#2E7D32] text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
-              }`}
-            >
-              {t === 'pending' ? (
-                <span className="flex items-center gap-2">
-                  En attente
-                  {pending.length > 0 && (
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-black ${tab === 'pending' ? 'bg-white/25 text-white' : 'bg-orange-100 text-orange-700'}`}>
-                      {pending.length}
-                    </span>
-                  )}
+        {/* KPI cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {kpis.map(({ label, value, icon: Icon, c, bg, sub }) => (
+            <div key={label} className="bg-white p-5" style={CARD_STYLE}>
+              <div className="flex items-center gap-3.5">
+                <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: bg, color: c }}>
+                  <Icon size={18} />
                 </span>
-              ) : 'Historique'}
+                <div className="min-w-0">
+                  <p className="text-[22px] font-extrabold text-[#18181B] leading-none tabular-nums">{value}</p>
+                  <p className="text-xs text-zinc-400 mt-1 leading-tight">{label}</p>
+                </div>
+              </div>
+              <p className="text-[11px] text-zinc-400 mt-3 pl-0.5">{sub}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 bg-white p-1.5 w-fit" style={CARD_STYLE}>
+          {([['pending', 'En attente'], ['history', 'Historique']] as const).map(([k, label]) => (
+            <button key={k} onClick={() => setTab(k)}
+              className={`px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${tab === k ? 'text-white' : 'text-zinc-500 hover:text-[#18181B] hover:bg-zinc-50'}`}
+              style={tab === k ? { background: '#1B5E20' } : undefined}>
+              {label}
+              {k === 'pending' && pending.length > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-black ${tab === 'pending' ? 'bg-white/25 text-white' : 'bg-[#FEF3E2] text-[#B45309]'}`}>
+                  {pending.length}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
-        {/* ── Tab: Pending ───────────────────────────────────────────────── */}
+        {/* ── Tab: Pending ────────────────────────────────────────────────────────── */}
         {tab === 'pending' && (
           <div className="space-y-3">
             {loading ? (
               Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-36 rounded-xl" />
+                <div key={i} className="bg-white h-36 animate-pulse" style={CARD_STYLE} />
               ))
             ) : pending.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 py-16 flex flex-col items-center gap-3 text-center shadow-sm">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle2 className="w-8 h-8 text-[#2E7D32]" />
-                </div>
-                <h3 className="font-bold text-gray-900">Aucun paiement en attente</h3>
-                <p className="text-sm text-gray-400">Tous les paiements Wave ont été traités.</p>
+              <div className="bg-white flex flex-col items-center justify-center py-20 text-center" style={CARD_STYLE}>
+                <span className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                  style={{ background: '#EAF5EB', color: '#2E7D32' }}>
+                  <CheckCircle2 size={26} />
+                </span>
+                <h3 className="font-bold text-[#18181B]">Aucun paiement en attente</h3>
+                <p className="text-sm text-zinc-400 mt-1 max-w-xs">Tous les paiements Wave ont été traités.</p>
               </div>
             ) : (
               pending.map(p => (
@@ -768,173 +703,147 @@ export default function WaveValidation() {
           </div>
         )}
 
-        {/* ── Tab: History ───────────────────────────────────────────────── */}
+        {/* ── Tab: History ─────────────────────────────────────────────────────────── */}
         {tab === 'history' && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-white overflow-hidden" style={CARD_STYLE}>
             {/* Filters */}
-            <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Rechercher nom, email..."
-                  value={search}
+            <div className="p-4 border-b border-[#E7E7EA] flex flex-col sm:flex-row flex-wrap gap-2.5">
+              <div className="relative flex-1 min-w-[180px]">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                <input placeholder="Rechercher nom, email…" value={search}
                   onChange={e => { setSearch(e.target.value); setHistPage(1); }}
-                  className="pl-9 rounded-xl h-9 text-sm border-gray-200"
-                />
+                  className="w-full h-9 pl-9 pr-3 rounded-lg bg-zinc-50 border border-transparent focus:border-[#E7E7EA] outline-none text-sm text-[#18181B]" />
               </div>
-              <Select value={statut} onValueChange={v => { setStatut(v === 'ALL' ? '' : v); setHistPage(1); }}>
-                <SelectTrigger className="w-40 rounded-xl h-9 text-sm border-gray-200">
-                  <SelectValue placeholder="Tous statuts" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Tous statuts</SelectItem>
-                  <SelectItem value="PENDING_PAYMENT">En attente</SelectItem>
-                  <SelectItem value="ACTIVE">Validé</SelectItem>
-                  <SelectItem value="SUSPENDED">Refusé</SelectItem>
-                  <SelectItem value="EXPIRED">Expiré</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                type="date"
-                value={dateDeb}
+              <select value={statut} onChange={e => { setStatut(e.target.value === 'ALL' ? '' : e.target.value); setHistPage(1); }}
+                className="h-9 px-2 rounded-lg border border-[#E7E7EA] bg-zinc-50 text-xs text-[#18181B] outline-none">
+                <option value="ALL">Tous statuts</option>
+                <option value="PENDING_PAYMENT">En attente</option>
+                <option value="ACTIVE">Validé</option>
+                <option value="SUSPENDED">Refusé</option>
+                <option value="EXPIRED">Expiré</option>
+              </select>
+              <input type="date" value={dateDeb}
                 onChange={e => { setDateDeb(e.target.value); setHistPage(1); }}
-                className="w-36 rounded-xl h-9 text-sm border-gray-200"
-              />
-              <Input
-                type="date"
-                value={dateFin}
+                className="h-9 px-2 rounded-lg border border-[#E7E7EA] bg-zinc-50 text-xs text-[#18181B] outline-none w-36" />
+              <input type="date" value={dateFin}
                 onChange={e => { setDateFin(e.target.value); setHistPage(1); }}
-                className="w-36 rounded-xl h-9 text-sm border-gray-200"
-              />
-              <Button
-                onClick={loadHistory}
-                size="sm"
-                variant="outline"
-                className="rounded-xl h-9 gap-1.5 shrink-0 border-gray-200"
-              >
-                <Filter className="w-3.5 h-3.5" />
-                Filtrer
-              </Button>
-              <Button
-                onClick={exportCSV}
-                size="sm"
-                variant="outline"
-                className="rounded-xl h-9 gap-1.5 shrink-0 border-gray-200"
-                disabled={history.length === 0}
-              >
-                <Download className="w-3.5 h-3.5" />
-                CSV
-              </Button>
+                className="h-9 px-2 rounded-lg border border-[#E7E7EA] bg-zinc-50 text-xs text-[#18181B] outline-none w-36" />
+              <button onClick={loadHistory}
+                className="h-9 px-3 rounded-lg border border-[#E7E7EA] text-xs font-semibold text-zinc-600 hover:bg-zinc-50 flex items-center gap-1.5 transition-colors">
+                <Filter size={13} /> Filtrer
+              </button>
+              <button onClick={exportCSV} disabled={history.length === 0}
+                className="h-9 px-3 rounded-lg border border-[#E7E7EA] text-xs font-semibold text-zinc-600 hover:bg-zinc-50 flex items-center gap-1.5 transition-colors disabled:opacity-40">
+                <Download size={13} /> CSV
+              </button>
             </div>
 
             {/* Table */}
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50">
-                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Date</TableHead>
-                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Utilisateur</TableHead>
-                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Plan</TableHead>
-                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Montant</TableHead>
-                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Référence Wave</TableHead>
-                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Statut</TableHead>
-                    <TableHead className="text-xs font-bold text-gray-500 uppercase tracking-wider">Attente</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <table className="w-full text-sm min-w-[680px]">
+                <thead>
+                  <tr className="text-left text-xs font-bold uppercase tracking-wide text-zinc-400 border-b border-[#E7E7EA]">
+                    <th className="py-3 px-5">Date</th>
+                    <th className="py-3 px-3">Utilisateur</th>
+                    <th className="py-3 px-3">Plan · Durée</th>
+                    <th className="py-3 px-3 text-right">Montant</th>
+                    <th className="py-3 px-3">Référence Wave</th>
+                    <th className="py-3 px-3">Statut</th>
+                    <th className="py-3 px-5">Attente</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {histLoading ? (
                     Array.from({ length: 8 }).map((_, i) => (
-                      <TableRow key={i}>
+                      <tr key={i} className="border-b border-[#E7E7EA]">
                         {Array.from({ length: 7 }).map((_, j) => (
-                          <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                          <td key={j} className="py-3 px-3">
+                            <div className="h-3 bg-zinc-100 rounded animate-pulse" />
+                          </td>
                         ))}
-                      </TableRow>
+                      </tr>
                     ))
                   ) : history.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-12 text-gray-400 text-sm">
+                    <tr>
+                      <td colSpan={7} className="py-14 text-center text-sm text-zinc-400">
                         Aucun résultat pour ces filtres
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   ) : history.map(h => (
-                    <TableRow key={h.id} className="hover:bg-gray-50 transition-colors">
-                      <TableCell className="text-xs text-gray-500 whitespace-nowrap">
-                        {fmtDate(h.created_at)}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{h.prenom} {h.nom}</p>
-                          <p className="text-xs text-gray-400">{h.email}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <p className="text-sm text-gray-700">{h.plan_name || '—'}</p>
-                        <p className="text-xs text-gray-400">{fmtDuree(h.duree_mois)}</p>
-                      </TableCell>
-                      <TableCell className="font-bold text-[#2E7D32] text-sm whitespace-nowrap">
-                        {fmtXOF(h.montant_paye)}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-mono text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                          {h.reference_wave || '—'}
+                    <tr key={h.id} className="border-b border-[#E7E7EA] last:border-0 hover:bg-zinc-50/70 transition-colors">
+                      <td className="py-3 px-5 text-xs text-zinc-500 whitespace-nowrap">{fmtDate(h.created_at)}</td>
+                      <td className="py-3 px-3">
+                        <p className="font-semibold text-[#18181B] text-sm whitespace-nowrap">{h.prenom} {h.nom}</p>
+                        <p className="text-xs text-zinc-400 truncate max-w-[160px]">{h.email}</p>
+                      </td>
+                      <td className="py-3 px-3">
+                        <p className="text-sm text-[#18181B]">{h.plan_name || '—'}</p>
+                        <p className="text-xs text-zinc-400">{fmtDuree(h.duree_mois)}</p>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <span className="font-bold text-sm text-[#2E7D32] tabular-nums whitespace-nowrap">
+                          {fmtXOF(h.montant_paye)}
                         </span>
-                      </TableCell>
-                      <TableCell>
-                        <StatutBadge statut={h.statut} />
-                      </TableCell>
-                      <TableCell className="text-xs text-gray-400 whitespace-nowrap">
+                      </td>
+                      <td className="py-3 px-3">
+                        {h.reference_wave ? (
+                          <span className="font-mono text-xs px-2 py-0.5 rounded-md"
+                            style={{ background: '#E0F2FE', color: '#0284C7' }}>
+                            {h.reference_wave}
+                          </span>
+                        ) : <span className="text-zinc-400 text-xs">—</span>}
+                      </td>
+                      <td className="py-3 px-3"><StatutPill statut={h.statut} /></td>
+                      <td className="py-3 px-5 text-xs text-zinc-400 whitespace-nowrap">
                         {h.heures_attente != null ? `${h.heures_attente}h` : '—'}
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
 
             {/* Pagination */}
             {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                <p className="text-xs text-gray-400">
+              <div className="flex items-center justify-between px-5 py-3.5 border-t border-[#E7E7EA]">
+                <p className="text-xs text-zinc-400">
                   {pagination.total} résultat{pagination.total > 1 ? 's' : ''} · page {pagination.page}/{pagination.pages}
                 </p>
                 <div className="flex gap-1">
-                  <Button
-                    size="sm" variant="outline"
-                    onClick={() => setHistPage(p => Math.max(1, p - 1))}
+                  <button onClick={() => setHistPage(p => Math.max(1, p - 1))}
                     disabled={histPage === 1 || histLoading}
-                    className="h-8 w-8 p-0 rounded-lg border-gray-200"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    size="sm" variant="outline"
-                    onClick={() => setHistPage(p => Math.min(pagination.pages, p + 1))}
+                    className="w-8 h-8 rounded-lg border border-[#E7E7EA] flex items-center justify-center text-zinc-500 hover:bg-zinc-50 disabled:opacity-40 transition-colors">
+                    <ChevronLeft size={15} />
+                  </button>
+                  <button onClick={() => setHistPage(p => Math.min(pagination.pages, p + 1))}
                     disabled={histPage === pagination.pages || histLoading}
-                    className="h-8 w-8 p-0 rounded-lg border-gray-200"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
+                    className="w-8 h-8 rounded-lg border border-[#E7E7EA] flex items-center justify-center text-zinc-500 hover:bg-zinc-50 disabled:opacity-40 transition-colors">
+                    <ChevronRight size={15} />
+                  </button>
                 </div>
               </div>
             )}
           </div>
         )}
+
       </div>
 
-      {/* ── Dialogs ─────────────────────────────────────────────────────── */}
-      <ValidateDialog
-        item={validateTarget}
-        open={!!validateTarget}
-        onClose={() => setValidateTarget(null)}
-        onSuccess={onValidated}
-      />
-      <RejectDialog
-        item={rejectTarget}
-        open={!!rejectTarget}
-        onClose={() => setRejectTarget(null)}
-        onSuccess={onRejected}
-      />
-      <PreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+      {/* ── Modals ──────────────────────────────────────────────────────────────── */}
+      {validateTarget && (
+        <ValidateModal
+          item={validateTarget}
+          onClose={() => setValidateTarget(null)}
+          onSuccess={onValidated}
+        />
+      )}
+      {rejectTarget && (
+        <RejectModal
+          item={rejectTarget}
+          onClose={() => setRejectTarget(null)}
+          onSuccess={onRejected}
+        />
+      )}
+      {previewUrl && <PreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />}
     </div>
   );
 }

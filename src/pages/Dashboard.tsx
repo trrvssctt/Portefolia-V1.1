@@ -1,15 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { isTokenExpired } from '@/utils/authUtils';
 import {
-  User, Plus, Eye, BarChart, CreditCard, Lock, ArrowRight,
-  Globe, TrendingUp, Star, Zap, Sparkles, Crown, FolderOpen, Search,
-  FileText, CheckCircle, Clock, LogIn
+  Plus, Eye, BarChart2, CreditCard, Lock, ArrowRight,
+  Globe, TrendingUp, Sparkles, FolderOpen, Search,
+  Clock, LogIn, Wifi, User, Star, Zap, Crown, ChevronDown,
 } from "lucide-react";
 import { format, formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -17,29 +14,15 @@ import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { PortfolioForm } from "@/components/dashboard/PortfolioForm";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlan } from '@/contexts/PlanContext';
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
-// ─── Types de plan et leurs limites ──────────────────────────────────────────
+// ─── Plan meta ────────────────────────────────────────────────────────────────
 type PlanType = 'free' | 'starter' | 'pro' | 'business';
 
-const PLAN_META: Record<PlanType, {
-  label: string;
-  limit: number;
-  icon: React.ReactNode;
-  textColor: string;
-  bgColor: string;
-}> = {
-  free: { label: 'Gratuit', limit: 1, icon: <Star className="w-3.5 h-3.5" />, textColor: 'text-gray-600', bgColor: 'bg-gray-100' },
-  starter: { label: 'Starter', limit: 5, icon: <Zap className="w-3.5 h-3.5" />, textColor: 'text-blue-700', bgColor: 'bg-blue-100' },
-  pro: { label: 'Pro', limit: 20, icon: <Sparkles className="w-3.5 h-3.5" />, textColor: 'text-purple-700', bgColor: 'bg-purple-100' },
-  business: { label: 'Business', limit: Infinity, icon: <Crown className="w-3.5 h-3.5" />, textColor: 'text-amber-700', bgColor: 'bg-amber-100' },
+const PLAN_META: Record<PlanType, { label: string; limit: number; icon: React.ReactNode }> = {
+  free:     { label: 'Gratuit',  limit: 1,        icon: <Star     size={14} /> },
+  starter:  { label: 'Starter',  limit: 5,        icon: <Zap      size={14} /> },
+  pro:      { label: 'Pro',      limit: 20,       icon: <Sparkles size={14} /> },
+  business: { label: 'Business', limit: Infinity, icon: <Crown    size={14} /> },
 };
 
 function getPlanType(plan: any): PlanType {
@@ -51,172 +34,112 @@ function getPlanType(plan: any): PlanType {
   return 'free';
 }
 
-// ─── Barre de progression du quota ───────────────────────────────────────────
-function PlanUsageBar({
-  used,
-  limit,
-  planLabel,
-  onUpgrade,
-}: {
-  used: number;
-  limit: number;
-  planLabel: string;
-  onUpgrade: () => void;
-}) {
+// ─── Plan usage bar ───────────────────────────────────────────────────────────
+function PlanUsage({ used, limit }: { used: number; limit: number }) {
   if (limit === Infinity) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-500">
-        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-          <div className="h-full w-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full" />
+      <div>
+        <div className="flex items-center justify-between text-xs mb-1.5">
+          <span className="text-[#71717A]"><strong className="text-[#18181B] font-semibold">{used}</strong> portfolios</span>
+          <span className="text-[#71717A]">Illimité</span>
         </div>
-        <span className="shrink-0 text-xs font-medium text-amber-600">Illimité</span>
+        <div className="h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+          <div className="h-full w-full rounded-full" style={{ background: '#2E7D32', opacity: 0.4 }} />
+        </div>
       </div>
     );
   }
-
   const pct = Math.min((used / limit) * 100, 100);
   const isAtLimit = used >= limit;
-  const barColor = isAtLimit ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-[#28A745]';
-
+  const barBg = isAtLimit ? '#EF4444' : pct >= 80 ? '#F59E0B' : '#2E7D32';
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-gray-500">
-          <strong className="text-gray-800">{used}</strong> / {limit} portfolios ({planLabel})
+    <div>
+      <div className="flex items-center justify-between text-xs mb-1.5">
+        <span className="text-[#71717A]">
+          <strong className="text-[#18181B] font-semibold">{used}</strong> / {limit} portfolios
         </span>
-        {isAtLimit ? (
-          <button
-            type="button"
-            onClick={onUpgrade}
-            className="text-[#28A745] font-semibold hover:underline flex items-center gap-1"
-          >
-            Upgrader <ArrowRight className="w-3 h-3" />
-          </button>
-        ) : (
-          <span className="text-gray-400">{limit - used} restant{limit - used > 1 ? 's' : ''}</span>
-        )}
+        <span className="text-[#71717A]">{limit - used} restant{limit - used > 1 ? 's' : ''}</span>
       </div>
-      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-          style={{ width: `${pct}%` }}
-        />
+      <div className="h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: barBg }} />
       </div>
     </div>
   );
 }
 
-// ─── Bouton création avec état limite ────────────────────────────────────────
-function NewPortfolioButton({
-  isAtLimit,
-  planLabel,
-  used,
-  limit,
-  onClick,
-  onUpgrade,
-}: {
-  isAtLimit: boolean;
-  planLabel: string;
-  used: number;
-  limit: number;
-  onClick: () => void;
-  onUpgrade: () => void;
-}) {
-  if (isAtLimit) {
-    return (
-      <div className="flex flex-col items-end gap-1.5">
-        <button
-          type="button"
-          onClick={onUpgrade}
-          className="flex items-center gap-2 bg-amber-50 border border-amber-300 text-amber-700 hover:bg-amber-100 transition-colors rounded-lg px-4 py-2 text-sm font-semibold"
-        >
-          <Lock className="w-4 h-4" />
-          Limite {planLabel} atteinte
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
-        <span className="text-xs text-gray-400">{used}/{limit === Infinity ? '∞' : limit} portfolios</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col items-end gap-1.5">
-      <Button onClick={onClick} className="bg-[#28A745] hover:bg-green-600 text-white font-semibold">
-        <Plus className="w-4 h-4 mr-2" />
-        Nouveau Portfolio
-      </Button>
-      <span className="text-xs text-gray-400">
-        {limit === Infinity ? 'Illimité' : `${used}/${limit} utilisés`}
-      </span>
-    </div>
-  );
-}
-
-// ─── Page Dashboard ───────────────────────────────────────────────────────────
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 const Dashboard = () => {
-  const [portfolios, setPortfolios] = useState<any[]>([]);
+  const [portfolios, setPortfolios]           = useState<any[]>([]);
   const [showPortfolioForm, setShowPortfolioForm] = useState(false);
-  const { isFreePlan: ctxIsFree, loading: planLoading, currentPlan } = usePlan();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const { user, profile, loading, signOut } = useAuth();
-  const [abonnements, setAbonnements] = useState<any[]>([]);
-  const [activites, setActivites] = useState<any[]>([]);
+  const { loading: planLoading, currentPlan } = usePlan();
+  const navigate                              = useNavigate();
+  const { toast }                             = useToast();
+  const { user, profile, loading, signOut }   = useAuth();
+  const [activites, setActivites]             = useState<any[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(true);
-  const [showAllActivities, setShowAllActivities] = useState(false);
 
-  const ACTIVITY_PREVIEW = 4;
+  const [searchTerm, setSearchTerm]               = useState('');
+  const [visibilityFilter, setVisibilityFilter]   = useState<'all' | 'public' | 'private'>('all');
+  const [sortBy, setSortBy]                       = useState<'newest' | 'oldest' | 'views'>('newest');
 
-  // États pour les filtres
-  const [searchTerm, setSearchTerm] = useState('');
-  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'views'>('newest');
-
-  // Dérivation du type de plan et des limites
-  const planType = useMemo(() => getPlanType(currentPlan), [currentPlan]);
-  const planMeta = PLAN_META[planType];
+  const planType      = useMemo(() => getPlanType(currentPlan), [currentPlan]);
+  const planMeta      = PLAN_META[planType];
   const portfolioLimit = planMeta.limit;
-  const isAtLimit = portfolioLimit !== Infinity && portfolios.length >= portfolioLimit;
+  const isAtLimit     = portfolioLimit !== Infinity && portfolios.length >= portfolioLimit;
 
-  // Filtrage et tri des portfolios
-  const filteredAndSortedPortfolios = useMemo(() => {
-    let filtered = [...portfolios];
-
-    // Filtre par recherche textuelle
+  const filtered = useMemo(() => {
+    let list = [...portfolios];
     if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-      filtered = filtered.filter((p) => {
-        const title = (p.titre || p.title || p.nom || '').toLowerCase();
-        const slug = (p.url_slug || p.slug || '').toLowerCase();
-        const description = (p.description || p.bio || '').toLowerCase();
-        return title.includes(search) || slug.includes(search) || description.includes(search);
+      const q = searchTerm.toLowerCase();
+      list = list.filter(p => {
+        const t = (p.titre || p.title || p.nom || '').toLowerCase();
+        const s = (p.url_slug || p.slug || '').toLowerCase();
+        const d = (p.description || p.bio || '').toLowerCase();
+        return t.includes(q) || s.includes(q) || d.includes(q);
       });
     }
-
-    // Filtre par visibilité
     if (visibilityFilter !== 'all') {
-      filtered = filtered.filter((p) => {
-        const isPublic = p.is_public !== undefined ? p.is_public : (p.est_public !== undefined ? p.est_public : true);
-        return visibilityFilter === 'public' ? isPublic : !isPublic;
+      list = list.filter(p => {
+        const pub = p.is_public !== undefined ? p.is_public : (p.est_public !== undefined ? p.est_public : true);
+        return visibilityFilter === 'public' ? pub : !pub;
       });
     }
-
-    // Tri
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'newest':
-          return new Date(b.date_creation || b.created_at || 0).getTime() - new Date(a.date_creation || a.created_at || 0).getTime();
-        case 'oldest':
-          return new Date(a.date_creation || a.created_at || 0).getTime() - new Date(b.date_creation || b.created_at || 0).getTime();
-        case 'views':
-          return (b.views_count || 0) - (a.views_count || 0);
-        default:
-          return 0;
-      }
+    list.sort((a, b) => {
+      if (sortBy === 'newest') return new Date(b.date_creation || b.created_at || 0).getTime() - new Date(a.date_creation || a.created_at || 0).getTime();
+      if (sortBy === 'oldest') return new Date(a.date_creation || a.created_at || 0).getTime() - new Date(b.date_creation || b.created_at || 0).getTime();
+      return (b.views_count || 0) - (a.views_count || 0);
     });
-
-    return filtered;
+    return list;
   }, [portfolios, searchTerm, visibilityFilter, sortBy]);
+
+  // ── Data fetchers ──────────────────────────────────────────────────────────
+  const loadPortfolios = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}/api/portfolios`, { headers: { Authorization: `Bearer ${token}` } });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || 'Erreur');
+      setPortfolios(json.portfolios || []);
+    } catch {
+      toast({ title: "Erreur", description: "Impossible de charger les portfolios", variant: "destructive" });
+    }
+  };
+
+  const loadActivity = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      setLoadingActivity(true);
+      const res = await fetch(`${API_BASE}/api/users/me/activity`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const json = await res.json();
+      setActivites(json.activities || []);
+    } catch {
+      /* ignore */
+    } finally {
+      setLoadingActivity(false);
+    }
+  };
 
   const handlePayNow = async () => {
     if (!currentPlan) return;
@@ -231,54 +154,8 @@ const Dashboard = () => {
       if (!res.ok) throw new Error(json?.error || 'Erreur');
       const url = json.checkout_url || (json.checkout && `${window.location.origin}/checkout?token=${json.checkout.token}`);
       if (url) window.location.href = url;
-    } catch (err: any) {
+    } catch {
       toast({ title: 'Erreur', description: 'Impossible de démarrer le paiement', variant: 'destructive' });
-    }
-  };
-
-  const loadAbonnements = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      const res = await fetch(`${API_BASE}/api/abonnements/me`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) return;
-      const json = await res.json();
-      const rows = json.abonnements || [];
-      const enriched = await Promise.all(rows.map(async (a: any) => {
-        const item = { ...a };
-        try {
-          if (item.metadata && typeof item.metadata === 'string') item.metadata = JSON.parse(item.metadata);
-        } catch { /* ignore */ }
-        if (item.plan_id) {
-          try {
-            const pres = await fetch(`${API_BASE}/api/plans/${item.plan_id}`);
-            if (pres.ok) {
-              const pjson = await pres.json();
-              item.plan = pjson.plan || null;
-            }
-          } catch { /* ignore */ }
-        }
-        return item;
-      }));
-      setAbonnements(enriched || []);
-    } catch (e) {
-      console.warn('Could not load abonnements', e);
-    }
-  };
-
-  const loadActivity = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      setLoadingActivity(true);
-      const res = await fetch(`${API_BASE}/api/users/me/activity`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) return;
-      const json = await res.json();
-      setActivites(json.activities || []);
-    } catch (e) {
-      console.warn('Could not load activity', e);
-    } finally {
-      setLoadingActivity(false);
     }
   };
 
@@ -290,635 +167,468 @@ const Dashboard = () => {
       navigate('/auth');
       return;
     }
-    if (!loading && !user) {
-      navigate('/auth');
-      return;
-    }
-    if (user) {
-      loadPortfolios();
-      loadAbonnements();
-      loadActivity();
-    }
+    if (!loading && !user) { navigate('/auth'); return; }
+    if (user) { loadPortfolios(); loadActivity(); }
   }, [user, loading, navigate]);
 
-  // Redirect Business plan users to their dedicated interface
   useEffect(() => {
     if (planLoading) return;
     const role = ((profile as any)?.role || '').toString().toLowerCase();
     if (role === 'business_admin') { navigate('/business/dashboard', { replace: true }); return; }
     if (role === 'business_member') { navigate('/business/member', { replace: true }); return; }
-    if (!planLoading && currentPlan && getPlanType(currentPlan) === 'business') {
-      navigate('/business/dashboard', { replace: true });
-    }
+    if (currentPlan && getPlanType(currentPlan) === 'business') navigate('/business/dashboard', { replace: true });
   }, [planLoading, currentPlan, profile, navigate]);
 
-  const loadPortfolios = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${API_BASE}/api/portfolios`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || 'Erreur');
-      setPortfolios(json.portfolios || []);
-    } catch {
-      toast({ title: "Erreur", description: "Impossible de charger les portfolios", variant: "destructive" });
-    }
-  };
-
   const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch {
+    try { await signOut(); } catch {
       toast({ title: "Erreur", description: "Impossible de se déconnecter", variant: "destructive" });
     }
   };
 
   const openCreate = () => {
     if (isAtLimit) {
-      toast({
-        title: 'Limite atteinte',
-        description: `Le plan ${planMeta.label} permet ${portfolioLimit} portfolio${portfolioLimit > 1 ? 's' : ''} maximum. Upgradez pour continuer.`,
-        variant: 'destructive',
-      });
+      toast({ title: 'Limite atteinte', description: `Le plan ${planMeta.label} permet ${portfolioLimit} portfolio${portfolioLimit > 1 ? 's' : ''} maximum.`, variant: 'destructive' });
       return;
     }
     setShowPortfolioForm(true);
   };
 
-  const handlePortfolioCreated = () => {
-    setShowPortfolioForm(false);
-    if (user) {
-      loadPortfolios();
-      loadActivity();
-    }
-  };
-
+  // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F7F8F8' }}>
         <div className="text-center">
-          <div className="w-8 h-8 bg-[#28A745] rounded-lg animate-pulse mx-auto mb-4" />
-          <p className="text-gray-600 text-sm">Chargement de votre dashboard...</p>
+          <div className="w-8 h-8 rounded-lg animate-pulse mx-auto mb-4" style={{ background: '#2E7D32' }} />
+          <p className="text-[#71717A] text-sm">Chargement de votre dashboard…</p>
         </div>
       </div>
     );
   }
-
   if (!user) return null;
 
   const paymentDue = currentPlan && Number(currentPlan.price_cents || 0) > 0 && (
-    (profile && profile.is_active === false) ||
+    (profile && (profile as any).is_active === false) ||
     (currentPlan.next_payment_date && new Date(currentPlan.next_payment_date) <= new Date())
   );
 
+  const totalViews = portfolios.reduce((s: number, p: any) => s + (p.views_count || 0), 0);
+  const totalPublic = portfolios.filter((p: any) => p.is_public !== undefined ? p.is_public : (p.est_public !== undefined ? p.est_public : true)).length;
+
+  // ── KPI data ───────────────────────────────────────────────────────────────
+  const kpis = [
+    { label: 'Portfolios',        value: portfolios.length,                                   sub: `sur ${portfolioLimit === Infinity ? '∞' : portfolioLimit} maximum`, icon: FolderOpen, primary: true  },
+    { label: 'Vues totales',      value: totalViews.toLocaleString('fr-FR'),                  sub: 'sur tous vos portfolios',                                           icon: TrendingUp,  primary: false },
+    { label: 'Portfolios publics',value: totalPublic,                                          sub: 'visibles en ligne',                                                 icon: Globe,       primary: false },
+    { label: 'Activités',         value: activites.length,                                     sub: 'ce mois-ci',                                                        icon: Clock,       primary: false },
+  ];
+
+  // ── Quick actions ──────────────────────────────────────────────────────────
+  const quickActions = [
+    { label: 'Nouveau portfolio', icon: Plus,     primary: true,  action: openCreate },
+    { label: 'Cartes NFC',        icon: Wifi,     primary: false, action: () => navigate('/dashboard/nfc-cards') },
+    { label: 'Mon profil',        icon: User,     primary: false, action: () => navigate('/dashboard/profile') },
+    { label: 'Analytics',         icon: BarChart2,primary: false, action: () => navigate(portfolios.length > 0 ? `/dashboard/analytics/${portfolios[0]?.id}` : '/upgrade') },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50">
+    <div className="min-h-screen" style={{ background: '#F7F8F8' }}>
       <DashboardNav onSignOut={handleSignOut} profile={profile} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 sm:py-10 space-y-8">
 
-        {/* ── Bienvenue ── */}
+        {/* ── Welcome ── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              Bonjour {profile?.prenom || profile?.nom || 'Utilisateur'} 👋
+            <h1 className="text-2xl sm:text-[28px] font-bold text-[#18181B] tracking-tight">
+              Bonjour, {profile?.prenom || profile?.nom || 'Utilisateur'}
             </h1>
-            <p className="text-gray-500 text-sm mt-1">
-              Gérez vos portfolios et suivez vos performances.
-            </p>
+            <p className="text-[#71717A] text-sm mt-1">Voici l'état de vos portfolios aujourd'hui.</p>
           </div>
           {!planLoading && (
-            <Badge className={`${planMeta.bgColor} ${planMeta.textColor} border-0 flex items-center gap-1.5 px-3 py-2 text-sm font-semibold self-start sm:self-auto`}>
-              {planMeta.icon}
+            <span className="inline-flex items-center gap-1.5 self-start sm:self-auto px-3 py-1.5 rounded-full border border-[#E7E7EA] text-sm font-semibold text-[#18181B] bg-white">
+              <span className="text-[#1B5E20]">{planMeta.icon}</span>
               Formule {planMeta.label}
-            </Badge>
+            </span>
           )}
         </div>
 
-        {/* ── KPIs rapides ── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            {
-              label: 'Portfolios',
-              value: portfolios.length,
-              icon: <FolderOpen className="w-4 h-4" />,
-              color: 'text-emerald-600',
-              bg: 'bg-emerald-50',
-              sub: `/ ${portfolioLimit === Infinity ? '∞' : portfolioLimit} max`,
-            },
-            {
-              label: 'Vues totales',
-              value: portfolios.reduce((s, p) => s + (p.views_count || 0), 0),
-              icon: <TrendingUp className="w-4 h-4" />,
-              color: 'text-blue-600',
-              bg: 'bg-blue-50',
-              sub: 'sur tous vos portfolios',
-            },
-            {
-              label: 'Activités',
-              value: activites.length,
-              icon: <Clock className="w-4 h-4" />,
-              color: 'text-purple-600',
-              bg: 'bg-purple-50',
-              sub: 'actions récentes',
-            },
-            {
-              label: 'Publics',
-              value: portfolios.filter(p => p.is_public !== undefined ? p.is_public : p.est_public !== undefined ? p.est_public : true).length,
-              icon: <Globe className="w-4 h-4" />,
-              color: 'text-amber-600',
-              bg: 'bg-amber-50',
-              sub: 'portfolios visibles',
-            },
-          ].map(kpi => (
-            <div key={kpi.label} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3 shadow-sm">
-              <div className={`${kpi.bg} ${kpi.color} p-2 rounded-lg shrink-0`}>
-                {kpi.icon}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xl font-bold text-gray-900 leading-tight">{kpi.value}</p>
-                <p className="text-xs font-medium text-gray-500">{kpi.label}</p>
-                <p className="text-[10px] text-gray-400 truncate">{kpi.sub}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Alerte paiement requis ── */}
+        {/* ── Alerte paiement ── */}
         {paymentDue && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <p className="font-semibold text-red-800 text-sm">Paiement requis</p>
-              <p className="text-red-600 text-xs mt-0.5">
-                Votre abonnement requiert un paiement pour continuer à utiliser toutes les fonctionnalités.
-              </p>
+              <p className="text-red-600 text-xs mt-0.5">Votre abonnement requiert un paiement pour continuer.</p>
             </div>
-            <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white shrink-0" onClick={handlePayNow}>
-              Payer maintenant — {(Number(currentPlan.price_cents || 0) / 100).toLocaleString('fr-FR')} {currentPlan.currency || 'F CFA'}
-            </Button>
+            <button
+              onClick={handlePayNow}
+              className="h-9 px-4 rounded-[10px] text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors shrink-0"
+            >
+              Payer maintenant — {Number(currentPlan.price_cents || 0).toLocaleString('fr-FR')} F CFA
+            </button>
           </div>
         )}
 
-        {/* ── Contenu principal ── */}
+        {/* ── KPIs ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {kpis.map(k => {
+            const Icon = k.icon;
+            return (
+              <div key={k.label} className="bg-white rounded-2xl border border-[#E7E7EA] p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span
+                    className="w-9 h-9 rounded-full flex items-center justify-center"
+                    style={k.primary
+                      ? { background: '#E8F5E9', color: '#1B5E20' }
+                      : { background: '#F4F4F5', color: 'rgba(24,24,27,0.6)' }
+                    }
+                  >
+                    <Icon size={17} />
+                  </span>
+                </div>
+                <p className="text-[28px] leading-none font-semibold text-[#18181B] tracking-tight tabular-nums">{k.value}</p>
+                <p className="text-sm font-medium text-[#18181B]/80 mt-2">{k.label}</p>
+                <p className="text-xs text-[#71717A] mt-0.5">{k.sub}</p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Main grid ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
 
           {/* ── Colonne portfolios ── */}
           <div className="lg:col-span-2 space-y-5">
 
-            {/* En-tête section portfolios */}
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            {/* En-tête */}
+            <div className="flex items-end justify-between gap-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Mes Portfolios</h2>
+                <h2 className="text-lg font-semibold text-[#18181B]">Mes portfolios</h2>
                 {!planLoading && (
-                  <div className="mt-2 w-full sm:w-72">
-                    <PlanUsageBar
-                      used={portfolios.length}
-                      limit={portfolioLimit}
-                      planLabel={planMeta.label}
-                      onUpgrade={() => navigate('/upgrade')}
-                    />
+                  <div className="mt-2.5 w-64 max-w-full">
+                    <PlanUsage used={portfolios.length} limit={portfolioLimit} />
                   </div>
                 )}
               </div>
-              <div className="shrink-0">
-                <NewPortfolioButton
-                  isAtLimit={isAtLimit}
-                  planLabel={planMeta.label}
-                  used={portfolios.length}
-                  limit={portfolioLimit}
-                  onClick={openCreate}
-                  onUpgrade={() => navigate('/upgrade')}
-                />
-              </div>
+              <button
+                onClick={openCreate}
+                disabled={isAtLimit}
+                className="flex items-center gap-1.5 h-10 px-4 rounded-[10px] text-sm font-semibold text-white shrink-0 transition-colors disabled:opacity-50"
+                style={{ background: '#2E7D32' }}
+              >
+                <Plus size={16} />
+                <span className="hidden sm:inline">Nouveau</span>
+              </button>
             </div>
 
-            {/* ── Bannière upgrade quand limite atteinte ── */}
+            {/* Bannière limite atteinte */}
             {isAtLimit && (
-              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="p-1.5 bg-amber-100 rounded-lg shrink-0 mt-0.5">
-                    <Lock className="w-4 h-4 text-amber-600" />
-                  </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                    <Lock size={16} className="text-amber-600" />
+                  </span>
                   <div>
-                    <p className="font-semibold text-amber-900 text-sm">
-                      Limite du plan {planMeta.label} atteinte
-                    </p>
-                    <p className="text-amber-700 text-xs mt-0.5">
-                      {planType === 'free' && 'Le plan Gratuit inclut 1 portfolio. Passez au Starter pour en créer 5.'}
-                      {planType === 'starter' && 'Le plan Starter inclut 5 portfolios. Passez au Pro pour en créer 20.'}
-                      {planType === 'pro' && 'Le plan Pro inclut 20 portfolios. Passez au Business pour un accès illimité.'}
-                    </p>
+                    <p className="font-semibold text-amber-900 text-sm">Limite du plan {planMeta.label} atteinte</p>
+                    <p className="text-amber-700 text-xs mt-0.5">Upgradez pour créer davantage de portfolios.</p>
                   </div>
                 </div>
-                <Button
-                  size="sm"
+                <button
                   onClick={() => navigate('/upgrade')}
-                  className="bg-amber-500 hover:bg-amber-600 text-white font-semibold shrink-0 gap-1.5"
+                  className="flex items-center gap-1.5 h-9 px-4 rounded-[10px] text-sm font-semibold text-white shrink-0"
+                  style={{ background: '#2E7D32' }}
                 >
-                  Voir les formules <ArrowRight className="w-3.5 h-3.5" />
-                </Button>
+                  Voir les formules <ArrowRight size={14} />
+                </button>
               </div>
             )}
 
-            {/* ── Barre de filtres ── */}
+            {/* Barre de filtres */}
             {portfolios.length > 0 && (
-              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between bg-white border border-gray-200 rounded-xl p-4">
-                <div className="flex flex-1 gap-2 w-full sm:max-w-md">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <Input
-                      placeholder="Rechercher un portfolio..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
+              <div className="flex items-center gap-2.5 bg-white border border-[#E7E7EA] rounded-2xl p-2.5">
+                <div className="relative flex-1">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#71717A]" />
+                  <input
+                    placeholder="Rechercher un portfolio…"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full h-9 pl-9 pr-3 rounded-[10px] bg-zinc-50 border border-transparent focus:border-[#E7E7EA] outline-none text-sm text-[#18181B] placeholder:text-[#71717A]"
+                  />
                 </div>
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <Select value={visibilityFilter} onValueChange={(v) => setVisibilityFilter(v as any)}>
-                    <SelectTrigger className="w-full sm:w-32">
-                      <SelectValue placeholder="Visibilité" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tous</SelectItem>
-                      <SelectItem value="public">Public</SelectItem>
-                      <SelectItem value="private">Privé</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-                    <SelectTrigger className="w-full sm:w-36">
-                      <SelectValue placeholder="Trier par" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="newest">Plus récent</SelectItem>
-                      <SelectItem value="oldest">Plus ancien</SelectItem>
-                      <SelectItem value="views">Plus de vues</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="relative">
+                  <select
+                    value={visibilityFilter}
+                    onChange={e => setVisibilityFilter(e.target.value as any)}
+                    className="h-9 pl-3 pr-7 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B]/70 bg-white hover:bg-zinc-50 transition-colors appearance-none cursor-pointer outline-none"
+                  >
+                    <option value="all">Visibilité</option>
+                    <option value="public">Public</option>
+                    <option value="private">Privé</option>
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#71717A] pointer-events-none" />
+                </div>
+                <div className="relative hidden sm:block">
+                  <select
+                    value={sortBy}
+                    onChange={e => setSortBy(e.target.value as any)}
+                    className="h-9 pl-3 pr-7 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B]/70 bg-white hover:bg-zinc-50 transition-colors appearance-none cursor-pointer outline-none"
+                  >
+                    <option value="newest">Plus récent</option>
+                    <option value="oldest">Plus ancien</option>
+                    <option value="views">Plus de vues</option>
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#71717A] pointer-events-none" />
                 </div>
               </div>
             )}
 
-            {/* ── Liste portfolios ── */}
-            {filteredAndSortedPortfolios.length === 0 && portfolios.length > 0 ? (
-              <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl py-16 px-6 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-8 h-8 text-gray-400" />
-                </div>
-                <h3 className="text-base font-semibold text-gray-900 mb-1">Aucun portfolio trouvé</h3>
-                <p className="text-gray-500 text-sm mb-5">
-                  Aucun portfolio ne correspond à votre recherche. Essayez de modifier vos filtres.
-                </p>
-                <Button
-                  variant="outline"
+            {/* Liste portfolios */}
+            {filtered.length === 0 && portfolios.length > 0 ? (
+              <div className="bg-white border border-dashed border-[#E7E7EA] rounded-2xl py-16 px-6 text-center">
+                <span className="w-14 h-14 rounded-full bg-zinc-100 flex items-center justify-center mx-auto mb-4">
+                  <Search size={24} className="text-[#71717A]" />
+                </span>
+                <h3 className="text-base font-semibold text-[#18181B] mb-1">Aucun portfolio trouvé</h3>
+                <p className="text-[#71717A] text-sm mb-5">Modifiez vos filtres pour affiner la recherche.</p>
+                <button
                   onClick={() => { setSearchTerm(''); setVisibilityFilter('all'); setSortBy('newest'); }}
+                  className="h-9 px-4 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors"
                 >
-                  Réinitialiser les filtres
-                </Button>
+                  Réinitialiser
+                </button>
               </div>
             ) : portfolios.length === 0 ? (
-              <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl py-16 px-6 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-emerald-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <FolderOpen className="w-8 h-8 text-green-600" />
-                </div>
-                <h3 className="text-base font-semibold text-gray-900 mb-1">Aucun portfolio pour le moment</h3>
-                <p className="text-gray-500 text-sm mb-5 max-w-xs mx-auto">
+              <div className="bg-white border border-dashed border-[#E7E7EA] rounded-2xl py-16 px-6 text-center">
+                <span
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                  style={{ background: '#E8F5E9', color: '#1B5E20' }}
+                >
+                  <FolderOpen size={24} />
+                </span>
+                <h3 className="text-base font-semibold text-[#18181B] mb-1">Aucun portfolio pour le moment</h3>
+                <p className="text-[#71717A] text-sm mb-5 max-w-xs mx-auto">
                   Créez votre premier portfolio pour partager votre profil professionnel.
                 </p>
-                <Button
+                <button
                   onClick={openCreate}
-                  disabled={isAtLimit}
-                  className="bg-[#28A745] hover:bg-green-600 text-white font-semibold"
+                  className="flex items-center gap-2 h-10 px-5 rounded-[10px] text-sm font-semibold text-white mx-auto"
+                  style={{ background: '#2E7D32' }}
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Créer mon premier portfolio
-                </Button>
+                  <Plus size={16} /> Créer mon premier portfolio
+                </button>
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredAndSortedPortfolios.map((portfolio) => {
-                  const accent = portfolio.theme_color || '#28A745';
-                  const isPublic = portfolio.is_public !== undefined
-                    ? portfolio.is_public
-                    : portfolio.est_public !== undefined
-                      ? portfolio.est_public
-                      : true;
-                  const title = portfolio.titre || portfolio.title || portfolio.nom || 'Sans titre';
-                  const slug = portfolio.url_slug || portfolio.slug || portfolio.id;
-                  const description = portfolio.description || portfolio.bio || '';
-                  const dateRaw = portfolio.date_creation || portfolio.created_at;
+                {filtered.map((p: any) => {
+                  const accent  = p.theme_color || '#2E7D32';
+                  const isPublic = p.is_public !== undefined ? p.is_public : (p.est_public !== undefined ? p.est_public : true);
+                  const title   = p.titre || p.title || p.nom || 'Sans titre';
+                  const slug    = p.url_slug || p.slug || p.id;
+                  const desc    = p.description || p.bio || '';
+                  const dateRaw = p.date_creation || p.created_at;
 
                   return (
                     <div
-                      key={portfolio.id}
-                      className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-all duration-200 flex flex-col sm:flex-row sm:items-center gap-4"
+                      key={p.id}
+                      className="group bg-white border border-[#E7E7EA] rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4 hover:border-[#18181B]/15 transition-colors"
                     >
-                      {/* Avatar */}
                       <div
-                        className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0"
-                        style={{ background: `linear-gradient(135deg, ${accent}99, ${accent})` }}
+                        className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-semibold text-sm shrink-0"
+                        style={{ background: `linear-gradient(140deg, ${accent}, ${accent}CC)` }}
                       >
                         {title.charAt(0).toUpperCase()}
                       </div>
 
-                      {/* Infos */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <h3 className="font-semibold text-gray-900 text-sm truncate">{title}</h3>
-                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full shrink-0 ${isPublic ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                            }`}>
-                            {isPublic ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                          <h3 className="font-semibold text-[#18181B] text-[15px] truncate">{title}</h3>
+                          <span
+                            className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0"
+                            style={isPublic
+                              ? { background: '#E8F5E9', color: '#1B5E20' }
+                              : { background: '#F4F4F5', color: '#71717A' }
+                            }
+                          >
+                            <Globe size={11} />
                             {isPublic ? 'Public' : 'Privé'}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-500 truncate">{description || 'Aucune description'}</p>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
-                          <span className="font-mono">/{slug}</span>
+                        <p className="text-sm text-[#71717A] truncate">{desc || 'Aucune description'}</p>
+                        <div className="flex items-center gap-3 mt-1.5 text-xs text-[#71717A]">
+                          <span className="font-mono text-[#18181B]/50">/{slug}</span>
                           {dateRaw && !isNaN(new Date(dateRaw).getTime()) && (
                             <span>· {format(new Date(dateRaw), 'dd/MM/yyyy')}</span>
                           )}
-                          {portfolio.views_count > 0 && (
+                          {p.views_count > 0 && (
                             <span className="flex items-center gap-1">
-                              <TrendingUp className="w-3 h-3" />
-                              {portfolio.views_count} vues
+                              <TrendingUp size={12} /> {p.views_count.toLocaleString('fr-FR')} vues
                             </span>
                           )}
                         </div>
                       </div>
 
-                      {/* Actions */}
                       <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs gap-1"
+                        <button
                           onClick={() => window.open(`/portfolio/${slug}`, '_blank')}
+                          className="flex items-center gap-1.5 h-9 px-3 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors"
                         >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Voir</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs gap-1"
+                          <Eye size={15} /> <span className="hidden sm:inline">Voir</span>
+                        </button>
+                        <button
                           onClick={() => navigate('/dashboard/portfolios')}
+                          className="flex items-center gap-1.5 h-9 px-3 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors"
                         >
-                          <BarChart className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Gérer</span>
-                        </Button>
+                          <BarChart2 size={15} /> <span className="hidden sm:inline">Éditer</span>
+                        </button>
                       </div>
                     </div>
                   );
                 })}
 
-                {/* Lien vers la page complète */}
                 <button
-                  type="button"
                   onClick={() => navigate('/dashboard/portfolios')}
-                  className="w-full text-center text-sm text-[#28A745] hover:text-green-700 font-medium py-2 hover:underline flex items-center justify-center gap-1.5"
+                  className="w-full text-center text-sm font-medium py-2 hover:underline flex items-center justify-center gap-1.5"
+                  style={{ color: '#1B5E20' }}
                 >
-                  Voir tous mes portfolios <ArrowRight className="w-3.5 h-3.5" />
+                  Voir tous mes portfolios <ArrowRight size={14} />
                 </button>
               </div>
             )}
           </div>
 
           {/* ── Sidebar ── */}
-          <div className="space-y-4">
+          <div className="space-y-5">
 
-            {/* Actions rapides — grille compacte 2 colonnes */}
-            <Card className="border-gray-100 shadow-sm">
-              <CardHeader className="pb-2 pt-4 px-4">
-                <CardTitle className="text-sm font-semibold text-gray-700">Actions rapides</CardTitle>
-              </CardHeader>
-              <CardContent className="px-4 pb-4">
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: 'Portfolios',   icon: <FolderOpen className="w-4 h-4" />, path: '/dashboard/portfolios', color: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100' },
-                    { label: 'Paiements',    icon: <CreditCard className="w-4 h-4" />,  path: '/dashboard/paiements',  color: 'text-blue-600 bg-blue-50 hover:bg-blue-100' },
-                    { label: 'Mon profil',   icon: <User className="w-4 h-4" />,        path: '/dashboard/profile',    color: 'text-purple-600 bg-purple-50 hover:bg-purple-100' },
-                    { label: 'Carte NFC',    icon: <CreditCard className="w-4 h-4" />,  path: '/dashboard/nfc-cards',  color: 'text-amber-600 bg-amber-50 hover:bg-amber-100' },
-                    { label: 'Formules',     icon: <Sparkles className="w-4 h-4" />,    path: '/upgrade',              color: 'text-pink-600 bg-pink-50 hover:bg-pink-100' },
-                    { label: 'Analytics',    icon: <BarChart className="w-4 h-4" />,    path: portfolios.length > 0 ? `/dashboard/analytics/${portfolios[0]?.id}` : '/upgrade', color: 'text-teal-600 bg-teal-50 hover:bg-teal-100' },
-                  ].map(({ label, icon, path, color }) => (
+            {/* Actions rapides */}
+            <div className="bg-white rounded-2xl border border-[#E7E7EA] p-5">
+              <h3 className="text-sm font-semibold text-[#18181B] mb-3.5">Actions rapides</h3>
+              <div className="grid grid-cols-2 gap-2.5">
+                {quickActions.map(q => {
+                  const Icon = q.icon;
+                  return (
                     <button
-                      key={path}
-                      onClick={() => navigate(path)}
-                      className={`flex flex-col items-center gap-1.5 rounded-xl p-3 text-xs font-medium transition-colors ${color}`}
+                      key={q.label}
+                      onClick={q.action}
+                      className={`flex items-center gap-2.5 h-12 px-3 rounded-xl text-sm font-medium transition-colors text-left ${!q.primary ? 'border border-[#E7E7EA] text-[#18181B] hover:bg-zinc-50' : 'text-white'}`}
+                      style={q.primary ? { background: '#1B5E20' } : undefined}
                     >
-                      {icon}
-                      {label}
+                      <Icon size={16} className={q.primary ? '' : 'text-[#71717A]'} />
+                      <span className="leading-tight">{q.label}</span>
                     </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Formule actuelle */}
+            <div className="bg-white rounded-2xl border border-[#E7E7EA] p-5">
+              <h3 className="text-sm font-semibold text-[#18181B] mb-3.5">Formule actuelle</h3>
+              {planLoading ? (
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-16 bg-zinc-100 rounded-xl" />
+                  <div className="h-3 bg-zinc-100 rounded w-3/4" />
+                  <div className="h-1.5 bg-zinc-100 rounded-full" />
+                </div>
+              ) : currentPlan ? (
+                <>
+                  {/* Plan inner block */}
+                  <div
+                    className="flex items-center justify-between rounded-xl p-3.5 mb-3.5"
+                    style={{ background: '#E8F5E9' }}
+                  >
+                    <div>
+                      <p className="text-sm font-bold text-[#18181B]">{currentPlan.name}</p>
+                      <p className="text-xs text-[#18181B]/60 mt-0.5">
+                        {Number(currentPlan.price_cents || 0) > 0
+                          ? `${Number(currentPlan.price_cents || 0).toLocaleString('fr-FR')} F CFA / mois`
+                          : 'Gratuit'}
+                      </p>
+                    </div>
+                    <span
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0"
+                      style={{ background: '#2E7D32' }}
+                    >
+                      <Sparkles size={17} />
+                    </span>
+                  </div>
+
+                  <PlanUsage used={portfolios.length} limit={portfolioLimit} />
+
+                  <div className="flex items-center justify-between mt-3.5 pt-3.5 border-t border-[#E7E7EA] text-xs">
+                    <span className="flex items-center gap-1.5 text-[#71717A]">
+                      <Clock size={14} />
+                      {(currentPlan.next_billing_date || currentPlan.end_date)
+                        ? `Renouvellement ${format(new Date(currentPlan.next_billing_date || currentPlan.end_date), 'dd MMM yyyy', { locale: fr })}`
+                        : 'Abonnement actif'}
+                    </span>
+                    <button
+                      onClick={() => navigate('/upgrade')}
+                      className="font-semibold hover:underline"
+                      style={{ color: '#1B5E20' }}
+                    >
+                      Gérer
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-sm text-[#71717A]">Aucune formule active</p>
+                  <button onClick={() => navigate('/upgrade')} className="text-xs font-medium hover:underline mt-1" style={{ color: '#1B5E20' }}>
+                    Voir les formules →
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Activité récente */}
+            <div className="bg-white rounded-2xl border border-[#E7E7EA] p-5">
+              <h3 className="text-sm font-semibold text-[#18181B] mb-3.5">Activité récente</h3>
+              {loadingActivity ? (
+                <div className="space-y-3 animate-pulse">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-zinc-100 shrink-0" />
+                      <div className="flex-1 space-y-1.5 pt-0.5">
+                        <div className="h-3 bg-zinc-100 rounded w-3/4" />
+                        <div className="h-2.5 bg-zinc-100 rounded w-1/2" />
+                      </div>
+                    </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Formule actuelle — compact */}
-            <Card className="border-gray-100 shadow-sm">
-              <CardHeader className="pb-2 pt-4 px-4">
-                <CardTitle className="text-sm font-semibold text-gray-700">Formule actuelle</CardTitle>
-              </CardHeader>
-              <CardContent className="px-4 pb-4">
-                {planLoading ? (
-                  <div className="space-y-2">
-                    <div className="h-8 bg-gray-100 rounded-lg animate-pulse" />
-                    <div className="h-3 bg-gray-100 rounded animate-pulse w-2/3" />
-                    <div className="h-1.5 bg-gray-100 rounded-full animate-pulse mt-3" />
-                  </div>
-                ) : currentPlan ? (
-                  <div className="space-y-3">
-                    {/* Plan badge + prix */}
-                    <div className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5">
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">{currentPlan.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {Number(currentPlan.price_cents || 0) > 0
-                            ? `${(Number(currentPlan.price_cents || 0) / 100).toLocaleString('fr-FR')} ${currentPlan.currency || 'F CFA'}`
-                            : 'Gratuit'}
-                        </p>
-                      </div>
-                      <Badge className={`${planMeta.bgColor} ${planMeta.textColor} border-0 text-xs flex items-center gap-1 shrink-0`}>
-                        {planMeta.icon} {planMeta.label}
-                      </Badge>
-                    </div>
-
-                    {/* Quota portfolios */}
-                    <PlanUsageBar
-                      used={portfolios.length}
-                      limit={portfolioLimit}
-                      planLabel={planMeta.label}
-                      onUpgrade={() => navigate('/upgrade')}
-                    />
-
-                    {/* Prochain renouvellement */}
-                    {Number(currentPlan.price_cents || 0) > 0 && (
-                      <div className="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 gap-2">
-                        <div className="flex items-center gap-1.5 text-xs text-amber-800 min-w-0">
-                          <Clock className="w-3.5 h-3.5 shrink-0 text-amber-500" />
-                          {(currentPlan.next_billing_date || currentPlan.end_date) ? (
-                            <span className="truncate">
-                              Renouvellement : <strong>{format(new Date(currentPlan.next_billing_date || currentPlan.end_date), 'dd MMM yyyy', { locale: fr })}</strong>
-                            </span>
-                          ) : (
-                            <span className="truncate">Abonnement payant actif</span>
+              ) : activites.length === 0 ? (
+                <div className="text-center py-6">
+                  <span className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center mx-auto mb-2">
+                    <Clock size={18} className="text-[#71717A]" />
+                  </span>
+                  <p className="text-sm text-[#71717A]">Aucune activité récente</p>
+                </div>
+              ) : (
+                <div className="relative space-y-1">
+                  <div className="absolute left-[15px] top-2 bottom-2 w-px bg-[#E7E7EA]" />
+                  {activites.slice(0, 5).map((a: any, i: number) => {
+                    const Icon = a.icon === 'folder' ? FolderOpen
+                      : a.icon === 'credit-card' ? CreditCard
+                      : a.icon === 'log-in' ? LogIn
+                      : Clock;
+                    return (
+                      <div key={`${a.activity_type}-${a.entity_id}-${i}`} className="relative flex items-start gap-3 py-2">
+                        <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 relative z-10 bg-zinc-100 text-[#18181B]/55">
+                          <Icon size={15} />
+                        </span>
+                        <div className="flex-1 min-w-0 pt-0.5">
+                          <p className="text-[13px] font-semibold text-[#18181B] leading-tight">{a.title || 'Activité'}</p>
+                          {a.description && <p className="text-xs text-[#71717A] truncate mt-0.5">{a.description}</p>}
+                          {a.created_at && (
+                            <p className="text-[11px] text-[#71717A]/70 mt-0.5">
+                              {formatDistanceToNow(new Date(a.created_at), { addSuffix: true, locale: fr })}
+                            </p>
                           )}
                         </div>
-                        <button
-                          onClick={() => navigate('/reabonnement')}
-                          className="text-[11px] text-emerald-600 font-semibold hover:underline shrink-0"
-                        >
-                          Renouveler →
-                        </button>
                       </div>
-                    )}
-
-                    {/* Abonnements — limités à 2, scroll si plus */}
-                    {abonnements.length > 0 && (
-                      <div>
-                        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Abonnements</p>
-                        <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1 scrollbar-thin">
-                          {abonnements.map((a) => (
-                            <div key={a.id} className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2 bg-white text-xs">
-                              <div className="min-w-0">
-                                <p className="font-medium text-gray-800 truncate">{a.plan?.name || 'Abonnement'}</p>
-                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                                  a.statut === 'active' ? 'bg-green-100 text-green-700' :
-                                  a.statut === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'
-                                }`}>
-                                  {a.statut || 'pending'}
-                                </span>
-                              </div>
-                              {a.montant > 0 && (
-                                <p className="text-gray-500 shrink-0 ml-2">{Number(a.montant).toLocaleString('fr-FR')} {a.currency || 'F CFA'}</p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-3">
-                    <p className="text-sm text-gray-400">Aucune formule active</p>
-                    <button onClick={() => navigate('/upgrade')} className="text-xs text-[#28A745] font-medium hover:underline mt-1">
-                      Voir les formules →
-                    </button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Activité récente — timeline avec pagination */}
-            <Card className="border-gray-100 shadow-sm">
-              <CardHeader className="pb-2 pt-4 px-4 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-gray-700">Activité récente</CardTitle>
-                {activites.length > ACTIVITY_PREVIEW && (
-                  <span className="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full font-medium">
-                    {activites.length}
-                  </span>
-                )}
-              </CardHeader>
-              <CardContent className="px-4 pb-4">
-                {loadingActivity ? (
-                  /* Skeleton amélioré */
-                  <div className="space-y-3">
-                    {[...Array(3)].map((_, i) => (
-                      <div key={i} className="flex items-start gap-3 animate-pulse">
-                        <div className="w-8 h-8 rounded-lg bg-gray-100 shrink-0" />
-                        <div className="flex-1 space-y-1.5 pt-0.5">
-                          <div className="h-3 bg-gray-100 rounded w-3/4" />
-                          <div className="h-2.5 bg-gray-100 rounded w-1/2" />
-                          <div className="h-2 bg-gray-100 rounded w-1/3" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : activites.length === 0 ? (
-                  <div className="text-center py-6">
-                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                      <Clock className="w-5 h-5 text-gray-300" />
-                    </div>
-                    <p className="text-sm text-gray-400 font-medium">Aucune activité</p>
-                    <p className="text-xs text-gray-300 mt-0.5">Vos actions apparaîtront ici</p>
-                  </div>
-                ) : (
-                  <>
-                    {/* Timeline */}
-                    <div
-                      className={`relative space-y-0 transition-all duration-300 ${
-                        showAllActivities && activites.length > ACTIVITY_PREVIEW
-                          ? 'max-h-80 overflow-y-auto pr-1'
-                          : ''
-                      }`}
-                    >
-                      {/* Ligne verticale */}
-                      <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gray-100" />
-
-                      {(showAllActivities ? activites : activites.slice(0, ACTIVITY_PREVIEW)).map((activity: any, index: number) => {
-                        const Icon = activity.icon === 'folder' ? FolderOpen
-                          : activity.icon === 'credit-card' ? CreditCard
-                          : activity.icon === 'log-in' ? LogIn
-                          : Clock;
-
-                        const dotColor =
-                          activity.activity_type === 'portfolio_created' ? 'bg-emerald-500' :
-                          activity.activity_type === 'payment_made' ? 'bg-blue-500' : 'bg-gray-400';
-
-                        const iconBg =
-                          activity.activity_type === 'portfolio_created' ? 'bg-emerald-50 text-emerald-600' :
-                          activity.activity_type === 'payment_made' ? 'bg-blue-50 text-blue-600' :
-                          'bg-gray-50 text-gray-500';
-
-                        return (
-                          <div
-                            key={`${activity.activity_type}-${activity.entity_id}-${index}`}
-                            className="relative flex items-start gap-3 py-2.5 pl-1"
-                          >
-                            {/* Dot sur la timeline */}
-                            <div className={`w-[7px] h-[7px] rounded-full ${dotColor} mt-2.5 shrink-0 relative z-10 ml-[12px]`} />
-
-                            {/* Icône + contenu */}
-                            <div className={`p-1.5 rounded-lg shrink-0 ${iconBg}`}>
-                              <Icon className="w-3.5 h-3.5" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-semibold text-gray-800 truncate leading-tight">
-                                {activity.title || 'Activité'}
-                              </p>
-                              {activity.description && (
-                                <p className="text-[11px] text-gray-400 truncate mt-0.5">
-                                  {activity.description}
-                                </p>
-                              )}
-                              {activity.created_at && (
-                                <p className="text-[10px] text-gray-300 mt-0.5">
-                                  {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true, locale: fr })}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Toggle voir plus / moins */}
-                    {activites.length > ACTIVITY_PREVIEW && (
-                      <button
-                        onClick={() => setShowAllActivities(v => !v)}
-                        className="w-full mt-2 text-center text-xs text-[#28A745] hover:text-green-700 font-medium py-1.5 hover:bg-green-50 rounded-lg transition-colors flex items-center justify-center gap-1"
-                      >
-                        {showAllActivities
-                          ? <>Réduire <CheckCircle className="w-3 h-3" /></>
-                          : <>Voir les {activites.length - ACTIVITY_PREVIEW} autres <ArrowRight className="w-3 h-3" /></>
-                        }
-                      </button>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -929,7 +639,7 @@ const Dashboard = () => {
           <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl sm:h-[92vh] h-[96vh] flex flex-col overflow-hidden">
             <PortfolioForm
               onClose={() => setShowPortfolioForm(false)}
-              onSuccess={handlePortfolioCreated}
+              onSuccess={() => { setShowPortfolioForm(false); if (user) { loadPortfolios(); loadActivity(); } }}
             />
           </div>
         </div>

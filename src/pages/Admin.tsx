@@ -204,7 +204,7 @@ export default function AdminDashboard() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="min-h-screen bg-gray-50">
         <AdminNav profile={profile} onSignOut={() => {}} />
         <div className="max-w-7xl mx-auto px-6 py-12">
           <Skeleton className="h-12 w-96 mb-8" />
@@ -222,17 +222,17 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-green-50">
+    <div className="min-h-screen bg-gray-50">
       <AdminNav profile={profile} onSignOut={signOut} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-10">
-          <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3">
-            <BarChart3 className="h-10 w-10 text-[#28A745]" />
+        {/* Header — dégradé charte #1B5E20 → #2E7D32 */}
+        <div className="admin-header-gradient rounded-xl shadow-card px-6 sm:px-8 py-7 mb-8 text-white">
+          <h1 className="text-3xl sm:text-4xl font-bold flex items-center gap-3">
+            <BarChart3 className="h-9 w-9" />
             Tableau de bord Administrateur
           </h1>
-          <p className="text-lg text-gray-600 mt-2">
+          <p className="text-base sm:text-lg text-white/80 mt-2">
             Suivi en temps réel des utilisateurs, commandes et revenus
           </p>
         </div>
@@ -250,7 +250,7 @@ export default function AdminDashboard() {
                   <p className="text-gray-600 mt-1">Accédez à l'espace d'administration des templates pour ajouter, modifier ou supprimer des modèles.</p>
                 </div>
                 <div>
-                  <Button onClick={() => window.open('/templates-gestion/login', '_blank')} className="bg-[#28A745] hover:bg-green-600">
+                  <Button onClick={() => window.open('/templates-gestion/login', '_blank')} className="bg-[#2E7D32] hover:bg-[#1B5E20]">
                     Accéder à l'administration
                   </Button>
                 </div>
@@ -259,64 +259,62 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* KPI Cards - Style Glassmorphism */}
+        {/* KPI Cards — charte : cartes blanches, accent vert, ombre douce */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-xl">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-white/90">Utilisateurs</CardTitle>
-                <Users className="h-8 w-8 opacity-80" />
+          <Card className="shadow-card border-l-4 border-l-[#2E7D32]">
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center bg-[#2E7D32]/10 text-[#2E7D32]">
+                  <Users className="h-5 w-5" />
+                </div>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#2E7D32]/10 text-[#2E7D32] flex items-center">
+                  <ArrowUpRight className="h-3.5 w-3.5 mr-0.5" />
+                  +{Number.isFinite(stats.growthRate) ? stats.growthRate : 0}%
+                </span>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{Number.isFinite(stats.totalUsers) ? stats.totalUsers.toLocaleString() : '—'}</div>
-              <p className="text-white/80 text-sm flex items-center mt-2">
-                <ArrowUpRight className="h-4 w-4 mr-1" />
-                +{Number.isFinite(stats.growthRate) ? stats.growthRate : 0}% ce mois
-              </p>
+              <div className="text-3xl font-bold text-gray-900">{Number.isFinite(stats.totalUsers) ? stats.totalUsers.toLocaleString() : '—'}</div>
+              <p className="text-sm text-gray-500 mt-1">Utilisateurs</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-xl">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-white/90">Portfolios</CardTitle>
-                <Activity className="h-8 w-8 opacity-80" />
+          <Card className="shadow-card border-l-4 border-l-[#1565C0]">
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center bg-[#1565C0]/10 text-[#1565C0]">
+                  <Activity className="h-5 w-5" />
+                </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{Number.isFinite(stats.totalPortfolios) ? stats.totalPortfolios.toLocaleString() : '—'}</div>
-              <p className="text-white/80 text-sm">Actifs</p>
+              <div className="text-3xl font-bold text-gray-900">{Number.isFinite(stats.totalPortfolios) ? stats.totalPortfolios.toLocaleString() : '—'}</div>
+              <p className="text-sm text-gray-500 mt-1">Portfolios actifs</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-orange-500 to-red-500 text-white border-0 shadow-xl">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-white/90">Commandes NFC</CardTitle>
-                <CreditCard className="h-8 w-8 opacity-80" />
+          <Card className="shadow-card border-l-4 border-l-[#B45309]">
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center bg-[#B45309]/10 text-[#B45309]">
+                  <CreditCard className="h-5 w-5" />
+                </div>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#B45309]/10 text-[#B45309] flex items-center">
+                  <Clock className="h-3.5 w-3.5 mr-0.5" />
+                  {stats.pendingOrders} en attente
+                </span>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{Number.isFinite(stats.totalNfcCards) ? stats.totalNfcCards.toLocaleString() : '—'}</div>
-              <p className="text-white/80 text-sm flex items-center">
-                <Clock className="h-4 w-4 mr-1" />
-                {stats.pendingOrders} en attente
-              </p>
+              <div className="text-3xl font-bold text-gray-900">{Number.isFinite(stats.totalNfcCards) ? stats.totalNfcCards.toLocaleString() : '—'}</div>
+              <p className="text-sm text-gray-500 mt-1">Commandes NFC</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white border-0 shadow-2xl">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-white/90">Revenus Validés</CardTitle>
-                <DollarSign className="h-8 w-8 opacity-80" />
+          <Card className="shadow-card border-l-4 border-l-[#2E7D32] bg-[#2E7D32]/[0.03]">
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between mb-3">
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center bg-[#2E7D32]/10 text-[#2E7D32]">
+                  <DollarSign className="h-5 w-5" />
+                </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{Number.isFinite(stats.validatedRevenue) ? stats.validatedRevenue.toLocaleString() : '—'} F CFA</div>
-              <p className="text-white/80 text-sm">
-                Total: {Number.isFinite(stats.totalRevenue) ? stats.totalRevenue.toLocaleString() : '—'} F CFA
+              <div className="text-2xl font-bold text-[#2E7D32]">{Number.isFinite(stats.validatedRevenue) ? stats.validatedRevenue.toLocaleString() : '—'} F CFA</div>
+              <p className="text-sm text-gray-500 mt-1">
+                Revenus validés · Total {Number.isFinite(stats.totalRevenue) ? stats.totalRevenue.toLocaleString() : '—'} F CFA
               </p>
             </CardContent>
           </Card>
@@ -335,7 +333,7 @@ export default function AdminDashboard() {
                 <div className="text-sm text-gray-600">utilisateur(s) en attente</div>
               </div>
               <div>
-                <Button onClick={() => navigate('/admin/users?pending=true')} className="bg-[#28A745]">Gérer les validations</Button>
+                <Button onClick={() => navigate('/admin/users?pending=true')} className="bg-[#2E7D32] hover:bg-[#1B5E20]">Gérer les validations</Button>
               </div>
             </CardContent>
           </Card>
@@ -353,7 +351,7 @@ export default function AdminDashboard() {
             <Card className="border-2 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-2xl flex items-center gap-2">
-                  <Package className="h-6 w-6 text-[#28A745]" />
+                  <Package className="h-6 w-6 text-[#2E7D32]" />
                   Gestion des Commandes NFC
                 </CardTitle>
                 <CardDescription>
@@ -401,7 +399,7 @@ export default function AdminDashboard() {
                               <td className="py-4 text-gray-600">
                                 {safeFormatDate(order.ordered_at)}
                               </td>
-                              <td className="py-4 text-right font-bold text-[#28A745]">
+                              <td className="py-4 text-right font-bold text-[#2E7D32]">
                                 {(order.montant_total || 30000).toLocaleString()} F CFA
                               </td>
                               <td className="py-4">

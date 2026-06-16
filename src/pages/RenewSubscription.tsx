@@ -24,7 +24,7 @@ function formatDate(date: Date): string {
 }
 
 function formatXOF(amount: number): string {
-  return `${Math.round(amount).toLocaleString('fr-FR')} XOF`;
+  return `${Math.round(amount).toLocaleString('fr-FR')} F CFA`;
 }
 
 export default function RenewSubscription() {
@@ -79,8 +79,8 @@ export default function RenewSubscription() {
     if (!currentPlan) return 0;
     const isYearly = (currentPlan.billing_interval || '').toLowerCase() === 'yearly';
     return isYearly
-      ? Number(currentPlan.price_cents || 0) / 100 / 12
-      : Number(currentPlan.price_cents || 0) / 100;
+      ? Number(currentPlan.price_cents || 0) / 12
+      : Number(currentPlan.price_cents || 0);
   })();
 
   return (

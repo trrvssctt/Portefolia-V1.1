@@ -372,7 +372,7 @@ export default function AdminUsers() {
       if (u.plan_id && plans.length) {
         const found = plans.find((p: any) => String(p.id) === String(u.plan_id));
         if (found) {
-          setAmountInput(String(Number(found.price_cents || 0) / 100));
+          setAmountInput(String(Number(found.price_cents || 0)));
         }
       } else {
         setAmountInput('0');
@@ -399,7 +399,7 @@ export default function AdminUsers() {
     if (selectedPlanId && plans.length) {
       const p = plans.find((x: any) => Number(x.id) === Number(selectedPlanId));
       if (p) {
-        const price = (Number(p.price_cents || 0) / 100).toString();
+        const price = (Number(p.price_cents || 0)).toString();
         setAmountInput(price);
       }
     }
@@ -1616,7 +1616,7 @@ export default function AdminUsers() {
                     <div className="space-y-2">
                       <div className="text-2xl font-black text-indigo-950 uppercase tracking-tight">{selectedUserDetails.plan_name}</div>
                       <div className="text-sm font-bold text-indigo-700/70">
-                        {(selectedUserDetails.plan_price_cents || 0) / 100} {selectedUserDetails.plan_currency || 'F CFA'} / mois
+                        {(selectedUserDetails.plan_price_cents || 0).toLocaleString('fr-FR')} {selectedUserDetails.plan_currency || 'F CFA'} / mois
                       </div>
                     </div>
                   ) : (
@@ -1704,7 +1704,7 @@ export default function AdminUsers() {
                 <SelectContent className="rounded-xl font-medium">
                   {plans.map((plan) => (
                     <SelectItem key={plan.id} value={String(plan.id)} className="rounded-lg">
-                      {plan.name} - {(plan.price_cents / 100).toLocaleString()} {plan.currency}
+                      {plan.name} - {(plan.price_cents).toLocaleString('fr-FR')} {plan.currency || 'F CFA'}
                     </SelectItem>
                   ))}
                 </SelectContent>

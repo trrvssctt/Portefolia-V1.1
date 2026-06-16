@@ -205,7 +205,7 @@ export default function CheckoutPage() {
   const checkoutMeta = data?.checkout?.metadata || {};
   const durationMonths: number = Number(checkoutMeta.duration_months) || 1;
   const discountPercent: number = Number(checkoutMeta.discount_percent) || 0;
-  const amount = Number(paiement?.montant || (plan.price_cents || 0) / 100 || 0);
+  const amount = Number(paiement?.montant || plan.price_cents || 0);
   const reference = `REF-${(token || '').slice(0, 10).toUpperCase()}`;
   const expired = timeLeft === 0 && !!data?.expires_at;
 
@@ -271,7 +271,7 @@ export default function CheckoutPage() {
                   <span className="text-4xl font-extrabold text-gray-900">
                     {amount.toLocaleString('fr')}
                   </span>
-                  <span className="text-gray-500 text-sm mb-1.5">XOF</span>
+                  <span className="text-gray-500 text-sm mb-1.5">F CFA</span>
                 </div>
                 <p className="text-xs text-gray-500">{periodLabel}</p>
                 {discountPercent > 0 && (
@@ -347,7 +347,7 @@ export default function CheckoutPage() {
                     <div className="space-y-3">
                       {[
                         { step: '1', title: 'Ouvrez Wave', sub: 'Allez dans l\'onglet Payer / Scanner' },
-                        { step: '2', title: `Entrez ${amount.toLocaleString('fr')} XOF`, sub: 'Vérifiez le montant avant de confirmer' },
+                        { step: '2', title: `Entrez ${amount.toLocaleString('fr')} F CFA`, sub: 'Vérifiez le montant avant de confirmer' },
                         { step: '3', title: 'Validez avec votre code PIN', sub: 'Puis revenez ici et cliquez sur le bouton' },
                       ].map(({ step, title, sub }) => (
                         <div key={step} className="flex gap-4 p-3 bg-gray-50 rounded-xl">

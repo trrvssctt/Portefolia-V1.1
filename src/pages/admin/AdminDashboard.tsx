@@ -24,7 +24,7 @@ class SectionBoundary extends Component<{ children: ReactNode; label: string }, 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3 text-[12px] text-red-500">
+        <div className="rounded-[12px] bg-[#FFEBEE] border border-[#FFCDD2] px-4 py-3 text-[12px] text-[#C62828]">
           Erreur d'affichage — {this.props.label}
         </div>
       );
@@ -37,7 +37,7 @@ class SectionBoundary extends Component<{ children: ReactNode; label: string }, 
 
 function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
+    <p className="text-[10px] font-semibold text-[#9E9E9E] uppercase tracking-[0.06em] mb-2">
       {children}
     </p>
   );
@@ -69,7 +69,7 @@ export default function AdminDashboard() {
             </span>
 
             {nbAlertesCritiques > 0 && (
-              <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-medium">
+              <span className="text-xs bg-[#C62828] text-white px-2 py-0.5 rounded-full font-medium">
                 {nbAlertesCritiques} alerte{nbAlertesCritiques > 1 ? 's' : ''}
               </span>
             )}
@@ -104,7 +104,7 @@ export default function AdminDashboard() {
 
           <button
             onClick={() => navigate('/admin/finance')}
-            className="bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-lg transition-colors"
+            className="bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-[8px] transition-colors font-medium"
           >
             Finance détaillée →
           </button>
@@ -113,13 +113,13 @@ export default function AdminDashboard() {
 
       {/* ── BANNER ERREUR GLOBALE ────────────────────────────────────────── */}
       {isError && (
-        <div className="mx-6 mt-4 flex items-center justify-between gap-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
-          <p className="text-[13px] text-red-700 font-medium">
+        <div className="mx-6 mt-4 flex items-center justify-between gap-4 rounded-[12px] bg-[#FFEBEE] border-l-4 border-[#C62828] px-4 py-3">
+          <p className="text-[13px] text-[#C62828] font-medium">
             Impossible de charger le dashboard — vérifiez votre connexion
           </p>
           <button
             onClick={() => refetch()}
-            className="shrink-0 text-xs font-semibold text-red-700 hover:underline"
+            className="shrink-0 text-xs font-semibold text-[#C62828] hover:underline"
           >
             Réessayer
           </button>

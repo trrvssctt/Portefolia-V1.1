@@ -1,99 +1,15 @@
-
 import { useEffect, useState, useMemo } from 'react';
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  AlertCircle,
-  CheckCircle2,
-  RefreshCw,
-  Search,
-  TrendingUp,
-  XCircle,
-  ExternalLink,
-  Download,
-  Filter,
-  BarChart3,
-  DollarSign,
-  CreditCard,
-  Users,
-  Calendar,
-  Eye,
-  MoreVertical,
-  Clock,
-  Receipt,
-  QrCode,
-  Shield,
-  ArrowUpRight,
-  ArrowDownRight,
-  Sparkles,
-  Activity,
-  Box,
-  TrendingDown,
-  Layout,
-  Banknote,
-  Navigation,
-  User
+  AlertCircle, CheckCircle2, RefreshCw, Search, TrendingUp, XCircle,
+  ExternalLink, Download, Filter, DollarSign, CreditCard, Calendar,
+  Eye, Clock, Receipt, Banknote, User, X, ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Separator } from '@/components/ui/separator';
-import { Textarea } from '@/components/ui/textarea';
 import { UserPaiementHistorique } from '@/components/admin/UserPaiementHistorique';
 import { useToast } from '@/hooks/use-toast';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  AreaChart,
-  Area,
-  ResponsiveContainer,
-  Tooltip as ReTooltip,
-  XAxis as ReXAxis,
-  YAxis as ReYAxis
-} from 'recharts';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
 type Paiement = {
   id: number;
   reference: string | null;
@@ -113,141 +29,92 @@ type Paiement = {
   motif_remboursement?: string | null;
 };
 
-const STATUS_CONFIG: Record<string, {
-  label: string;
-  color: string;
-  bgColor: string;
-  icon: React.ReactNode;
-  description: string;
-}> = {
-  pending: {
-    label: 'En attente',
-    color: 'text-yellow-600',
-    bgColor: 'bg-yellow-100 text-yellow-800',
-    icon: <Clock className="w-4 h-4" />,
-    description: 'En attente de validation'
-  },
-  confirmed: {
-    label: 'Confirmé',
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100 text-blue-800',
-    icon: <CheckCircle2 className="w-4 h-4" />,
-    description: 'Paiement confirmé'
-  },
-  paid: {
-    label: 'Payé',
-    color: 'text-green-600',
-    bgColor: 'bg-green-100 text-green-800',
-    icon: <CheckCircle2 className="w-4 h-4" />,
-    description: 'Paiement finalisé'
-  },
-  failed: {
-    label: 'Échoué',
-    color: 'text-red-600',
-    bgColor: 'bg-red-100 text-red-800',
-    icon: <XCircle className="w-4 h-4" />,
-    description: 'Paiement échoué'
-  },
-  upcoming: {
-    label: 'À venir',
-    color: 'text-indigo-600',
-    bgColor: 'bg-indigo-100 text-indigo-800',
-    icon: <Calendar className="w-4 h-4" />,
-    description: 'Paiements programmés (abonnements)'
-  },
-  refunded: {
-    label: 'Remboursé',
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-100 text-purple-800',
-    icon: <RefreshCw className="w-4 h-4" />,
-    description: 'Paiement remboursé'
-  },
-  reussi: {
-    label: 'Réussi',
-    color: 'text-emerald-700',
-    bgColor: 'bg-emerald-100 text-emerald-800',
-    icon: <CheckCircle2 className="w-4 h-4" />,
-    description: 'Paiement réussi'
-  },
-  cancelled: {
-    label: 'Annulé',
-    color: 'text-gray-600',
-    bgColor: 'bg-gray-100 text-gray-800',
-    icon: <XCircle className="w-4 h-4" />,
-    description: 'Paiement annulé'
-  },
+// ─── Design tokens ─────────────────────────────────────────────────────────────
+const CARD_STYLE = { borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.08)' } as const;
+const ADMIN_GRAD = 'linear-gradient(135deg, #1B5E20, #2E7D32)';
+
+const STATUS_PILL: Record<string, { c: string; bg: string; label: string }> = {
+  pending:   { c: '#B45309', bg: '#FEF3E2', label: 'En attente' },
+  confirmed: { c: '#1565C0', bg: '#E8F1FD', label: 'Confirmé' },
+  paid:      { c: '#2E7D32', bg: '#EAF5EB', label: 'Payé' },
+  reussi:    { c: '#2E7D32', bg: '#EAF5EB', label: 'Réussi' },
+  failed:    { c: '#C62828', bg: '#FEECEC', label: 'Échoué' },
+  refunded:  { c: '#7C3AED', bg: '#F3EEFF', label: 'Remboursé' },
+  upcoming:  { c: '#7C3AED', bg: '#F3EEFF', label: 'À venir' },
+  cancelled: { c: '#52525B', bg: '#F4F4F5', label: 'Annulé' },
 };
 
 const PAYMENT_METHODS = [
-  { value: 'wave', label: 'Wave', icon: '💸' },
-  { value: 'orange_money', label: 'Orange Money', icon: '🟠' },
-  { value: 'mtn_money', label: 'MTN Money', icon: '🟡' },
-  { value: 'card', label: 'Carte bancaire', icon: '💳' },
-  { value: 'manual', label: 'Manuel', icon: '📝' },
-  { value: 'cash', label: 'Espèces', icon: '💰' },
-  { value: 'transfer', label: 'Virement', icon: '🏦' },
+  { value: 'wave',         label: 'Wave',          icon: '💸' },
+  { value: 'orange_money', label: 'Orange Money',  icon: '🟠' },
+  { value: 'mtn_money',    label: 'MTN Money',     icon: '🟡' },
+  { value: 'card',         label: 'Carte bancaire',icon: '💳' },
+  { value: 'manual',       label: 'Manuel',        icon: '📝' },
+  { value: 'cash',         label: 'Espèces',       icon: '💰' },
+  { value: 'transfer',     label: 'Virement',      icon: '🏦' },
 ];
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function StatusPill({ status }: { status: string }) {
+  const s = STATUS_PILL[status] ?? { c: '#52525B', bg: '#F4F4F5', label: status };
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full"
+      style={{ color: s.c, background: s.bg }}>
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: s.c }} />
+      {s.label}
+    </span>
+  );
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
 export default function AdminPaiements() {
   const { toast } = useToast();
-  const [selectedUser, setSelectedUser] = useState<number | null>(null);
-  const [paiements, setPaiements] = useState<Paiement[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [methodFilter, setMethodFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all');
-  const [sortBy, setSortBy] = useState<'date' | 'user' | 'amount' | 'status'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const [selectedUser, setSelectedUser]   = useState<number | null>(null);
+  const [paiements, setPaiements]         = useState<Paiement[]>([]);
+  const [loading, setLoading]             = useState(true);
+  const [refreshing, setRefreshing]       = useState(false);
+  const [search, setSearch]               = useState('');
+  const [statusFilter, setStatusFilter]   = useState('all');
+  const [methodFilter, setMethodFilter]   = useState('all');
+  const [dateFilter, setDateFilter]       = useState('all');
+  const [sortBy, setSortBy]               = useState<'date' | 'user' | 'amount' | 'status'>('date');
+  const [sortOrder, setSortOrder]         = useState<'asc' | 'desc'>('desc');
   const [selectedPaiement, setSelectedPaiement] = useState<Paiement | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen]     = useState(false);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
-  const [newStatus, setNewStatus] = useState('');
-  const [notes, setNotes] = useState('');
+  const [newStatus, setNewStatus]         = useState('');
+  const [notes, setNotes]                 = useState('');
   const [stats, setStats] = useState({
-    total: 0,
-    paid: 0,
-    pending: 0,
-    failed: 0,
-    refunded: 0,
-    totalRevenue: 0,
-    avgAmount: 0,
-    todayRevenue: 0,
-    reussi: {
-      label: 'Réussi',
-      color: 'text-emerald-700',
-      bgColor: 'bg-emerald-100 text-emerald-800',
-      icon: <CheckCircle2 className="w-4 h-4" />,
-      description: 'Paiement réussi'
-    },
+    total: 0, paid: 0, pending: 0, failed: 0, refunded: 0,
+    totalRevenue: 0, avgAmount: 0, todayRevenue: 0,
   });
 
+  // ── Normalizers ──────────────────────────────────────────────────────────────
   const normalize = (s: any) => {
     if (!s && s !== 0) return '';
     try {
       return s.toString().normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-    } catch (e) {
+    } catch {
       return String(s).toLowerCase();
     }
   };
 
-  // Map various localized or provider statuses to canonical keys used by the UI
   const canonicalStatus = (s: any) => {
     const n = normalize(s || '');
     if (!n) return '';
-    // french refunded 'remboursé' -> 'rembourse' after normalization; map to 'refunded'
     if (['refunded', 'rembourse', 'remboursement', 'remboursee'].includes(n)) return 'refunded';
     if (['reussi', 'success', 'succeeded'].includes(n)) return 'reussi';
     if (['paid', 'paye', 'payee', 'paye'].includes(n)) return 'paid';
     if (['confirmed'].includes(n)) return 'confirmed';
     if (['pending', 'enattente', 'en_attente'].includes(n)) return 'pending';
-    if (['failed', 'echoue', 'echec', 'echoue'].includes(n)) return 'failed';
+    if (['failed', 'echoue', 'echec'].includes(n)) return 'failed';
     if (['upcoming', 'a venir', 'avenir', 'avenu'].includes(n)) return 'upcoming';
-    if (['cancelled', 'annule', 'annulé', 'annulee'].includes(n)) return 'cancelled';
+    if (['cancelled', 'annule', 'annulee'].includes(n)) return 'cancelled';
     return n;
   };
 
+  // ── Load ──────────────────────────────────────────────────────────────────────
   const loadPaiements = async () => {
     setRefreshing(true);
     try {
@@ -256,7 +123,6 @@ export default function AdminPaiements() {
 
       let res;
       if (statusFilter === 'upcoming') {
-        // fetch upcoming abonnements/payments
         res = await fetch(`${API_BASE}/api/admin/paiements/upcoming?days=30`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -270,7 +136,6 @@ export default function AdminPaiements() {
       }
 
       if (!res.ok) throw new Error('Erreur réseau');
-
       const json = await res.json();
       const items = statusFilter === 'upcoming' ? (json.upcoming || []) : (json.paiements || json.items || []);
 
@@ -282,8 +147,7 @@ export default function AdminPaiements() {
         utilisateur_id: p.utilisateur_id || p.user_id || null,
         user_name: p.user_name
           || (p.utilisateur_prenom ? `${p.utilisateur_prenom} ${p.utilisateur_nom || ''}`.trim() : null)
-          || p.user_prenom
-          || null,
+          || p.user_prenom || null,
         user_email: p.user_email || p.utilisateur_email || null,
         image_paiement: p.image_paiement || p.payment_image || null,
         payment_method: p.moyen_paiement || p.payment_method || 'Manual',
@@ -298,49 +162,28 @@ export default function AdminPaiements() {
 
       setPaiements(normalized);
 
-      // Prefer server-provided stats if available to avoid client-side discrepancies
-      if (json && json.stats) {
+      if (json?.stats) {
         const s: any = json.stats;
         setStats({
           total: Number(s.total || normalized.length || 0),
-          paid: Number(s.paid || 0),
-          pending: Number(s.pending || 0),
-          failed: Number(s.failed || 0),
-          refunded: Number(s.refunded || 0),
+          paid: Number(s.paid || 0), pending: Number(s.pending || 0),
+          failed: Number(s.failed || 0), refunded: Number(s.refunded || 0),
           totalRevenue: Number(s.totalRevenue || s.total_revenue || 0),
           avgAmount: Number(s.avgAmount || s.avg_amount || 0),
           todayRevenue: Number(s.todayRevenue || s.today_revenue || 0),
         });
       } else {
-        // Calculate stats locally (safe guards against division by zero)
-        const total = normalized.length;
         const paidStatuses = ['paid', 'reussi', 'confirmed'];
-        const paid = normalized.filter(p => paidStatuses.includes(p.status)).length;
-        const pending = normalized.filter(p => p.status === 'pending').length;
-        const failed = normalized.filter(p => p.status === 'failed').length;
-        const refunded = normalized.filter(p => p.status === 'refunded').length;
-        const totalRevenue = normalized
-          .filter(p => paidStatuses.includes(p.status))
-          .reduce((acc, p) => acc + p.montant, 0);
-        const avgAmount = paid > 0 ? Math.round(totalRevenue / paid) : 0;
-
-        // Today's revenue
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const paid      = normalized.filter(p => paidStatuses.includes(p.status)).length;
+        const pending   = normalized.filter(p => p.status === 'pending').length;
+        const failed    = normalized.filter(p => p.status === 'failed').length;
+        const refunded  = normalized.filter(p => p.status === 'refunded').length;
+        const totalRevenue = normalized.filter(p => paidStatuses.includes(p.status)).reduce((a, p) => a + p.montant, 0);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
         const todayRevenue = normalized
           .filter(p => paidStatuses.includes(p.status) && new Date(p.date_paiement || p.created_at) >= today)
-          .reduce((acc, p) => acc + p.montant, 0);
-
-        setStats({
-          total,
-          paid,
-          pending,
-          failed,
-          refunded,
-          totalRevenue,
-          avgAmount,
-          todayRevenue,
-        });
+          .reduce((a, p) => a + p.montant, 0);
+        setStats({ total: normalized.length, paid, pending, failed, refunded, totalRevenue, avgAmount: paid > 0 ? Math.round(totalRevenue / paid) : 0, todayRevenue });
       }
     } catch (err) {
       console.error('Erreur chargement paiements:', err);
@@ -351,903 +194,598 @@ export default function AdminPaiements() {
     }
   };
 
-  useEffect(() => {
-    loadPaiements();
-  }, [statusFilter]);
+  useEffect(() => { loadPaiements(); }, [statusFilter]);
 
+  // ── Filtered list ─────────────────────────────────────────────────────────────
   const filteredPaiements = useMemo(() => {
-    let filtered = [...paiements];
-
-    // Filter by search
+    let list = [...paiements];
     if (search) {
-      const searchLower = search.toLowerCase();
-      filtered = filtered.filter(p =>
-        (p.reference || '').toLowerCase().includes(searchLower) ||
-        (p.numero_commande || '').toLowerCase().includes(searchLower) ||
-        (p.user_name || '').toLowerCase().includes(searchLower) ||
-        (p.user_email || '').toLowerCase().includes(searchLower) ||
+      const q = search.toLowerCase();
+      list = list.filter(p =>
+        (p.reference || '').toLowerCase().includes(q) ||
+        (p.numero_commande || '').toLowerCase().includes(q) ||
+        (p.user_name || '').toLowerCase().includes(q) ||
+        (p.user_email || '').toLowerCase().includes(q) ||
         String(p.utilisateur_id || '').includes(search)
       );
     }
-
-    // Filter by status
     if (statusFilter !== 'all') {
-      const canonicalFilter = canonicalStatus(statusFilter);
-      filtered = filtered.filter(p => p.status === canonicalFilter);
+      const cf = canonicalStatus(statusFilter);
+      list = list.filter(p => p.status === cf);
     }
-
-    // Filter by payment method
-    if (methodFilter !== 'all') {
-      filtered = filtered.filter(p => p.payment_method === methodFilter);
-    }
-
-    // Filter by date
+    if (methodFilter !== 'all') list = list.filter(p => p.payment_method === methodFilter);
     if (dateFilter !== 'all') {
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-      filtered = filtered.filter((p) => {
-        const paymentDate = new Date(p.date_paiement || p.created_at);
-
-        switch (dateFilter) {
-          case 'today':
-            return paymentDate >= today;
-          case 'week':
-            const weekAgo = new Date(today);
-            weekAgo.setDate(weekAgo.getDate() - 7);
-            return paymentDate >= weekAgo;
-          case 'month':
-            const monthAgo = new Date(today);
-            monthAgo.setMonth(monthAgo.getMonth() - 1);
-            return paymentDate >= monthAgo;
-          default:
-            return true;
-        }
+      list = list.filter(p => {
+        const d = new Date(p.date_paiement || p.created_at);
+        if (dateFilter === 'today') return d >= today;
+        if (dateFilter === 'week')  { const w = new Date(today); w.setDate(w.getDate() - 7); return d >= w; }
+        if (dateFilter === 'month') { const m = new Date(today); m.setMonth(m.getMonth() - 1); return d >= m; }
+        return true;
       });
     }
-
-    const sorted = filtered.slice();
-    sorted.sort((a, b) => {
-      let aV: any;
-      let bV: any;
+    list.sort((a, b) => {
+      let aV: any, bV: any;
       switch (sortBy) {
-        case 'user':
-          aV = (a.user_name || '').toString().toLowerCase();
-          bV = (b.user_name || '').toString().toLowerCase();
-          break;
-        case 'amount':
-          aV = Number(a.montant || 0);
-          bV = Number(b.montant || 0);
-          break;
-        case 'status':
-          aV = (a.status || '').toString().toLowerCase();
-          bV = (b.status || '').toString().toLowerCase();
-          break;
-        case 'date':
-        default:
-          aV = new Date(a.date_paiement || a.created_at).getTime();
-          bV = new Date(b.date_paiement || b.created_at).getTime();
-          break;
+        case 'user':   aV = (a.user_name || '').toLowerCase();   bV = (b.user_name || '').toLowerCase(); break;
+        case 'amount': aV = Number(a.montant || 0);              bV = Number(b.montant || 0); break;
+        case 'status': aV = (a.status || '').toLowerCase();      bV = (b.status || '').toLowerCase(); break;
+        default:       aV = new Date(a.date_paiement || a.created_at).getTime(); bV = new Date(b.date_paiement || b.created_at).getTime();
       }
-
-      // string compare
-      if (typeof aV === 'string' && typeof bV === 'string') {
-        const cmp = aV.localeCompare(bV);
-        return sortOrder === 'desc' ? -cmp : cmp;
-      }
-
-      // numeric compare
-      const numCmp = (Number(aV) || 0) - (Number(bV) || 0);
-      return sortOrder === 'desc' ? -numCmp : numCmp;
+      if (typeof aV === 'string') return sortOrder === 'desc' ? -aV.localeCompare(bV) : aV.localeCompare(bV);
+      return sortOrder === 'desc' ? -(aV - bV) : aV - bV;
     });
-
-    return sorted;
+    return list;
   }, [paiements, search, statusFilter, methodFilter, dateFilter, sortBy, sortOrder]);
 
-  const updatePaiementStatus = async (paiementId: number, status: string, notes?: string) => {
+  // ── Actions ───────────────────────────────────────────────────────────────────
+  const updatePaiementStatus = async (paiementId: number, status: string, notesVal?: string) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Token manquant');
-
       const res = await fetch(`${API_BASE}/api/admin/paiements/${paiementId}/status`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          status,
-          notes: notes || undefined,
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status, notes: notesVal || undefined }),
       });
-
-      if (!res.ok) {
-        throw new Error('Erreur mise à jour');
-      }
-
+      if (!res.ok) throw new Error('Erreur mise à jour');
       const jsonRes = await res.json().catch(() => null);
-
       setUpdateDialogOpen(false);
       setSelectedPaiement(null);
       setNotes('');
-      // If server returned the paiement and its status is 'reussi', show success toast
-      const paiementReturned = jsonRes && jsonRes.paiement ? jsonRes.paiement : null;
-      if (paiementReturned) {
-        const returnedStatus = canonicalStatus(paiementReturned.status || paiementReturned.statut || '');
-        if (returnedStatus === 'reussi') {
-          toast({ title: 'Paiement confirmé', description: 'Facture générée et email envoyé à l\'utilisateur.' });
-        } else if (returnedStatus === 'refunded') {
-          const motif = paiementReturned.motif_remboursement || paiementReturned.motif || paiementReturned.notes || null;
-          toast({ title: 'Paiement remboursé', description: motif ? `Motif: ${motif}` : 'Le paiement a été remboursé.' });
-        }
+      const returned = jsonRes?.paiement;
+      if (returned) {
+        const rs = canonicalStatus(returned.status || returned.statut || '');
+        if (rs === 'reussi') toast({ title: 'Paiement confirmé', description: 'Facture générée et email envoyé.' });
+        else if (rs === 'refunded') toast({ title: 'Paiement remboursé' });
       }
-
       loadPaiements();
-
     } catch (err) {
       console.error(err);
     }
-  };
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return '—';
-    try {
-      return new Date(dateString).toLocaleString('fr-FR', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
-  const formatCurrency = (amount: number) => `${amount.toLocaleString('fr-FR')} F CFA`;
-
-  const getPaymentMethodIcon = (method: string) => {
-    const found = PAYMENT_METHODS.find(m => m.value === method);
-    return found ? found.icon : '📝';
-  };
-
-  const getPaymentMethodLabel = (method: string) => {
-    const found = PAYMENT_METHODS.find(m => m.value === method);
-    return found ? found.label : 'Manuel';
   };
 
   const exportPaiements = async () => {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE}/api/admin/paiements/export`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
-
       if (!res.ok) throw new Error('Export failed');
-
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `paiements-${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-    } catch (error) {
-      console.error('Export error:', error);
-    }
+      document.body.appendChild(a); a.click();
+      window.URL.revokeObjectURL(url); document.body.removeChild(a);
+    } catch (e) { console.error('Export error:', e); }
   };
 
   const openInvoice = async (paiement: Paiement) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-
       let invoiceId = paiement.invoice_id;
-
-      // If no invoice ID, try to find by reference
       if (!invoiceId && paiement.reference) {
         const byRef = await fetch(
           `${API_BASE}/api/admin/invoices/by-reference?reference=${encodeURIComponent(paiement.reference)}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        if (byRef.ok) {
-          const data = await byRef.json();
-          invoiceId = data.invoice?.id;
-        }
+        if (byRef.ok) { const data = await byRef.json(); invoiceId = data.invoice?.id; }
       }
-
       if (invoiceId) {
         window.open(`/admin/invoices/${invoiceId}`, '_blank');
       } else {
-        // Open HTML view directly
         const htmlRes = await fetch(`${API_BASE}/api/admin/invoices/generate`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            paiement_id: paiement.id,
-            reference: paiement.reference,
-          }),
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ paiement_id: paiement.id, reference: paiement.reference }),
         });
-
         if (htmlRes.ok) {
           const html = await htmlRes.text();
           const blob = new Blob([html], { type: 'text/html' });
-          const url = URL.createObjectURL(blob);
-          window.open(url, '_blank');
+          window.open(URL.createObjectURL(blob), '_blank');
         }
       }
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
+  const formatDate = (d: string | null) => {
+    if (!d) return '—';
+    try {
+      return new Date(d).toLocaleString('fr-FR', {
+        day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+    } catch { return d; }
+  };
+
+  const formatCurrency = (n: number) => `${n.toLocaleString('fr-FR')} F CFA`;
+  const getMethodIcon  = (m: string) => PAYMENT_METHODS.find(x => x.value === m)?.icon || '📝';
+  const getMethodLabel = (m: string) => PAYMENT_METHODS.find(x => x.value === m)?.label || 'Manuel';
+
+  // ── KPIs ─────────────────────────────────────────────────────────────────────
+  const kpis = [
+    { label: 'CA total', value: formatCurrency(stats.totalRevenue), sub: `${stats.paid} paiements validés`, icon: TrendingUp, c: '#2E7D32', bg: '#EAF5EB' },
+    { label: "Aujourd'hui", value: formatCurrency(stats.todayRevenue), sub: "Encaissé aujourd'hui", icon: Calendar, c: '#1565C0', bg: '#E8F1FD' },
+    { label: 'En attente', value: stats.pending, sub: 'À traiter', icon: Clock, c: stats.pending > 0 ? '#B45309' : '#52525B', bg: stats.pending > 0 ? '#FEF3E2' : '#F4F4F5' },
+    { label: 'Panier moyen', value: formatCurrency(stats.avgAmount), sub: `${stats.total} transactions`, icon: Banknote, c: '#7C3AED', bg: '#F3EEFF' },
+  ];
+
+  // ── Status filter tabs ────────────────────────────────────────────────────────
+  const STATUS_TABS = [
+    ['all', 'Tous'],
+    ['reussi', 'Réussi'],
+    ['pending', 'En attente'],
+    ['failed', 'Échoué'],
+    ['refunded', 'Remboursé'],
+    ['cancelled', 'Annulé'],
+  ] as const;
+
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen" style={{ background: '#F7F8F8' }}>
 
-
-      <main className="flex-1 p-4 sm:p-6 lg:p-12 max-w-[1600px] mx-auto w-full space-y-12">
-        {/* ── PREMIUM HEADER ── */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col lg:flex-row lg:items-end justify-between gap-8"
-        >
-          <div>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="h-12 w-12 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-xl shadow-blue-200">
-                <CreditCard className="h-6 w-6" />
-              </div>
-              <Badge variant="outline" className="rounded-full border-blue-100 bg-blue-50 text-blue-600 font-black text-[10px] uppercase tracking-widest px-4 py-1">
-                Admin Financial Engine
-              </Badge>
+      {/* ── AdminHeader ─────────────────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden" style={{ background: ADMIN_GRAD }}>
+        <div className="absolute inset-0 opacity-[0.12] pointer-events-none"
+          style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '22px 22px' }} />
+        <div className="relative max-w-[1180px] mx-auto px-5 sm:px-8 py-7 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex items-center gap-3.5 flex-1 min-w-0 pl-10 md:pl-0">
+            <span className="w-12 h-12 rounded-2xl bg-white/[0.12] flex items-center justify-center text-white shrink-0">
+              <CreditCard size={24} strokeWidth={1.9} />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-white leading-tight">Paiements</h1>
+              <p className="text-white/65 text-sm mt-0.5">
+                {formatCurrency(stats.totalRevenue)} encaissés · {stats.total} transactions
+              </p>
             </div>
-            <h1 className="text-4xl lg:text-6xl font-black text-gray-900 tracking-tight">
-              Gestion des <span className="text-blue-600">Paiements</span>
-            </h1>
-            <p className="text-gray-400 font-bold text-sm uppercase tracking-[0.2em] mt-4">
-              Trésorerie & Performance Transactionnelle</p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={loadPaiements}
-              disabled={refreshing}
-              className="h-14 px-8 rounded-2xl font-black border-gray-100 shadow-xl shadow-gray-100/50 hover:bg-gray-50"
-            >
-              <RefreshCw className={`h-4 w-4 mr-3 ${refreshing ? 'animate-spin' : ''}`} />
-              Sync Live
-            </Button>
-            <Button
-              onClick={exportPaiements}
-              className="h-14 px-8 rounded-2xl font-black bg-gray-900 text-white shadow-xl shadow-gray-200 hover:bg-blue-600 transition-all"
-            >
-              <Download className="h-4 w-4 mr-3" />
-              Export CSV
-            </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={exportPaiements}
+              className="h-10 px-4 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-semibold flex items-center gap-1.5 transition-colors">
+              <Download size={15} /> Exporter
+            </button>
+            <button onClick={loadPaiements}
+              className="h-10 w-10 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors">
+              <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
+            </button>
           </div>
-        </motion.div>
+        </div>
+      </div>
 
-        {/* ── BENTO STATS GRID ── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Main Revenue Card */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1 }}
-            className="lg:col-span-2"
-          >
-            <Card className="h-full border-0 shadow-3xl shadow-emerald-100/50 bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-[2.5rem] overflow-hidden group">
-              <CardContent className="p-10 relative h-full flex flex-col justify-between overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
-                  <TrendingUp className="h-32 w-32" />
-                </div>
-                <div className="relative z-10">
-                  <p className="text-emerald-100 font-bold text-xs uppercase tracking-widest mb-2">Chiffre d'Affaires Global</p>
-                  <h3 className="text-5xl font-black tracking-tighter mb-4">
-                    {formatCurrency(stats.totalRevenue).split(' ')[0]}<span className="text-2xl ml-2">FCFA</span>
-                  </h3>
-                  <div className="flex items-center gap-3">
-                    <div className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                      <Activity className="h-3 w-3 animate-pulse" /> +{stats.todayRevenue.toLocaleString()} F aujourd'hui
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-8">
-                  <p className="text-emerald-100/60 text-[10px] font-bold uppercase tracking-widest">Volume : {stats.paid} paiements validés</p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+      {/* ── AdminBody ───────────────────────────────────────────────────────────── */}
+      <div className="max-w-[1180px] mx-auto px-5 sm:px-8 py-7 space-y-7">
 
-          {/* Average Amount Card */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-          >
-            <Card className="h-full border-0 shadow-3xl shadow-blue-100/50 bg-white rounded-[2.5rem] overflow-hidden group">
-              <CardContent className="p-8 flex flex-col justify-between h-full">
-                <div className="h-14 w-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mb-6 shadow-sm border border-blue-100 group-hover:scale-110 transition-transform">
-                  <Activity className="h-6 w-6" />
+        {/* KPI cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {kpis.map(({ label, value, sub, icon: Icon, c, bg }) => (
+            <div key={label} className="bg-white p-5" style={CARD_STYLE}>
+              <div className="flex items-center gap-3.5">
+                <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: bg, color: c }}>
+                  <Icon size={18} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-lg font-extrabold text-[#18181B] leading-none tabular-nums truncate">{value}</p>
+                  <p className="text-xs text-zinc-400 mt-1 leading-tight">{label}</p>
                 </div>
-                <div className="mb-4">
-                  <h4 className="text-4xl font-black text-gray-900 tracking-tight">{stats.avgAmount.toLocaleString()}</h4>
-                  <p className="text-gray-400 font-bold text-[10px] uppercase tracking-widest mt-1">Panier Moyen (F)</p>
-                </div>
-                <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
-                  <span className="text-[9px] text-gray-400 font-bold uppercase">Efficacité Lab</span>
-                  <div className="h-1.5 w-12 bg-blue-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 w-2/3" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Conversion/Status Card */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Card className="h-full border-0 shadow-3xl shadow-orange-100/50 bg-white rounded-[2.5rem] overflow-hidden group">
-              <CardContent className="p-8 flex flex-col justify-between h-full">
-                <div className="flex justify-between items-start">
-                  <div className="h-14 w-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center shadow-sm border border-orange-100">
-                    <Clock className="h-6 w-6" />
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-black text-gray-900 leading-none">{stats.pending}</p>
-                    <p className="text-[9px] font-black text-orange-600 uppercase tracking-tighter mt-1">A Valider</p>
-                  </div>
-                </div>
-                <div className="mt-8">
-                  <h4 className="text-xl font-black text-gray-900 mb-2">Transactions</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-gray-50 rounded-xl p-2">
-                      <p className="text-xs font-black text-emerald-600 uppercase tracking-tighter">{stats.paid}</p>
-                      <p className="text-[8px] text-gray-400 font-bold">Payés</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-xl p-2">
-                      <p className="text-xs font-black text-red-600 uppercase tracking-tighter">{stats.failed}</p>
-                      <p className="text-[8px] text-gray-400 font-bold">Echecs</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+              </div>
+              <p className="text-[11px] text-zinc-400 mt-3 pl-0.5">{sub}</p>
+            </div>
+          ))}
         </div>
 
-        {/* ── HIGH PERFORMANCE FILTERS ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card className="border-0 shadow-3xl shadow-gray-100/50 bg-white rounded-[2.5rem] p-4">
-            <CardContent className="p-2">
-              <div className="flex flex-col lg:flex-row gap-4">
-                <div className="flex-1 relative group">
-                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-300 group-hover:text-blue-500 transition-colors" />
-                  <Input
-                    placeholder="Rechercher une transaction, un client, une référence..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className="h-16 pl-14 rounded-2xl border-gray-50 bg-gray-50/50 focus:bg-white focus:ring-4 focus:ring-blue-50 font-bold transition-all"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:flex gap-3">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="h-16 lg:w-48 rounded-2xl border-gray-50 bg-gray-50/50 font-black text-xs uppercase tracking-widest">
-                      <SelectValue placeholder="Statut" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl border-gray-100 shadow-2xl font-black text-xs">
-                      <SelectItem value="all">Tous Statuts</SelectItem>
-                      <SelectItem value="pending">En Attente</SelectItem>
-                      <SelectItem value="reussi">Réussi</SelectItem>
-                      <SelectItem value="confirmed">Confirmé</SelectItem>
-                      <SelectItem value="paid">Payé</SelectItem>
-                      <SelectItem value="failed">Échoué</SelectItem>
-                      <SelectItem value="refunded">Remboursé</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={methodFilter} onValueChange={setMethodFilter}>
-                    <SelectTrigger className="h-16 lg:w-48 rounded-2xl border-gray-50 bg-gray-50/50 font-black text-xs uppercase tracking-widest">
-                      <SelectValue placeholder="Méthode" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl border-gray-100 shadow-2xl font-black text-xs">
-                      <SelectItem value="all">Toutes Méthodes</SelectItem>
-                      {PAYMENT_METHODS.map(method => (
-                        <SelectItem key={method.value} value={method.value}>
-                          <span className="flex items-center gap-2">
-                            {method.icon} {method.label}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={dateFilter} onValueChange={setDateFilter}>
-                    <SelectTrigger className="h-16 lg:w-40 rounded-2xl border-gray-50 bg-gray-50/50 font-black text-xs uppercase tracking-widest">
-                      <SelectValue placeholder="Période" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl border-gray-100 shadow-2xl font-black text-xs">
-                      <SelectItem value="all">Période Totale</SelectItem>
-                      <SelectItem value="today">Aujourd'hui</SelectItem>
-                      <SelectItem value="week">Cette Semaine</SelectItem>
-                      <SelectItem value="month">Ce Mois</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <div className="flex gap-2">
-                    <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
-                      <SelectTrigger className="h-16 lg:w-32 rounded-2xl border-gray-50 bg-gray-50/50 font-black text-[10px] uppercase tracking-tighter">
-                        <SelectValue placeholder="Tri" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-2xl border-gray-100 shadow-2xl font-black text-xs">
-                        <SelectItem value="date">Chronologique</SelectItem>
-                        <SelectItem value="amount">Montant</SelectItem>
-                        <SelectItem value="user">Utilisateur</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* ── TRANSACTION LIST ── */}
-        <Tabs defaultValue="list" className="w-full space-y-8">
-          <div className="flex items-center justify-between">
-            <TabsList className="h-12 bg-white p-1 rounded-2xl border border-gray-100 shadow-sm">
-              <TabsTrigger value="list" className="rounded-xl font-bold text-xs uppercase tracking-widest px-6">Transactions</TabsTrigger>
-              <TabsTrigger value="overview" className="rounded-xl font-bold text-xs uppercase tracking-widest px-6">Vue d'ensemble</TabsTrigger>
-            </TabsList>
-
-            <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-gray-50 shadow-sm">
-              <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none">
-                {filteredPaiements.length} Operations Identifiées
-              </span>
-            </div>
+        {/* ── Filter toolbar ─────────────────────────────────────────────────────── */}
+        <div className="bg-white p-3 flex flex-col gap-3" style={CARD_STYLE}>
+          {/* Search */}
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input placeholder="Rechercher une transaction, un client, une référence…"
+              value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full h-9 pl-9 pr-3 rounded-lg bg-zinc-50 border border-transparent focus:border-[#E7E7EA] outline-none text-sm text-[#18181B]" />
           </div>
 
-          <TabsContent value="list" className="mt-0 active:scale-1 transition-transform focus-visible:outline-none">
-            {loading ? (
-              <div className="grid gap-6">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-32 w-full rounded-[2.5rem]" />
+          {/* Status tabs + filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            {STATUS_TABS.map(([k, label]) => (
+              <button key={k} onClick={() => setStatusFilter(k)}
+                className={`px-3 h-9 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${statusFilter === k ? 'text-white' : 'border border-[#E7E7EA] text-zinc-500 hover:bg-zinc-50'}`}
+                style={statusFilter === k ? { background: '#1B5E20' } : undefined}>
+                {label}
+              </button>
+            ))}
+
+            <div className="ml-auto flex items-center gap-2">
+              <select value={methodFilter} onChange={e => setMethodFilter(e.target.value)}
+                className="h-9 px-2 rounded-lg border border-[#E7E7EA] bg-zinc-50 text-xs text-[#18181B] outline-none">
+                <option value="all">Toutes méthodes</option>
+                {PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.icon} {m.label}</option>)}
+              </select>
+              <select value={dateFilter} onChange={e => setDateFilter(e.target.value)}
+                className="h-9 px-2 rounded-lg border border-[#E7E7EA] bg-zinc-50 text-xs text-[#18181B] outline-none">
+                <option value="all">Toute période</option>
+                <option value="today">Aujourd'hui</option>
+                <option value="week">Cette semaine</option>
+                <option value="month">Ce mois</option>
+              </select>
+              <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
+                className="h-9 px-2 rounded-lg border border-[#E7E7EA] bg-zinc-50 text-xs text-[#18181B] outline-none">
+                <option value="date">Date</option>
+                <option value="amount">Montant</option>
+                <option value="user">Client</option>
+                <option value="status">Statut</option>
+              </select>
+              <button onClick={() => setSortOrder(o => o === 'desc' ? 'asc' : 'desc')}
+                className="h-9 px-2.5 rounded-lg border border-[#E7E7EA] text-xs font-semibold text-zinc-500 hover:bg-zinc-50 transition-colors">
+                {sortOrder === 'desc' ? '↓' : '↑'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Count strip */}
+        <div className="flex items-center gap-3">
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold shrink-0" style={{ background: '#1B5E20' }}>
+            {filteredPaiements.length}
+          </span>
+          <div>
+            <p className="text-sm font-bold text-[#18181B]">Transactions</p>
+            <p className="text-xs text-zinc-400">
+              {filteredPaiements.filter(p => ['paid', 'reussi'].includes(p.status)).length} validés ·{' '}
+              {filteredPaiements.filter(p => p.status === 'pending').length} en attente
+            </p>
+          </div>
+        </div>
+
+        {/* ── Table ────────────────────────────────────────────────────────────────── */}
+        {loading ? (
+          <div className="bg-white overflow-hidden" style={CARD_STYLE}>
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="flex items-center gap-4 px-5 py-4 border-b border-[#E7E7EA] last:border-0">
+                <div className="w-9 h-9 rounded-full bg-zinc-100 animate-pulse shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 bg-zinc-100 rounded w-48 animate-pulse" />
+                  <div className="h-2.5 bg-zinc-100 rounded w-32 animate-pulse" />
+                </div>
+                <div className="h-3 bg-zinc-100 rounded w-24 animate-pulse" />
+              </div>
+            ))}
+          </div>
+        ) : filteredPaiements.length === 0 ? (
+          <div className="bg-white flex flex-col items-center justify-center py-20 text-center" style={CARD_STYLE}>
+            <span className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+              style={{ background: '#E8F5E9', color: '#1B5E20' }}>
+              <Banknote size={24} />
+            </span>
+            <h3 className="font-bold text-[#18181B]">Aucune transaction</h3>
+            <p className="text-sm text-zinc-400 mt-1 max-w-xs">Aucun paiement ne correspond aux filtres sélectionnés.</p>
+          </div>
+        ) : (
+          <div className="bg-white overflow-hidden" style={CARD_STYLE}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[720px]">
+                <thead>
+                  <tr className="text-left text-xs font-bold uppercase tracking-wide text-zinc-400 border-b border-[#E7E7EA]">
+                    <th className="py-3 px-5">Référence</th>
+                    <th className="py-3 px-3">Client</th>
+                    <th className="py-3 px-3">Méthode</th>
+                    <th className="py-3 px-3 text-right">Montant</th>
+                    <th className="py-3 px-3">Statut</th>
+                    <th className="py-3 px-3">Date</th>
+                    <th className="py-3 px-5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPaiements.map(p => (
+                    <tr key={p.id}
+                      className="border-b border-[#E7E7EA] last:border-0 hover:bg-zinc-50/70 transition-colors cursor-pointer"
+                      onClick={() => { setSelectedPaiement(p); setDetailsOpen(true); }}>
+                      <td className="py-3 px-5">
+                        <span className="font-mono text-xs text-zinc-500">
+                          {p.reference || `#${p.id}`}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <p className="font-semibold text-[#18181B] whitespace-nowrap">{p.user_name || 'Anonyme'}</p>
+                        {p.user_email && (
+                          <p className="text-xs text-zinc-400 truncate max-w-[160px]">{p.user_email}</p>
+                        )}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="flex items-center gap-1.5 text-sm text-[#18181B]">
+                          <span>{getMethodIcon(p.payment_method || '')}</span>
+                          <span className="text-xs text-zinc-500">{getMethodLabel(p.payment_method || '')}</span>
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <span className="font-bold tabular-nums text-[#18181B] whitespace-nowrap">
+                          {formatCurrency(p.montant)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3"><StatusPill status={p.status} /></td>
+                      <td className="py-3 px-3 text-xs text-zinc-500 whitespace-nowrap">
+                        {formatDate(p.date_paiement)}
+                      </td>
+                      <td className="py-3 px-5" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-1 justify-end">
+                          <button onClick={() => { setSelectedPaiement(p); setDetailsOpen(true); }}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                            title="Détails">
+                            <Eye size={14} />
+                          </button>
+                          <button onClick={() => openInvoice(p)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                            title="Facture">
+                            <Receipt size={14} />
+                          </button>
+                          {p.status !== 'reussi' && p.status !== 'refunded' && p.status !== 'failed' && (
+                            <button onClick={() => { setSelectedPaiement(p); setNewStatus('reussi'); setUpdateDialogOpen(true); }}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-[#EAF5EB] hover:text-[#2E7D32] transition-colors"
+                              title="Valider">
+                              <CheckCircle2 size={14} />
+                            </button>
+                          )}
+                          <button onClick={() => { setSelectedPaiement(p); setNewStatus(p.status); setUpdateDialogOpen(true); }}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors"
+                            title="Modifier statut">
+                            <RefreshCw size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* User payment history */}
+        {selectedUser && (
+          <div>
+            <h2 className="text-base font-bold text-[#18181B] mb-3">Historique paiement utilisateur</h2>
+            <UserPaiementHistorique userId={selectedUser} onClose={() => setSelectedUser(null)} />
+          </div>
+        )}
+
+      </div>
+
+      {/* ── Details drawer (slide-in right) ──────────────────────────────────────── */}
+      {detailsOpen && selectedPaiement && (
+        <div className="fixed inset-0 z-[80] flex justify-end" onClick={() => setDetailsOpen(false)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative w-full max-w-md h-full bg-white shadow-2xl flex flex-col"
+            onClick={e => e.stopPropagation()}
+            style={{ animation: 'slideInRight 0.25s cubic-bezier(0.22,1,0.36,1)' }}>
+
+            {/* Header */}
+            <div className="relative overflow-hidden shrink-0" style={{ background: ADMIN_GRAD }}>
+              <div className="absolute inset-0 opacity-[0.12] pointer-events-none"
+                style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)', backgroundSize: '22px 22px' }} />
+              <button onClick={() => setDetailsOpen(false)}
+                className="absolute top-4 right-4 w-9 h-9 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors">
+                <X size={18} />
+              </button>
+              <div className="relative px-6 pt-7 pb-6 flex items-center gap-4">
+                <span className="w-16 h-16 rounded-2xl bg-white/15 flex items-center justify-center text-white shrink-0">
+                  <CreditCard size={28} strokeWidth={1.6} />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-xl font-bold text-white truncate">{selectedPaiement.user_name || 'Anonyme'}</h2>
+                  <p className="text-white/70 text-sm font-mono truncate">{selectedPaiement.reference || `#${selectedPaiement.id}`}</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <StatusPill status={selectedPaiement.status} />
+                    <span className="text-xs font-semibold text-white/80">{formatCurrency(selectedPaiement.montant)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  ['Montant', formatCurrency(selectedPaiement.montant)],
+                  ['Méthode', getMethodLabel(selectedPaiement.payment_method || '')],
+                  ['Date', formatDate(selectedPaiement.date_paiement)],
+                  ['Commande', `#${selectedPaiement.numero_commande || '—'}`],
+                ].map(([l, v]) => (
+                  <div key={l} className="rounded-xl border border-[#E7E7EA] p-3">
+                    <p className="text-[10px] font-bold uppercase text-zinc-400 mb-0.5">{l}</p>
+                    <p className="text-sm font-semibold text-[#18181B] truncate">{v}</p>
+                  </div>
                 ))}
               </div>
-            ) : filteredPaiements.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center py-24 bg-white rounded-[3rem] border-2 border-dashed border-gray-100">
-                <div className="h-24 w-24 rounded-full bg-gray-50 flex items-center justify-center mb-6">
-                  <Banknote className="h-10 w-10 text-gray-200" />
+
+              {/* Client info */}
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mb-3">Client</p>
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-3 text-sm">
+                    <User size={15} className="text-zinc-400 shrink-0" />
+                    <span className="text-[#18181B]">{selectedPaiement.user_name || '—'}</span>
+                  </div>
+                  {selectedPaiement.user_email && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <Receipt size={15} className="text-zinc-400 shrink-0" />
+                      <a href={`mailto:${selectedPaiement.user_email}`}
+                        className="text-[#1565C0] hover:underline break-all"
+                        onClick={e => e.stopPropagation()}>
+                        {selectedPaiement.user_email}
+                      </a>
+                    </div>
+                  )}
+                  {selectedPaiement.utilisateur_id && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <span className="font-mono text-xs text-zinc-400 pl-6">ID #{selectedPaiement.utilisateur_id}</span>
+                    </div>
+                  )}
                 </div>
-                <h3 className="text-xl font-black text-gray-900 mb-2">Aucun Paiement</h3>
-                <p className="text-gray-400 font-bold text-sm tracking-tight">Désolé, nous n'avons trouvé aucune transaction correspondante.</p>
-              </motion.div>
-            ) : (
-              <div className="grid gap-6">
-                {filteredPaiements.map((paiement, idx) => {
-                  const config = STATUS_CONFIG[paiement.status] || STATUS_CONFIG.pending;
-
-                  return (
-                    <motion.div
-                      key={paiement.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                    >
-                      <Card className="group border-0 shadow-3xl shadow-gray-100/50 bg-white rounded-[2.5rem] overflow-hidden hover:shadow-2xl hover:shadow-blue-100/30 transition-all duration-500">
-                        <CardContent className="p-0">
-                          <div className="flex flex-col lg:flex-row">
-                            {/* Left Status Bar */}
-                            <div className={`w-2 lg:w-3 ${config.bgColor.split(' ')[0]} transition-colors group-hover:w-4 duration-500`} />
-
-                            <div className="flex-1 p-8 lg:p-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-                              <div className="flex items-center gap-8 flex-1">
-                                <div className="relative">
-                                  <div className={`h-20 w-20 rounded-3xl ${config.bgColor} flex items-center justify-center shadow-lg transition-transform group-hover:rotate-12 duration-500`}>
-                                    {config.icon}
-                                  </div>
-                                  <div className="absolute -bottom-2 -right-2 h-10 w-10 bg-white rounded-2xl shadow-xl flex items-center justify-center border border-gray-50">
-                                    <span className="text-xl">{getPaymentMethodIcon(paiement.payment_method || '')}</span>
-                                  </div>
-                                </div>
-
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex flex-wrap items-center gap-3 mb-3">
-                                    <Badge variant="outline" className={`border-0 rounded-full px-4 py-1 font-black text-[9px] uppercase tracking-widest ${config.bgColor}`}>
-                                      {config.label}
-                                    </Badge>
-                                    <span className="text-[10px] font-mono font-black text-gray-400 uppercase tracking-widest">REF: {paiement.reference || 'SYSTEM_INTERNAL'}</span>
-                                  </div>
-
-                                  <h3 className="text-2xl font-black text-gray-900 mb-1">{formatCurrency(paiement.montant)}</h3>
-                                  <div className="flex flex-wrap items-center gap-4 text-sm font-bold text-gray-500">
-                                    <div className="flex items-center gap-2">
-                                      <User className="h-4 w-4 text-blue-500" />
-                                      {paiement.user_name || 'Anonyme'}
-                                    </div>
-                                    {paiement.user_email && (
-                                      <>
-                                        <div className="h-1 w-1 rounded-full bg-gray-200" />
-                                        <a
-                                          href={`mailto:${paiement.user_email}`}
-                                          className="text-blue-500 hover:text-blue-700 hover:underline text-xs font-bold transition-colors"
-                                          onClick={e => e.stopPropagation()}
-                                        >
-                                          {paiement.user_email}
-                                        </a>
-                                      </>
-                                    )}
-                                    <div className="h-1 w-1 rounded-full bg-gray-200" />
-                                    <div className="flex items-center gap-2">
-                                      <Calendar className="h-4 w-4 text-orange-400" />
-                                      {formatDate(paiement.date_paiement)}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-4">
-                                <div className="hidden xl:block text-right">
-                                  <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Moyen de Paiement</p>
-                                  <p className="text-sm font-black text-gray-700">{getPaymentMethodLabel(paiement.payment_method || '')}</p>
-                                </div>
-
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" className="h-14 w-14 rounded-2xl border-gray-100 hover:bg-gray-50 shadow-sm active:scale-95 transition-all text-gray-400 hover:text-blue-600">
-                                      <MoreVertical className="h-6 w-6" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="rounded-[1.5rem] border-gray-100 shadow-2xl p-3 min-w-[240px]">
-                                    <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Operations Disponibles</DropdownMenuLabel>
-                                    <DropdownMenuItem onClick={() => {
-                                      setSelectedPaiement(paiement);
-                                      setDetailsOpen(true);
-                                    }} className="rounded-xl py-3 cursor-pointer focus:bg-blue-50 focus:text-blue-600 font-bold">
-                                      <Eye className="mr-3 h-4 w-4 opacity-40" /> Voir Intelligence
-                                    </DropdownMenuItem>
-
-                                    <DropdownMenuItem onClick={() => openInvoice(paiement)} className="rounded-xl py-3 cursor-pointer focus:bg-blue-50 focus:text-blue-600 font-bold">
-                                      <Receipt className="mr-3 h-4 w-4 opacity-40" /> Consulter Facture
-                                    </DropdownMenuItem>
-
-                                    <DropdownMenuSeparator className="bg-gray-50" />
-
-                                    {paiement.status !== 'reussi' && paiement.status !== 'refunded' && paiement.status !== 'failed' && (
-                                      <>
-                                        <DropdownMenuItem onClick={() => {
-                                          setSelectedPaiement(paiement);
-                                          setNewStatus('reussi');
-                                          setUpdateDialogOpen(true);
-                                        }} className="rounded-xl py-3 cursor-pointer focus:bg-emerald-50 focus:text-emerald-600 text-emerald-600 font-black">
-                                          <CheckCircle2 className="mr-3 h-4 w-4" /> Valider Paiement
-                                        </DropdownMenuItem>
-                                      </>
-                                    )}
-
-                                    <DropdownMenuItem onClick={() => {
-                                      setSelectedPaiement(paiement);
-                                      setNewStatus('failed');
-                                      setUpdateDialogOpen(true);
-                                    }} className="rounded-xl py-3 cursor-pointer focus:bg-red-50 focus:text-red-600 text-red-500 font-bold">
-                                      <XCircle className="mr-3 h-4 w-4 opacity-40" /> Marquer Rejeté
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  );
-                })}
               </div>
-            )}
-          </TabsContent>
 
-          <TabsContent value="overview">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Répartition par statut</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {Object.entries(STATUS_CONFIG).map(([status, config]) => {
-                      const count = paiements.filter(p => p.status === status).length;
-                      const percentage = paiements.length > 0 ? (count / paiements.length * 100).toFixed(1) : 0;
-
-                      return (
-                        <div key={status} className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${config.bgColor}`}>
-                              {config.icon}
-                            </div>
-                            <div>
-                              <div className="font-medium">{config.label}</div>
-                              <div className="text-sm text-gray-500">{config.description}</div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold">{count}</div>
-                            <div className="text-sm text-gray-500">{percentage}%</div>
-                          </div>
-                        </div>
-                      );
-                    })}
+              {/* Notes */}
+              {selectedPaiement.notes && (
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mb-2">Notes</p>
+                  <div className="rounded-xl border border-[#E7E7EA] p-3 text-sm text-zinc-600 leading-relaxed"
+                    style={{ background: '#E8F1FD' }}>
+                    {selectedPaiement.notes}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              )}
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Méthodes de paiement</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {PAYMENT_METHODS.map((method) => {
-                      const count = paiements.filter(p => p.payment_method === method.value).length;
-
-                      return (
-                        <div key={method.value} className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center">
-                              {method.icon}
-                            </div>
-                            <div className="font-medium">{method.label}</div>
-                          </div>
-                          <div className="font-bold">{count}</div>
-                        </div>
-                      );
-                    })}
+              {/* Motif remboursement */}
+              {selectedPaiement.motif_remboursement && (
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mb-2">Motif remboursement</p>
+                  <div className="rounded-xl border border-[#E7E7EA] p-3 text-sm text-[#7C3AED] leading-relaxed"
+                    style={{ background: '#F3EEFF' }}>
+                    {selectedPaiement.motif_remboursement}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              )}
+
+              {/* Payment proof */}
+              {selectedPaiement.image_paiement && (
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mb-2">Preuve de paiement</p>
+                  <div className="relative rounded-xl overflow-hidden border border-[#E7E7EA] group cursor-pointer"
+                    onClick={() => window.open(selectedPaiement.image_paiement!, '_blank')}>
+                    <img src={selectedPaiement.image_paiement} alt="Preuve"
+                      className="w-full object-contain max-h-48 group-hover:opacity-80 transition-opacity" />
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
+                        <ExternalLink size={16} className="text-white" />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          </TabsContent>
-        </Tabs>
-      </main>
 
-      {selectedUser && (
-        <div className="max-w-7xl mx-auto w-full p-4">
-          <h2 className="text-xl font-semibold mb-4">Historique paiement utilisateur</h2>
-          <UserPaiementHistorique userId={selectedUser} onClose={() => setSelectedUser(null)} />
+            {/* Footer */}
+            <div className="border-t border-[#E7E7EA] p-4 flex items-center gap-2 shrink-0">
+              <button onClick={() => openInvoice(selectedPaiement)}
+                className="flex-1 h-10 rounded-lg border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 flex items-center justify-center gap-1.5 transition-colors">
+                <Receipt size={14} /> Facture
+              </button>
+              <button onClick={() => { setUpdateDialogOpen(true); setNewStatus(selectedPaiement.status); }}
+                className="flex-1 h-10 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-1.5"
+                style={{ background: '#2E7D32' }}>
+                <RefreshCw size={14} /> Modifier statut
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-
-      {/* ── PAYMENT DETAILS INTELLIGENCE ── */}
-      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="max-w-4xl bg-white/80 backdrop-blur-2xl border-0 shadow-[0_32px_128px_-16px_rgba(0,0,0,0.1)] rounded-[3rem] p-0 overflow-hidden focus-visible:outline-none">
-          {selectedPaiement && (
-            <div className="flex flex-col h-full">
-              <div className="p-10 lg:p-12 space-y-10">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <Badge variant="outline" className="rounded-full border-blue-100 bg-blue-50 text-blue-600 font-black text-[10px] uppercase tracking-widest px-4 py-1 mb-4">
-                      Transaction Intelligence
-                    </Badge>
-                    <h2 className="text-4xl font-black text-gray-900 tracking-tight">Détails du <span className="text-blue-600">Paiement</span></h2>
-                    <p className="text-gray-400 font-bold text-sm mt-2 font-mono">REF: {selectedPaiement.reference || 'SYSTEM'}</p>
-                  </div>
-                  <div className={`h-20 w-20 rounded-[2rem] ${STATUS_CONFIG[selectedPaiement.status]?.bgColor || 'bg-gray-100'} flex items-center justify-center shadow-lg transform rotate-6`}>
-                    {STATUS_CONFIG[selectedPaiement.status]?.icon}
-                  </div>
+      {/* ── Update status modal ───────────────────────────────────────────────────── */}
+      {updateDialogOpen && selectedPaiement && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+          style={{ background: 'rgba(16,24,40,0.55)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setUpdateDialogOpen(false)}>
+          <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            {/* Modal header */}
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-[#E7E7EA]">
+              <div className="flex items-center gap-3">
+                <span className="w-9 h-9 rounded-xl flex items-center justify-center"
+                  style={{ background: '#FEF3E2', color: '#B45309' }}>
+                  <RefreshCw size={17} />
+                </span>
+                <div>
+                  <h2 className="font-semibold text-[#18181B] text-sm">Modifier le statut</h2>
+                  <p className="text-xs text-zinc-400 font-mono truncate max-w-[220px]">{selectedPaiement.reference || `#${selectedPaiement.id}`}</p>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  <div className="bg-gray-50/50 p-8 rounded-[2rem] border border-gray-100 group hover:bg-white hover:shadow-xl hover:shadow-gray-100/50 transition-all">
-                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-4 opacity-50">Montant Total</p>
-                    <h4 className="text-3xl font-black text-gray-900 tracking-tighter group-hover:text-blue-600 transition-colors">{formatCurrency(selectedPaiement.montant)}</h4>
-                    <p className="text-[10px] font-bold text-emerald-600 uppercase mt-2">Incluant les taxes et frais</p>
-                  </div>
-
-                  <div className="bg-gray-50/50 p-8 rounded-[2rem] border border-gray-100">
-                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-4 opacity-50">Mode de Règlement</p>
-                    <div className="flex items-center gap-3">
-                      <span className="text-3xl">{getPaymentMethodIcon(selectedPaiement.payment_method || '')}</span>
-                      <h4 className="text-xl font-black text-gray-900">{getPaymentMethodLabel(selectedPaiement.payment_method || '')}</h4>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50/50 p-8 rounded-[2rem] border border-gray-100">
-                    <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-4 opacity-50">Statut Actuel</p>
-                    <Badge className={`rounded-xl px-4 py-2 font-black text-[10px] uppercase tracking-widest border-0 shadow-sm ${STATUS_CONFIG[selectedPaiement.status]?.bgColor}`}>
-                      {STATUS_CONFIG[selectedPaiement.status]?.label}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3 mb-2">
-                      <User className="h-5 w-5 text-blue-500" />
-                      <h5 className="text-xs font-black uppercase tracking-widest text-gray-900">Identité Client</h5>
-                    </div>
-                    <div className="space-y-4 bg-gray-50/30 p-6 rounded-[1.5rem]">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-400 underline decoration-gray-200 underline-offset-4">Nom Complet</span>
-                        <span className="text-sm font-black text-gray-900">{selectedPaiement.user_name || '—'}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-400 underline decoration-gray-200 underline-offset-4">Email Direct</span>
-                        {selectedPaiement.user_email ? (
-                          <a
-                            href={`mailto:${selectedPaiement.user_email}`}
-                            className="text-sm font-black text-blue-600 hover:text-blue-800 hover:underline transition-colors"
-                          >
-                            {selectedPaiement.user_email}
-                          </a>
-                        ) : (
-                          <span className="text-sm font-black text-gray-900">—</span>
-                        )}
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-400 underline decoration-gray-200 underline-offset-4">Identifiant</span>
-                        <span className="text-sm font-mono font-bold text-blue-600">#{selectedPaiement.utilisateur_id}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3 mb-2">
-                      <Box className="h-5 w-5 text-orange-400" />
-                      <h5 className="text-xs font-black uppercase tracking-widest text-gray-900">Données Commande</h5>
-                    </div>
-                    <div className="space-y-4 bg-gray-50/30 p-6 rounded-[1.5rem]">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-400 underline decoration-gray-200 underline-offset-4">Numéro Order</span>
-                        <span className="text-sm font-black text-gray-900">#{selectedPaiement.numero_commande || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-400 underline decoration-gray-200 underline-offset-4">Horodatage</span>
-                        <span className="text-sm font-black text-gray-900">{formatDate(selectedPaiement.date_paiement)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {selectedPaiement.notes && (
-                  <div>
-                    <Label className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 block">Notes Administratives</Label>
-                    <div className="p-6 bg-blue-50/50 rounded-[1.5rem] border border-blue-100 border-dashed text-sm font-bold text-blue-900">
-                      {selectedPaiement.notes}
-                    </div>
-                  </div>
-                )}
-
-                {selectedPaiement.image_paiement && (
-                  <div>
-                    <Label className="text-xs font-black uppercase tracking-widest text-gray-400 mb-3 block">Preuve de Règlement</Label>
-                    <div className="relative aspect-[16/9] bg-gray-100 rounded-[2rem] overflow-hidden group">
-                      <img
-                        src={selectedPaiement.image_paiement}
-                        alt="Justificatif"
-                        className="absolute inset-0 w-full h-full object-contain cursor-zoom-in transition-transform duration-700 group-hover:scale-105"
-                        onClick={() => window.open(selectedPaiement.image_paiement!, '_blank')}
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                        <ExternalLink className="h-12 w-12 text-white" />
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
-
-              <div className="p-8 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-4">
-                <Button
-                  variant="ghost"
-                  onClick={() => setDetailsOpen(false)}
-                  className="h-14 px-8 rounded-2xl font-black text-gray-400 hover:text-gray-900 transition-all uppercase tracking-widest text-xs">
-                  Fermer la vue
-                </Button>
-                <Button
-                  onClick={() => openInvoice(selectedPaiement)}
-                  className="h-14 px-10 rounded-2xl font-black bg-blue-600 text-white shadow-xl shadow-blue-200 hover:bg-gray-900 transition-all">
-                  <Receipt className="mr-3 h-5 w-5" />
-                  Générer Facture
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* ── STATUS UPDATE INTERFACE ── */}
-      <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
-        <DialogContent className="max-w-xl bg-white/95 backdrop-blur-xl border-0 shadow-3xl shadow-gray-200/50 rounded-[2.5rem] p-0 overflow-hidden focus-visible:outline-none">
-          <div className="p-10">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="h-14 w-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center shadow-sm">
-                <RefreshCw className="h-6 w-6 animate-spin" style={{ animationDuration: '3s' }} />
-              </div>
-              <div>
-                <h2 className="text-2xl font-black text-gray-900 leading-tight">Modifier <span className="text-orange-600">Statut</span></h2>
-                <p className="text-xs font-bold text-gray-400 font-mono mt-1">REF: {selectedPaiement?.reference}</p>
-              </div>
+              <button onClick={() => setUpdateDialogOpen(false)}
+                className="w-9 h-9 rounded-lg flex items-center justify-center text-zinc-400 hover:bg-zinc-100">
+                <X size={18} />
+              </button>
             </div>
 
-            <div className="space-y-8">
-              <div className="space-y-4">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Nouveau Statut Transactionnel</Label>
-                <Select value={newStatus} onValueChange={setNewStatus}>
-                  <SelectTrigger className="h-16 rounded-2xl border-gray-100 bg-gray-50/30 font-black text-sm uppercase tracking-widest">
-                    <SelectValue placeholder="Sélectionner un statut" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl border-gray-100 shadow-2xl font-black text-xs h-full">
-                    <SelectItem value="pending">En Attente</SelectItem>
-                    <SelectItem value="reussi">Réussi / Validé</SelectItem>
-                    <SelectItem value="confirmed">Confirmé</SelectItem>
-                    <SelectItem value="paid">Payé</SelectItem>
-                    <SelectItem value="failed">Échoué / Rejeté</SelectItem>
-                    <SelectItem value="refunded">Remboursé</SelectItem>
-                    <SelectItem value="cancelled">Annulé</SelectItem>
-                  </SelectContent>
-                </Select>
+            {/* Modal body */}
+            <div className="px-6 py-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[#18181B] uppercase tracking-wide">Nouveau statut</label>
+                <select value={newStatus} onChange={e => setNewStatus(e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-[#E7E7EA] bg-zinc-50 outline-none text-sm text-[#18181B]">
+                  <option value="pending">En attente</option>
+                  <option value="reussi">Réussi / Validé</option>
+                  <option value="confirmed">Confirmé</option>
+                  <option value="paid">Payé</option>
+                  <option value="failed">Échoué / Rejeté</option>
+                  <option value="refunded">Remboursé</option>
+                  <option value="cancelled">Annulé</option>
+                </select>
               </div>
 
-              <div className="space-y-4">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400">Raison ou Commentaire Interne</Label>
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Précisez la raison du changement de statut..."
-                  className="min-h-[140px] rounded-2xl border-gray-100 bg-gray-50/30 p-6 font-bold focus:ring-4 focus:ring-blue-50 transition-all"
-                />
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[#18181B] uppercase tracking-wide">
+                  Commentaire interne{newStatus === 'refunded' && <span className="text-red-500 ml-0.5">*</span>}
+                </label>
+                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
+                  placeholder="Raison du changement de statut…"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#E7E7EA] outline-none text-sm text-[#18181B] resize-none focus:border-[#18181B]/30" />
               </div>
 
-              <div className="p-6 bg-blue-50/50 rounded-2xl border border-blue-100 flex items-start gap-4">
-                <AlertCircle className="h-6 w-6 text-blue-600 mt-0.5" />
-                <p className="text-[11px] font-bold text-blue-800 leading-relaxed">
-                  Action Critique : La validation synchronisera les données et pourra déclencher l'envoi d'un mail de confirmation au client.
+              <div className="flex items-start gap-2.5 rounded-xl border p-3"
+                style={{ background: '#EFF6FF', borderColor: '#BFDBFE' }}>
+                <AlertCircle size={14} className="text-blue-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-800 leading-relaxed">
+                  La validation peut déclencher l'envoi d'un email de confirmation au client.
                 </p>
               </div>
             </div>
-          </div>
 
-          <div className="p-8 bg-gray-50 border-t border-gray-100 flex flex-col md:flex-row gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => setUpdateDialogOpen(false)}
-              className="flex-1 h-16 rounded-2xl font-black text-gray-400 hover:text-gray-900 uppercase tracking-widest text-xs">
-              Annuler
-            </Button>
-            <Button
-              onClick={() => {
-                if (newStatus === 'refunded' && (!notes || notes.trim().length === 0)) {
-                  toast({ title: 'Motif requis', description: 'Veuillez indiquer un motif de remboursement.', variant: 'destructive' });
-                  return;
-                }
-                if (selectedPaiement) {
+            {/* Modal footer */}
+            <div className="px-6 py-4 border-t border-[#E7E7EA] flex items-center gap-2 justify-end">
+              <button onClick={() => setUpdateDialogOpen(false)}
+                className="h-10 px-4 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors">
+                Annuler
+              </button>
+              <button
+                onClick={() => {
+                  if (newStatus === 'refunded' && (!notes || notes.trim().length === 0)) {
+                    toast({ title: 'Motif requis', description: 'Indiquez un motif de remboursement.', variant: 'destructive' });
+                    return;
+                  }
                   updatePaiementStatus(selectedPaiement.id, newStatus, notes);
-                }
-              }}
-              className="flex-2 h-16 px-10 rounded-2xl font-black bg-gray-900 text-white shadow-xl hover:bg-blue-600 transition-all">
-              Enregistrer les Modifications
-            </Button>
+                }}
+                className="h-10 px-5 rounded-[10px] text-sm font-semibold text-white"
+                style={{ background: '#2E7D32' }}>
+                Enregistrer
+              </button>
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
+
+      <style>{`@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
     </div>
   );
 }

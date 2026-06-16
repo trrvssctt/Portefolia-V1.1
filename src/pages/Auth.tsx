@@ -18,7 +18,21 @@ import {
 const DRAFT_KEY = 'portefolia_signup_draft';
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 
-type PaymentMethod = 'wave' | 'stripe';
+type PaymentMethod = 'wave';
+
+const AUTH_DURATIONS = [
+  { months: 1,  label: '1 mois',  discount: 0 },
+  { months: 3,  label: '3 mois',  discount: 15, badge: '-15%' },
+  { months: 12, label: '1 an',    discount: 20, badge: '-20%' },
+] as const;
+type AuthDurIdx = 0 | 1 | 2;
+
+function addMonths(d: Date, m: number): Date {
+  const r = new Date(d); r.setMonth(r.getMonth() + m); return r;
+}
+function fmtDate(d: Date): string {
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
 
 // Client-side email format check (mirrors backend regex)
 const EMAIL_REGEX = /^[a-zA-Z0-9]([a-zA-Z0-9._%+\-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
@@ -35,7 +49,12 @@ const Auth = () => {
   // Signup multi-step state
   const [signupStep, setSignupStep] = useState<1 | 2>(1);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('wave');
-  const [billingPeriod, setBillingPeriod] = useState<'mensuel' | 'annuel'>('mensuel');
+  const [durationIdx, setDurationIdx] = useState<AuthDurIdx>(() => {
+    const d = Number(new URLSearchParams(window.location.search).get('duration'));
+    if (d === 3) return 1;
+    if (d === 12) return 2;
+    return 0;
+  });
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
 
   const [formData, setFormData] = useState({
@@ -50,12 +69,15 @@ const Auth = () => {
   // Draft session restoration
   const [draftBanner, setDraftBanner] = useState<{ firstName: string; email: string; planSlug: string | null } | null>(null);
 
-  // Bannière plan expiré / suspendu
+  // Bannière plan expiré / suspendu / email non vérifié
   const [expiredBanner, setExpiredBanner] = useState<{
-    code: 'SUBSCRIPTION_EXPIRED' | 'BUSINESS_SUSPENDED' | 'PAYMENT_PENDING' | 'PAYMENT_REQUIRED' | 'ACCOUNT_INACTIVE';
+    code: 'SUBSCRIPTION_EXPIRED' | 'BUSINESS_SUSPENDED' | 'PAYMENT_PENDING' | 'PAYMENT_REQUIRED' | 'ACCOUNT_INACTIVE' | 'EMAIL_NOT_VERIFIED';
     message: string;
     checkout_token: string | null;
+    email?: string;
   } | null>(null);
+  // Bannière "vérifiez votre email" après inscription
+  const [verificationSent, setVerificationSent] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -132,14 +154,14 @@ const Auth = () => {
   useEffect(() => {
     if (!formData.firstName && !formData.lastName && !formData.email) return;
     saveDraft();
-  }, [formData.firstName, formData.lastName, formData.email, paymentMethod, billingPeriod]);
+  }, [formData.firstName, formData.lastName, formData.email, paymentMethod, durationIdx]);
 
   // ── Sauvegarde aussi quand l'utilisateur quitte la page ──────────────────────
   useEffect(() => {
     const handleUnload = () => saveDraft();
     window.addEventListener('beforeunload', handleUnload);
     return () => window.removeEventListener('beforeunload', handleUnload);
-  }, [formData, paymentMethod, billingPeriod]);
+  }, [formData, paymentMethod, durationIdx]);
 
   const saveDraft = () => {
     if (!formData.firstName && !formData.lastName && !formData.email) return;
@@ -149,7 +171,7 @@ const Auth = () => {
         lastName: formData.lastName,
         email: formData.email,
         paymentMethod,
-        billingPeriod,
+        durationIdx,
         planSlug: searchParams.get('plan'),
         savedAt: Date.now(),
       }));
@@ -170,7 +192,7 @@ const Auth = () => {
         email: draft.email || '',
       }));
       if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod);
-      if (draft.billingPeriod) setBillingPeriod(draft.billingPeriod);
+      if (draft.durationIdx !== undefined) setDurationIdx(draft.durationIdx as AuthDurIdx);
       if (draft.planSlug && draft.planSlug !== searchParams.get('plan')) {
         navigate(`/auth?plan=${draft.planSlug}`, { replace: true });
       }
@@ -183,13 +205,15 @@ const Auth = () => {
   // ── Derived values ──────────────────────────────────────────────────────────
   const selectedPlanSlug = searchParams.get('plan');
   const hasPlanSelected = !!selectedPlanSlug;
-  const unitMonthly = planData ? (planData.price_monthly_cents ?? planData.price_cents ?? planData.price ?? 0) : 0;
-  const unitAnnual = planData ? (planData.price_annual_cents ?? unitMonthly * 12) : 0;
-  const hasAnnualOption = unitAnnual > 0 && unitAnnual < unitMonthly * 12;
-  const currentAmount = billingPeriod === 'annuel' && unitAnnual ? Math.round(unitAnnual / 12) : unitMonthly;
-  const isFree = currentAmount === 0;
-  const currency = planData?.currency === 'FCFA' ? 'F CFA' : (planData?.currency || 'F CFA');
+  const unitMonthly = planData ? Number(planData.price_monthly_cents ?? planData.price_cents ?? planData.price ?? 0) : 0;
+  const isFree = unitMonthly === 0;
+  const currency = (planData?.currency === 'FCFA' || planData?.currency === 'XOF') ? 'F CFA' : (planData?.currency || 'F CFA');
   const formatAmount = (val: number) => `${Number(val).toLocaleString('fr-FR')} ${currency}`;
+  const { months: durMonths, discount: durDiscount } = AUTH_DURATIONS[durationIdx];
+  const totalAmount = isFree ? 0 : Math.round(unitMonthly * durMonths * (1 - durDiscount / 100));
+  const perMonthAmount = durMonths > 1 ? Math.round(totalAmount / durMonths) : totalAmount;
+  const savings = Math.round(unitMonthly * durMonths - totalAmount);
+  const newEndDate = addMonths(new Date(), durMonths);
 
   // ── Step 1 → Step 2 navigation ──────────────────────────────────────────────
   const goToStep2 = () => {
@@ -279,6 +303,17 @@ const Auth = () => {
           return;
         }
 
+        // Email non vérifié → afficher bannière avec info
+        if (code === 'EMAIL_NOT_VERIFIED') {
+          setExpiredBanner({
+            code: 'EMAIL_NOT_VERIFIED',
+            message: result.error.message,
+            checkout_token: null,
+            email: result.error.email || formData.email,
+          });
+          return;
+        }
+
         toast({ title: "Erreur de connexion", description: result.error.message, variant: "destructive" });
         return;
       }
@@ -319,7 +354,7 @@ const Auth = () => {
       if (!signUpOptions.plan_id && !signUpOptions.plan_slug && selectedPlanSlug) {
         signUpOptions.plan_slug = selectedPlanSlug;
       }
-      if (billingPeriod === 'annuel') signUpOptions.billing_period = 'annual';
+      signUpOptions.duration_months = durMonths;
 
       const result = await signUp(formData.email, formData.password, formData.firstName, formData.lastName, signUpOptions) as any;
       const { error, token, data } = result || {};
@@ -338,24 +373,11 @@ const Auth = () => {
         return;
       }
 
-      // Free plan → auto-subscribe and go to dashboard
-      if (token) {
+      // Vérification email requise (plan gratuit ou payant)
+      if (data?.requiresVerification) {
         clearDraft();
-        try {
-          if (planData && (planData.id || planData.slug)) {
-            const body: any = {};
-            if (planData.id) body.plan_id = planData.id;
-            if (planData.slug) body.plan_slug = planData.slug;
-            await fetch(`${API_BASE}/api/plans/subscribe`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify(body),
-            });
-          }
-        } catch (e) {
-          console.warn('Could not auto-subscribe user after signup', e);
-        }
-        toast({ title: 'Bienvenue !', description: 'Compte créé avec succès.' });
+        setVerificationSent(formData.email);
+        setActiveTab('signin');
         return;
       }
 
@@ -504,6 +526,7 @@ const Auth = () => {
                   PAYMENT_PENDING:      { bg: 'bg-blue-50 border-blue-200',    iconBg: 'bg-blue-100',   icon: <Mail className="w-4 h-4 text-blue-600" />,         title: 'Paiement en cours de validation',titleColor: 'text-blue-800',   msgColor: 'text-blue-700' },
                   PAYMENT_REQUIRED:     { bg: 'bg-orange-50 border-orange-200',iconBg: 'bg-orange-100', icon: <CreditCard className="w-4 h-4 text-orange-600" />, title: 'Paiement requis',                titleColor: 'text-orange-800', msgColor: 'text-orange-700' },
                   ACCOUNT_INACTIVE:     { bg: 'bg-slate-50 border-slate-200',  iconBg: 'bg-slate-100',  icon: <Shield className="w-4 h-4 text-slate-500" />,     title: 'Compte inactif',                 titleColor: 'text-slate-800',  msgColor: 'text-slate-600' },
+                  EMAIL_NOT_VERIFIED:   { bg: 'bg-amber-50 border-amber-200',  iconBg: 'bg-amber-100',  icon: <Mail className="w-4 h-4 text-amber-600" />,        title: 'Email non vérifié',              titleColor: 'text-amber-800',  msgColor: 'text-amber-700' },
                 }[expiredBanner.code];
                 return (
                   <div className={`mb-4 rounded-xl border p-4 ${cfg.bg}`}>
@@ -518,6 +541,31 @@ const Auth = () => {
                           <p className="text-xs mt-2 text-blue-600 font-medium">
                             Un email vous sera envoyé par <strong>comptabilite@portefolia.tech</strong> dès que votre paiement sera confirmé.
                           </p>
+                        )}
+                        {expiredBanner.code === 'EMAIL_NOT_VERIFIED' && (
+                          <div className="mt-3">
+                            <p className="text-xs text-amber-600 mb-2">
+                              Vérifiez votre boîte mail (y compris les spams) et cliquez sur le lien reçu de <strong>support@portefolia.tech</strong>.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await fetch(`${API_BASE}/api/auth/resend-verification`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ email: expiredBanner.email || formData.email }),
+                                  });
+                                  toast({ title: 'Email renvoyé', description: 'Vérifiez votre boîte mail.' });
+                                } catch {
+                                  toast({ title: 'Erreur', description: 'Impossible de renvoyer l\'email.', variant: 'destructive' });
+                                }
+                              }}
+                              className="text-xs font-bold text-amber-700 hover:text-amber-900 underline underline-offset-2"
+                            >
+                              Renvoyer l'email de vérification
+                            </button>
+                          </div>
                         )}
                         {expiredBanner.code === 'PAYMENT_REQUIRED' && expiredBanner.checkout_token && (
                           <button
@@ -549,6 +597,30 @@ const Auth = () => {
                   </div>
                 );
               })()}
+
+              {/* Bannière "vérifiez votre email" après inscription */}
+              {verificationSent && (
+                <div className="mb-4 rounded-xl border border-green-200 bg-green-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
+                      <Mail className="w-4 h-4 text-green-700" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-green-800">Vérifiez votre email !</p>
+                      <p className="text-xs mt-0.5 leading-relaxed text-green-700">
+                        Un lien de vérification a été envoyé à <strong>{verificationSent}</strong>.
+                        Cliquez sur ce lien pour accéder à votre compte.
+                      </p>
+                      <p className="text-xs mt-1.5 text-green-600">
+                        Expéditeur : <strong>support@portefolia.tech</strong> — vérifiez aussi vos spams.
+                      </p>
+                    </div>
+                    <button type="button" onClick={() => setVerificationSent(null)} className="text-green-400 hover:text-green-600 shrink-0">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Draft restoration banner — always visible above the tabs */}
               {draftBanner && (
@@ -646,22 +718,37 @@ const Auth = () => {
                     <div className="space-y-4">
                       {/* Plan badge */}
                       {planData && (
-                        <div className="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-xl">
-                          <div className="w-9 h-9 bg-[#28A745]/10 rounded-lg flex items-center justify-center shrink-0">
-                            <Check className="w-5 h-5 text-[#28A745]" />
+                        <div className="rounded-xl border border-green-100 bg-green-50 overflow-hidden">
+                          <div className="flex items-center gap-3 px-3 pt-3 pb-2">
+                            <div className="w-8 h-8 bg-[#28A745]/15 rounded-lg flex items-center justify-center shrink-0">
+                              <Check className="w-4 h-4 text-[#28A745]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11px] text-gray-400 uppercase tracking-wide font-medium">Formule sélectionnée</p>
+                              <p className="text-sm font-bold text-gray-900 truncate">{planData.name}</p>
+                            </div>
+                            {!isFree && savings > 0 && (
+                              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-200 text-green-800 shrink-0">
+                                −{durDiscount}%
+                              </span>
+                            )}
                           </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Formule sélectionnée</p>
-                            <p className="text-sm font-bold text-gray-900">
-                              {planData.name}
-                              {!isFree && (
-                                <span className="ml-2 font-normal text-gray-500">
-                                  — {formatAmount(currentAmount)}/mois
+                          {!isFree && (
+                            <div className="px-3 pb-3 flex items-baseline gap-1.5">
+                              <span className="text-xl font-extrabold text-gray-900">{formatAmount(totalAmount)}</span>
+                              <span className="text-xs text-gray-400">
+                                {durMonths === 1 ? '/ mois' : durMonths === 12 ? '/ an' : `pour ${durMonths} mois`}
+                              </span>
+                              {savings > 0 && (
+                                <span className="text-xs text-gray-400 line-through ml-1">
+                                  {formatAmount(unitMonthly * durMonths)}
                                 </span>
                               )}
-                              {isFree && <span className="ml-2 font-normal text-green-600">Gratuit</span>}
-                            </p>
-                          </div>
+                            </div>
+                          )}
+                          {isFree && (
+                            <p className="px-3 pb-3 text-sm font-semibold text-green-600">Gratuit pour toujours</p>
+                          )}
                         </div>
                       )}
 
@@ -780,7 +867,7 @@ const Auth = () => {
                             {planData?.name || selectedPlanSlug}
                           </h3>
                         </div>
-                        <div className="px-5 py-4 bg-white">
+                        <div className="px-5 py-4 bg-white space-y-4">
                           {isFree ? (
                             <div className="flex items-end gap-1">
                               <span className="text-4xl font-extrabold text-gray-900">0</span>
@@ -788,87 +875,78 @@ const Auth = () => {
                               <span className="text-gray-400 text-sm mb-1 ml-1">— Gratuit pour toujours</span>
                             </div>
                           ) : (
-                            <div>
-                              <div className="flex items-end gap-1 mb-1">
-                                <span className="text-4xl font-extrabold text-gray-900">
-                                  {Number(currentAmount).toLocaleString('fr-FR')}
-                                </span>
-                                <span className="text-gray-500 text-sm mb-1.5">{currency}</span>
-                                <span className="text-gray-400 text-sm mb-1.5">/mois</span>
+                            <>
+                              {/* Duration selector */}
+                              <div className="flex gap-2">
+                                {AUTH_DURATIONS.map((d, i) => (
+                                  <button
+                                    key={d.months}
+                                    type="button"
+                                    onClick={() => setDurationIdx(i as AuthDurIdx)}
+                                    className={`flex-1 py-2 px-1 rounded-xl text-xs font-semibold border-2 transition-all relative ${
+                                      durationIdx === i
+                                        ? 'border-[#28A745] bg-green-50 text-[#28A745]'
+                                        : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                                    }`}
+                                  >
+                                    {'badge' in d && d.badge && (
+                                      <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">
+                                        {d.badge}
+                                      </span>
+                                    )}
+                                    <span className="block mt-1">{d.label}</span>
+                                  </button>
+                                ))}
                               </div>
 
-                              {/* Billing toggle */}
-                              {hasAnnualOption && (
-                                <div className="flex gap-2 mt-3">
-                                  <button
-                                    type="button"
-                                    onClick={() => setBillingPeriod('mensuel')}
-                                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${billingPeriod === 'mensuel' ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}
-                                  >
-                                    Mensuel
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setBillingPeriod('annuel')}
-                                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors relative ${billingPeriod === 'annuel' ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}
-                                  >
-                                    Annuel
-                                    <span className="ml-1.5 text-xs bg-green-100 text-[#28A745] px-1.5 py-0.5 rounded-full font-bold">
-                                      −20%
+                              {/* Price breakdown */}
+                              <div>
+                                <div className="flex items-end gap-1.5">
+                                  <span className="text-3xl font-extrabold text-gray-900">
+                                    {totalAmount.toLocaleString('fr-FR')}
+                                  </span>
+                                  <span className="text-gray-500 text-sm mb-1">{currency}</span>
+                                  {durMonths > 1 && (
+                                    <span className="text-gray-400 text-xs mb-1.5">
+                                      · soit {perMonthAmount.toLocaleString('fr-FR')} {currency}/mois
                                     </span>
-                                  </button>
+                                  )}
+                                  {durMonths === 1 && (
+                                    <span className="text-gray-400 text-sm mb-1">/mois</span>
+                                  )}
                                 </div>
-                              )}
-                              {billingPeriod === 'annuel' && unitAnnual > 0 && (
-                                <p className="text-xs text-gray-500 mt-2">
-                                  Facturé {formatAmount(unitAnnual)} par an
+                                {savings > 0 && (
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-xs text-gray-400 line-through">
+                                      {(unitMonthly * durMonths).toLocaleString('fr-FR')} {currency}
+                                    </span>
+                                    <span className="text-xs font-bold text-green-600">
+                                      Économie : {savings.toLocaleString('fr-FR')} {currency}
+                                    </span>
+                                  </div>
+                                )}
+                                <p className="text-xs text-gray-400 mt-1.5">
+                                  Accès jusqu'au <strong className="text-gray-600">{fmtDate(newEndDate)}</strong>
                                 </p>
-                              )}
-                            </div>
+                              </div>
+                            </>
                           )}
                         </div>
                       </div>
 
-                      {/* Payment method selector (only for paid plans) */}
+                      {/* Payment method info (Wave uniquement) */}
                       {!isFree && (
-                        <div className="space-y-2">
-                          <Label className="text-sm font-semibold text-gray-700">Mode de paiement</Label>
-
-                          <button
-                            type="button"
-                            onClick={() => setPaymentMethod('wave')}
-                            className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all ${paymentMethod === 'wave' ? 'border-[#1BC29A] bg-[#1BC29A]/5' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
-                          >
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${paymentMethod === 'wave' ? 'bg-[#1BC29A]' : 'bg-gray-100'}`}>
-                              <Smartphone className={`w-5 h-5 ${paymentMethod === 'wave' ? 'text-white' : 'text-gray-500'}`} />
-                            </div>
-                            <div className="text-left flex-1">
-                              <p className="text-sm font-semibold text-gray-900">Wave / Mobile Money</p>
-                              <p className="text-xs text-gray-500">Wave, Orange Money, Free Money</p>
-                            </div>
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${paymentMethod === 'wave' ? 'border-[#1BC29A] bg-[#1BC29A]' : 'border-gray-300'}`}>
-                              {paymentMethod === 'wave' && <div className="w-2 h-2 rounded-full bg-white" />}
-                            </div>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setPaymentMethod('stripe')}
-                            className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all ${paymentMethod === 'stripe' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 bg-white'}`}
-                          >
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${paymentMethod === 'stripe' ? 'bg-blue-600' : 'bg-gray-100'}`}>
-                              <CreditCard className={`w-5 h-5 ${paymentMethod === 'stripe' ? 'text-white' : 'text-gray-500'}`} />
-                            </div>
-                            <div className="text-left flex-1">
-                              <p className="text-sm font-semibold text-gray-900">Carte bancaire</p>
-                              <p className="text-xs text-gray-500 flex items-center gap-1">
-                                <Shield className="w-3 h-3" /> Sécurisé par Stripe
-                              </p>
-                            </div>
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${paymentMethod === 'stripe' ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}`}>
-                              {paymentMethod === 'stripe' && <div className="w-2 h-2 rounded-full bg-white" />}
-                            </div>
-                          </button>
+                        <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-[#1BC29A] bg-[#1BC29A]/5">
+                          <div className="w-10 h-10 rounded-xl bg-[#1BC29A] flex items-center justify-center shrink-0">
+                            <Smartphone className="w-5 h-5 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-gray-900">Wave / Mobile Money</p>
+                            <p className="text-xs text-gray-500">Wave, Orange Money, Free Money</p>
+                          </div>
+                          <div className="w-5 h-5 rounded-full border-2 border-[#1BC29A] bg-[#1BC29A] flex items-center justify-center shrink-0">
+                            <div className="w-2 h-2 rounded-full bg-white" />
+                          </div>
                         </div>
                       )}
 
@@ -877,13 +955,13 @@ const Auth = () => {
                         type="button"
                         disabled={isLoading}
                         onClick={() => handleSignUp()}
-                        className={`w-full font-semibold h-12 rounded-xl shadow-md transition-all ${isFree ? 'bg-[#28A745] hover:bg-[#218838] shadow-green-100' : paymentMethod === 'wave' ? 'bg-[#1BC29A] hover:bg-[#17a884] shadow-teal-100' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-100'} text-white`}
+                        className={`w-full font-semibold h-12 rounded-xl shadow-md transition-all ${isFree ? 'bg-[#28A745] hover:bg-[#218838] shadow-green-100' : 'bg-[#1BC29A] hover:bg-[#17a884] shadow-teal-100'} text-white`}
                       >
                         {isLoading
                           ? 'Création du compte...'
                           : isFree
                           ? 'Créer mon compte gratuitement'
-                          : `Créer mon compte et payer`}
+                          : 'Créer mon compte et payer via Wave'}
                       </Button>
 
                       {/* Back link */}

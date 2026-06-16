@@ -3,150 +3,119 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 const envBase = import.meta.env.VITE_API_BASE;
 const API_BASE = envBase || (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://backennfc.onrender.com');
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { isTokenExpired } from '@/utils/authUtils';
 import {
-  Plus,
-  CreditCard,
-  CheckCircle,
-  Clock,
-  XCircle,
-  Eye,
-  Package,
-  Search,
-  Wifi,
-  Zap,
-  ShoppingCart,
-  X,
-  Trash2,
-  ChevronRight,
-  Sparkles,
+  Plus, CreditCard, CheckCircle, Clock, XCircle, Eye, Package,
+  Search, Wifi, Zap, ShoppingCart, X, Trash2, ChevronDown, Scan,
 } from "lucide-react";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 /* ─── helpers ─────────────────────────────────────────────── */
-const statusConfig = {
-  active:   { label: 'Active',      icon: CheckCircle, bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  inactive: { label: 'Inactive',    icon: XCircle,     bg: 'bg-red-100',     text: 'text-red-700',     dot: 'bg-red-500'     },
-  pending:  { label: 'En attente',  icon: Clock,       bg: 'bg-amber-100',   text: 'text-amber-700',   dot: 'bg-amber-500'   },
+const NFC_STATUS = {
+  active:   { label: 'Active',     tint: '#E8F5E9', color: '#1B5E20', dot: '#2E7D32' },
+  pending:  { label: 'En attente', tint: '#FEF3E2', color: '#B45309', dot: '#F59E0B' },
+  inactive: { label: 'Inactive',   tint: '#FEE2E2', color: '#B91C1C', dot: '#EF4444' },
 };
 
-function getCardStatus(card: any) {
-  if (card.is_active)         return 'active';
-  if (card.activated_at)      return 'inactive';
+function getCardStatus(card: any): 'active' | 'pending' | 'inactive' {
+  if (card.is_active)    return 'active';
+  if (card.activated_at) return 'inactive';
   return 'pending';
 }
 
-/* ─── NFC card visual ──────────────────────────────────────── */
-function NFCCardVisual({ card, onActivate, onDeactivate, onViewPortfolio }: {
+/* ─── NFCStat ──────────────────────────────────────────────── */
+function NFCStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string | number }) {
+  return (
+    <div className="bg-white rounded-2xl border border-[#E7E7EA] p-4 flex items-center gap-3.5">
+      <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-zinc-100 text-[#18181B]/60">
+        {icon}
+      </span>
+      <div>
+        <p className="text-xl font-semibold text-[#18181B] leading-none tabular-nums">{value}</p>
+        <p className="text-xs text-[#71717A] mt-1">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ─── NFCCardItem ──────────────────────────────────────────── */
+function NFCCardItem({ card, onActivate, onDeactivate, onViewPortfolio }: {
   card: any;
   onActivate: (id: string) => void;
   onDeactivate: (id: string) => void;
   onViewPortfolio: (slug: string) => void;
 }) {
   const status = getCardStatus(card);
-  const cfg    = statusConfig[status];
-  const StatusIcon = cfg.icon;
+  const s = NFC_STATUS[status];
+  const isActive = status === 'active';
+
+  const cardBg = isActive
+    ? 'linear-gradient(140deg, #2E7D32, #1B5E20)'
+    : status === 'pending'
+    ? 'linear-gradient(140deg, #F59E0B, #D97706)'
+    : 'linear-gradient(140deg, #A1A1AA, #71717A)';
 
   return (
-    <div className="group relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden">
-      {/* Accent bar top */}
-      <div className={`h-1 w-full ${status === 'active' ? 'bg-gradient-to-r from-emerald-400 to-green-500' : status === 'pending' ? 'bg-gradient-to-r from-amber-400 to-orange-400' : 'bg-gradient-to-r from-gray-300 to-gray-400'}`} />
-
+    <div className="bg-white rounded-2xl border border-[#E7E7EA] overflow-hidden flex flex-col hover:shadow-[0_10px_36px_rgba(16,24,40,0.08)] transition-shadow">
       <div className="p-5">
-        {/* Card visual + info */}
         <div className="flex items-start gap-4">
-          {/* Mini NFC card illustration */}
-          <div className={`relative flex-shrink-0 w-16 h-10 rounded-lg flex items-center justify-center shadow-md ${status === 'active' ? 'bg-gradient-to-br from-[#28A745] to-emerald-700' : status === 'pending' ? 'bg-gradient-to-br from-amber-500 to-orange-600' : 'bg-gradient-to-br from-gray-400 to-gray-600'}`}>
-            <Wifi size={14} className="text-white opacity-90" />
-            <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-white/30" />
+          {/* Mini NFC card */}
+          <div className="relative w-16 h-10 rounded-lg flex items-center justify-center shrink-0 shadow-sm"
+            style={{ background: cardBg }}>
+            <Wifi size={14} className="text-white/90 rotate-90" />
+            <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-white/40" />
           </div>
-
-          {/* Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <h3 className="font-semibold text-gray-900 text-sm leading-tight truncate">
+              <h3 className="font-semibold text-[#18181B] text-sm leading-tight line-clamp-1">
                 {card.portfolios?.title || 'Portfolio'}
               </h3>
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${cfg.bg} ${cfg.text}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                {cfg.label}
+              <span
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0"
+                style={{ background: s.tint, color: s.color }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.dot }} />
+                {s.label}
               </span>
             </div>
-
-            <p className="text-xs text-gray-400 mt-0.5 font-mono truncate">
-              UID: {card.card_uid || '—'}
-            </p>
-
-            <div className="flex flex-wrap gap-x-3 mt-2">
+            <p className="text-xs font-mono text-[#71717A]/80 mt-1">UID : {card.card_uid || '—'}</p>
+            <div className="flex flex-wrap gap-x-3 mt-2 text-xs text-[#71717A]">
               {card.ordered_at && (
-                <span className="text-xs text-gray-400">
-                  Commandée le {new Date(card.ordered_at).toLocaleDateString('fr-FR')}
-                </span>
+                <span>Commandée le {new Date(card.ordered_at).toLocaleDateString('fr-FR')}</span>
               )}
               {card.activated_at && (
-                <span className="text-xs text-gray-400">
-                  Activée le {new Date(card.activated_at).toLocaleDateString('fr-FR')}
-                </span>
+                <span>· Activée le {new Date(card.activated_at).toLocaleDateString('fr-FR')}</span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
+        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#E7E7EA]">
           {card.portfolios?.slug && (
-            <Button
-              variant="outline"
-              size="sm"
+            <button
               onClick={() => onViewPortfolio(card.portfolios.slug)}
-              className="flex-1 text-xs h-8 gap-1.5"
+              className="flex-1 h-9 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors flex items-center justify-center gap-1.5"
             >
-              <Eye size={13} />
-              Voir portfolio
-            </Button>
+              <Eye size={14} /> Voir portfolio
+            </button>
           )}
-
-          {!card.activated_at ? (
-            <Button
-              size="sm"
-              onClick={() => onActivate(card.id)}
-              className="flex-1 text-xs h-8 bg-emerald-600 hover:bg-emerald-700 gap-1.5"
-            >
-              <Zap size={13} />
-              Activer
-            </Button>
-          ) : card.is_active ? (
-            <Button
-              variant="outline"
-              size="sm"
+          {isActive ? (
+            <button
               onClick={() => onDeactivate(card.id)}
-              className="flex-1 text-xs h-8 text-red-600 border-red-200 hover:bg-red-50 gap-1.5"
+              className="flex-1 h-9 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B]/70 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-1.5"
             >
-              <XCircle size={13} />
-              Désactiver
-            </Button>
+              <XCircle size={13} /> Désactiver
+            </button>
           ) : (
-            <Button
-              size="sm"
+            <button
               onClick={() => onActivate(card.id)}
-              className="flex-1 text-xs h-8 bg-emerald-600 hover:bg-emerald-700 gap-1.5"
+              className="flex-1 h-9 rounded-[10px] text-sm font-semibold text-white transition-colors flex items-center justify-center gap-1.5"
+              style={{ background: '#2E7D32' }}
             >
-              <CheckCircle size={13} />
-              Réactiver
-            </Button>
+              <Zap size={14} /> {card.activated_at ? 'Réactiver' : 'Activer'}
+            </button>
           )}
         </div>
       </div>
@@ -158,10 +127,10 @@ function NFCCardVisual({ card, onActivate, onDeactivate, onViewPortfolio }: {
 const NFCCards = () => {
   const { user, profile, loading: authLoading, signOut } = useAuth();
   const { isFreePlan: ctxFree } = usePlan();
-  const [isFreePlan, setIsFreePlan]     = useState(false);
-  const [nfcCards, setNfcCards]         = useState<any[]>([]);
-  const [portfolios, setPortfolios]     = useState<any[]>([]);
-  const [loading, setLoading]           = useState(true);
+  const [isFreePlan, setIsFreePlan]       = useState(false);
+  const [nfcCards, setNfcCards]           = useState<any[]>([]);
+  const [portfolios, setPortfolios]       = useState<any[]>([]);
+  const [loading, setLoading]             = useState(true);
   const [showOrderForm, setShowOrderForm] = useState(false);
 
   type LocalOrderItem = { portfolio_id: string; quantity: number };
@@ -173,8 +142,8 @@ const NFCCards = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending'>('all');
   const [sortBy, setSortBy]             = useState<'newest' | 'oldest' | 'status' | 'portfolio'>('newest');
 
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const navigate   = useNavigate();
+  const { toast }  = useToast();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -190,17 +159,27 @@ const NFCCards = () => {
     if (user) {
       (async () => {
         setIsFreePlan(!!ctxFree);
-        if (ctxFree) { setLoading(false); return; }
         await loadData();
       })();
     }
   }, [user, authLoading, navigate]);
 
+  const handleSubscriptionError = (code: string) => {
+    if (code === 'PENDING_VALIDATION') { navigate('/pending-validation'); return; }
+    if (code === 'SUBSCRIPTION_EXPIRED') { navigate('/renouveler'); return; }
+    if (code === 'ACCOUNT_SUSPENDED') { navigate('/compte-suspendu'); return; }
+    navigate('/upgrade');
+  };
+
   const loadData = async () => {
     try {
       const token = localStorage.getItem('token');
       const pRes  = await fetch(`${API_BASE}/api/portfolios`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!pRes.ok) throw new Error('Failed to load portfolios');
+      if (!pRes.ok) {
+        const errJson = await pRes.json().catch(() => ({}));
+        if (pRes.status === 403 && errJson.code) { handleSubscriptionError(errJson.code); return; }
+        throw new Error('Failed to load portfolios');
+      }
       const pJson = await pRes.json();
       const normalizedPortfolios = (pJson.portfolios || []).map((p: any) => ({
         ...p, title: p.title || p.titre || '', slug: p.slug || p.url_slug || '',
@@ -221,7 +200,7 @@ const NFCCards = () => {
 
       const allCards: any[] = [];
       for (const oc of ordersWithCards) {
-        const ord   = oc.order || {};
+        const ord = oc.order || {};
         for (const card of (oc.cards || [])) {
           const portfolioSlug = card.lien_portfolio || card.lienPortfolio || card.portfolio_slug || '';
           const matching      = normalizedPortfolios.find((p: any) => (p.slug || '') === portfolioSlug);
@@ -326,193 +305,187 @@ const NFCCards = () => {
   /* ── loading ── */
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50 flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-4 border-[#28A745] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-gray-500">Chargement de vos cartes NFC…</p>
+      <div className="min-h-screen" style={{ background: '#F7F8F8' }}>
+        <div className="h-16 bg-white border-b border-[#E7E7EA]" />
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-10 space-y-7">
+          <div className="h-9 w-56 rounded-xl bg-zinc-100 animate-pulse" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 rounded-2xl bg-zinc-100 animate-pulse" />)}
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-44 rounded-2xl bg-zinc-100 animate-pulse" />)}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50">
+    <div className="min-h-screen" style={{ background: '#F7F8F8' }}>
       <DashboardNav onSignOut={signOut} profile={profile || user || {}} />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 sm:py-10 space-y-7">
 
-        {/* ── Upgrade prompt (free plan) ── */}
-        {isFreePlan && (
-          <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100 bg-white">
-            <div className="h-1 bg-gradient-to-r from-[#28A745] to-emerald-400" />
-            <div className="p-8 flex flex-col sm:flex-row items-start sm:items-center gap-6">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                <CreditCard className="w-7 h-7 text-[#28A745]" />
-              </div>
-              <div className="flex-1">
-                <h2 className="text-lg font-semibold text-gray-900">Cartes NFC indisponibles</h2>
-                <p className="text-sm text-gray-500 mt-1">Passez à une formule payante pour commander vos cartes NFC et partager votre portfolio professionnellement.</p>
-              </div>
-              <Button onClick={() => navigate('/upgrade')} className="bg-[#28A745] hover:bg-green-600 shrink-0">
-                Voir les formules <ChevronRight size={16} className="ml-1" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {!isFreePlan && (
-          <>
-            {/* ── Page header ── */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+            {/* ── Header ── */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <Wifi className="w-5 h-5 text-[#28A745]" />
-                  <h1 className="text-2xl font-bold text-gray-900">Mes Cartes NFC</h1>
+                <div className="flex items-center gap-2">
+                  <Wifi size={20} style={{ color: '#1B5E20' }} />
+                  <h1 className="text-2xl sm:text-[28px] font-bold text-[#18181B] tracking-tight">Mes cartes NFC</h1>
                 </div>
-                <p className="text-sm text-gray-500">Partagez votre portfolio d'un simple geste.</p>
+                <p className="text-[#71717A] text-sm mt-1">Partagez votre portfolio d'un simple geste.</p>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
+                <button
                   onClick={() => navigate('/nfc-types')}
-                  className="text-sm h-9"
+                  className="h-10 px-4 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors"
                 >
                   Types de cartes
-                </Button>
-                <Button
+                </button>
+                <button
                   onClick={() => setShowOrderForm(true)}
                   disabled={portfolios.length === 0}
-                  className="bg-[#28A745] hover:bg-green-600 text-sm h-9 gap-1.5"
+                  className="flex items-center gap-1.5 h-10 px-4 rounded-[10px] text-sm font-semibold text-white transition-colors disabled:opacity-50"
+                  style={{ background: '#2E7D32' }}
                 >
-                  <Plus size={15} />
-                  Commander
-                </Button>
+                  <Plus size={16} /> Commander
+                </button>
               </div>
             </div>
 
             {/* ── No portfolio warning ── */}
             {portfolios.length === 0 && (
-              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-6 mb-8 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-                  <Package className="w-5 h-5 text-amber-600" />
-                </div>
+              <div className="bg-white rounded-2xl border border-[#E7E7EA] p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-zinc-100 text-[#18181B]/60">
+                  <Package className="w-5 h-5" />
+                </span>
                 <div className="flex-1">
-                  <p className="font-medium text-amber-900 text-sm">Aucun portfolio disponible</p>
-                  <p className="text-xs text-amber-700 mt-0.5">Créez d'abord un portfolio pour pouvoir commander une carte NFC.</p>
+                  <p className="font-medium text-[#18181B] text-sm">Aucun portfolio disponible</p>
+                  <p className="text-xs text-[#71717A] mt-0.5">Créez d'abord un portfolio pour pouvoir commander une carte NFC.</p>
                 </div>
-                <Button size="sm" onClick={() => navigate('/dashboard/portfolios')} className="bg-amber-600 hover:bg-amber-700 shrink-0 text-xs">
+                <button
+                  onClick={() => navigate('/dashboard/portfolios')}
+                  className="h-9 px-4 rounded-[10px] text-sm font-medium text-white shrink-0"
+                  style={{ background: '#2E7D32' }}
+                >
                   Créer un portfolio
-                </Button>
+                </button>
               </div>
             )}
 
             {/* ── Stats ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              {[
-                { label: 'Total cartes',   value: nfcCards.length,  icon: CreditCard,   from: 'from-blue-500',    to: 'to-blue-600'    },
-                { label: 'Actives',        value: activeCount,      icon: CheckCircle,  from: 'from-emerald-500', to: 'to-green-600'   },
-                { label: 'En attente',     value: pendingCount,     icon: Clock,        from: 'from-amber-500',   to: 'to-orange-500'  },
-                { label: 'Prix unitaire',  value: '30 000 F',       icon: Sparkles,     from: 'from-violet-500',  to: 'to-purple-600'  },
-              ].map((stat) => {
-                const Icon = stat.icon;
-                return (
-                  <div key={stat.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.from} ${stat.to} flex items-center justify-center flex-shrink-0`}>
-                      <Icon className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500">{stat.label}</p>
-                      <p className="text-xl font-bold text-gray-900 leading-tight">{stat.value}</p>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <NFCStat icon={<CreditCard size={18} />} label="Total cartes"  value={nfcCards.length} />
+              <NFCStat icon={<CheckCircle size={18} />} label="Actives"       value={activeCount} />
+              <NFCStat icon={<Clock size={18} />}       label="En attente"    value={pendingCount} />
+              <NFCStat icon={<Zap size={18} />}         label="Prix unitaire" value="30 000 F" />
             </div>
 
             {/* ── Filter bar ── */}
             {nfcCards.length > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row gap-3 mb-6">
+              <div className="bg-white rounded-2xl border border-[#E7E7EA] p-2.5 flex items-center gap-2.5">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#71717A]" />
+                  <input
                     placeholder="Rechercher par portfolio…"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 h-9 text-sm"
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full h-9 pl-9 pr-3 rounded-[10px] bg-zinc-50 border border-transparent focus:border-[#E7E7EA] outline-none text-sm text-[#18181B] placeholder:text-[#71717A]"
                   />
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-                    <SelectTrigger className="w-full sm:w-36 h-9 text-sm">
-                      <SelectValue placeholder="Statut" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tous statuts</SelectItem>
-                      <SelectItem value="active">Actives</SelectItem>
-                      <SelectItem value="inactive">Inactives</SelectItem>
-                      <SelectItem value="pending">En attente</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-                    <SelectTrigger className="w-full sm:w-36 h-9 text-sm">
-                      <SelectValue placeholder="Trier par" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="newest">Plus récent</SelectItem>
-                      <SelectItem value="oldest">Plus ancien</SelectItem>
-                      <SelectItem value="status">Statut</SelectItem>
-                      <SelectItem value="portfolio">Portfolio</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="relative">
+                  <select
+                    value={statusFilter}
+                    onChange={e => setStatusFilter(e.target.value as any)}
+                    className="h-9 pl-3 pr-8 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B]/70 appearance-none bg-white outline-none hover:bg-zinc-50 transition-colors cursor-pointer"
+                  >
+                    <option value="all">Tous statuts</option>
+                    <option value="active">Actives</option>
+                    <option value="inactive">Inactives</option>
+                    <option value="pending">En attente</option>
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#71717A]" />
+                </div>
+                <div className="relative">
+                  <select
+                    value={sortBy}
+                    onChange={e => setSortBy(e.target.value as any)}
+                    className="h-9 pl-3 pr-8 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B]/70 appearance-none bg-white outline-none hover:bg-zinc-50 transition-colors cursor-pointer"
+                  >
+                    <option value="newest">Plus récent</option>
+                    <option value="oldest">Plus ancien</option>
+                    <option value="status">Statut</option>
+                    <option value="portfolio">Portfolio</option>
+                  </select>
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#71717A]" />
                 </div>
               </div>
             )}
 
             {/* ── Cards grid ── */}
             {nfcCards.length === 0 ? (
-              /* Empty state */
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
-                <div className="w-20 h-20 bg-gradient-to-br from-[#28A745] to-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-green-200">
-                  <CreditCard className="w-9 h-9 text-white" />
+              <div className="bg-white rounded-2xl border border-[#E7E7EA] p-12 text-center">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#E8F5E9', color: '#1B5E20' }}>
+                  <CreditCard className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Aucune carte NFC</h3>
-                <p className="text-sm text-gray-500 max-w-xs mx-auto mb-6">
+                <h3 className="font-semibold text-[#18181B] mb-1">Aucune carte NFC</h3>
+                <p className="text-sm text-[#71717A] max-w-xs mx-auto mb-6">
                   Commandez votre première carte NFC et partagez votre portfolio d'un simple geste.
                 </p>
                 {portfolios.length > 0 && (
-                  <Button onClick={() => setShowOrderForm(true)} className="bg-[#28A745] hover:bg-green-600 gap-2">
-                    <Plus size={16} />
-                    Commander ma première carte
-                  </Button>
+                  <button
+                    onClick={() => setShowOrderForm(true)}
+                    className="h-10 px-4 rounded-[10px] text-sm font-semibold text-white flex items-center gap-1.5 mx-auto transition-colors"
+                    style={{ background: '#2E7D32' }}
+                  >
+                    <Plus size={15} /> Commander ma première carte
+                  </button>
                 )}
               </div>
             ) : filteredAndSortedCards.length === 0 ? (
-              /* No results */
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-7 h-7 text-gray-400" />
+              <div className="bg-white rounded-2xl border border-[#E7E7EA] p-10 text-center">
+                <div className="w-12 h-12 rounded-xl bg-zinc-100 flex items-center justify-center mx-auto mb-3">
+                  <Search className="w-5 h-5 text-[#71717A]" />
                 </div>
-                <h3 className="text-base font-semibold text-gray-900 mb-1">Aucun résultat</h3>
-                <p className="text-sm text-gray-500 mb-5">Aucune carte ne correspond à vos filtres.</p>
-                <Button variant="outline" size="sm" onClick={() => { setSearchTerm(''); setStatusFilter('all'); setSortBy('newest'); }}>
+                <h3 className="font-semibold text-[#18181B] mb-1">Aucun résultat</h3>
+                <p className="text-sm text-[#71717A] mb-4">Aucune carte ne correspond à vos filtres.</p>
+                <button
+                  onClick={() => { setSearchTerm(''); setStatusFilter('all'); setSortBy('newest'); }}
+                  className="h-9 px-4 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors"
+                >
                   Réinitialiser les filtres
-                </Button>
+                </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredAndSortedCards.map((card) => (
-                  <NFCCardVisual
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredAndSortedCards.map(card => (
+                  <NFCCardItem
                     key={card.id}
                     card={card}
                     onActivate={activateCard}
                     onDeactivate={deactivateCard}
-                    onViewPortfolio={(slug) => window.open(`/portfolio/${slug}`, '_blank')}
+                    onViewPortfolio={slug => window.open(`/portfolio/${slug}`, '_blank')}
                   />
                 ))}
               </div>
             )}
-          </>
-        )}
+
+            {/* ── Promo strip ── */}
+            <div className="rounded-2xl border border-[#E7E7EA] bg-white p-6 flex flex-col sm:flex-row items-start sm:items-center gap-5">
+              <span className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: '#E8F5E9', color: '#1B5E20' }}>
+                <Scan size={22} />
+              </span>
+              <div className="flex-1">
+                <p className="font-semibold text-[#18181B] text-sm">Besoin de cartes pour votre équipe ?</p>
+                <p className="text-sm text-[#71717A] mt-0.5">Commandez en lot et profitez de tarifs dégressifs dès 10 cartes.</p>
+              </div>
+              <button
+                onClick={() => navigate('/upgrade')}
+                className="h-10 px-4 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors shrink-0"
+              >
+                Découvrir l'offre Business
+              </button>
+            </div>
       </div>
 
       {/* ── Order modal ── */}
@@ -520,19 +493,19 @@ const NFCCards = () => {
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
           <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
             {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E7E7EA] shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#28A745]/10 flex items-center justify-center">
-                  <ShoppingCart className="w-4 h-4 text-[#28A745]" />
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#E8F5E9', color: '#1B5E20' }}>
+                  <ShoppingCart className="w-4 h-4" />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-gray-900 text-sm">Commander une carte NFC</h2>
-                  <p className="text-xs text-gray-400">30 000 F CFA / carte</p>
+                  <h2 className="font-semibold text-[#18181B] text-sm">Commander une carte NFC</h2>
+                  <p className="text-xs text-[#71717A]">30 000 F CFA / carte</p>
                 </div>
               </div>
               <button
                 onClick={() => { setShowOrderForm(false); setOrderItems([]); setPendingItem({ portfolio_id: '', quantity: 1 }); }}
-                className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+                className="w-8 h-8 rounded-lg hover:bg-zinc-100 flex items-center justify-center text-[#71717A] hover:text-[#18181B] transition-colors"
               >
                 <X size={16} />
               </button>
@@ -545,23 +518,23 @@ const NFCCards = () => {
                 {/* Items list */}
                 {orderItems.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Articles ajoutés</p>
+                    <p className="text-xs font-semibold text-[#71717A] uppercase tracking-wide">Articles ajoutés</p>
                     {orderItems.map((it, idx) => {
                       const p = portfolios.find(pf => String(pf.id) === String(it.portfolio_id));
                       return (
-                        <div key={idx} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-2.5">
+                        <div key={idx} className="flex items-center justify-between bg-zinc-50 rounded-xl px-4 py-2.5">
                           <div className="flex items-center gap-3">
-                            <div className="w-6 h-6 rounded bg-[#28A745]/10 flex items-center justify-center">
-                              <CreditCard size={12} className="text-[#28A745]" />
+                            <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: '#E8F5E9', color: '#1B5E20' }}>
+                              <CreditCard size={12} />
                             </div>
-                            <span className="text-sm text-gray-800">{p ? p.title : `Portfolio ${it.portfolio_id}`}</span>
+                            <span className="text-sm text-[#18181B]">{p ? p.title : `Portfolio ${it.portfolio_id}`}</span>
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="text-sm font-medium text-gray-600">{it.quantity} carte{it.quantity > 1 ? 's' : ''}</span>
+                            <span className="text-sm font-medium text-[#71717A]">{it.quantity} carte{it.quantity > 1 ? 's' : ''}</span>
                             <button
                               type="button"
                               onClick={() => setOrderItems(prev => prev.filter((_, i) => i !== idx))}
-                              className="text-gray-300 hover:text-red-500 transition-colors"
+                              className="text-[#71717A]/50 hover:text-red-500 transition-colors"
                             >
                               <Trash2 size={14} />
                             </button>
@@ -574,73 +547,71 @@ const NFCCards = () => {
 
                 {/* Add item */}
                 <div className="space-y-3">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Ajouter un article</p>
+                  <p className="text-xs font-semibold text-[#71717A] uppercase tracking-wide">Ajouter un article</p>
                   <div>
-                    <Label className="text-xs text-gray-600 mb-1 block">Portfolio</Label>
+                    <label className="text-xs font-medium text-[#71717A] mb-1.5 block">Portfolio</label>
                     <select
                       value={pendingItem.portfolio_id}
-                      onChange={(e) => setPendingItem(prev => ({ ...prev, portfolio_id: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-[#28A745]/30 focus:border-[#28A745]"
+                      onChange={e => setPendingItem(prev => ({ ...prev, portfolio_id: e.target.value }))}
+                      className="w-full h-11 px-3.5 rounded-xl border border-[#E7E7EA] bg-white text-sm text-[#18181B] outline-none focus:border-[#2E7D32] transition-colors"
                     >
                       <option value="">Sélectionnez un portfolio</option>
-                      {portfolios.map((portfolio) => (
+                      {portfolios.map(portfolio => (
                         <option key={portfolio.id} value={portfolio.id}>{portfolio.title}</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <Label className="text-xs text-gray-600 mb-1 block">Quantité</Label>
-                    <Input
+                    <label className="text-xs font-medium text-[#71717A] mb-1.5 block">Quantité</label>
+                    <input
                       type="number"
                       min={1}
                       value={pendingItem.quantity}
-                      onChange={(e) => setPendingItem(prev => ({ ...prev, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
-                      className="h-9 text-sm rounded-xl"
+                      onChange={e => setPendingItem(prev => ({ ...prev, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                      className="w-full h-11 px-3.5 rounded-xl border border-[#E7E7EA] bg-white text-sm text-[#18181B] outline-none focus:border-[#2E7D32] transition-colors"
                     />
                   </div>
-                  <Button
+                  <button
                     type="button"
-                    variant="outline"
-                    className="w-full text-sm h-9 gap-2 border-dashed"
                     disabled={!pendingItem.portfolio_id}
                     onClick={() => {
                       if (!pendingItem.portfolio_id) return;
                       setOrderItems(prev => [...prev, pendingItem]);
                       setPendingItem({ portfolio_id: '', quantity: 1 });
                     }}
+                    className="w-full h-10 rounded-[10px] border-2 border-dashed border-[#E7E7EA] text-sm font-medium text-[#18181B]/60 hover:border-[#2E7D32] hover:text-[#1B5E20] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
                   >
-                    <Plus size={14} />
-                    Ajouter à la commande
-                  </Button>
+                    <Plus size={14} /> Ajouter à la commande
+                  </button>
                 </div>
               </div>
 
               {/* Modal footer */}
-              <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 space-y-3">
+              <div className="px-6 py-4 border-t border-[#E7E7EA] shrink-0 space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">Total estimé</span>
-                  <span className="font-bold text-[#28A745] text-base">{totalEstimated.toLocaleString('fr-FR')} F CFA</span>
+                  <span className="text-[#71717A]">Total estimé</span>
+                  <span className="font-bold text-[#1B5E20] text-base">{totalEstimated.toLocaleString('fr-FR')} F CFA</span>
                 </div>
                 <div className="flex gap-2">
-                  <Button
+                  <button
                     type="button"
-                    variant="outline"
-                    className="flex-1 h-10 text-sm"
                     onClick={() => { setShowOrderForm(false); setOrderItems([]); setPendingItem({ portfolio_id: '', quantity: 1 }); }}
+                    className="flex-1 h-10 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors"
                   >
                     Annuler
-                  </Button>
-                  <Button
+                  </button>
+                  <button
                     type="submit"
                     disabled={submitting || (orderItems.length === 0 && !pendingItem.portfolio_id)}
-                    className="flex-1 h-10 text-sm bg-[#28A745] hover:bg-green-600 gap-2"
+                    className="flex-1 h-10 rounded-[10px] text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60"
+                    style={{ background: '#2E7D32' }}
                   >
                     {submitting ? (
-                      <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Envoi…</>
+                      <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Envoi…</>
                     ) : (
                       <><ShoppingCart size={15} /> Confirmer la commande</>
                     )}
-                  </Button>
+                  </button>
                 </div>
               </div>
             </form>

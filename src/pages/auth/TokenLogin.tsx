@@ -60,7 +60,7 @@ export default function TokenLogin() {
         setPhase('welcome');
 
         setTimeout(() => {
-          if (!cancelled) navigate('/dashboard', { replace: true });
+          if (!cancelled) window.location.replace('/dashboard');
         }, 2200);
       } catch {
         if (!cancelled) {
