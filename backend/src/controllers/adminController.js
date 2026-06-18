@@ -11,6 +11,7 @@ const planModel = require('../models/planModel');
 const abonnementModel = require('../models/abonnementModel');
 const sendEmail = require('../utils/sendEmail');
 const { emailPaiementCommandeValide, emailCommandeLivree } = require('../utils/emailTemplates');
+const { buildInvoiceHtml } = require('../utils/buildInvoiceHtml');
 const checkoutModel = require('../models/checkoutModel');
 
 async function listUsers(req, res) {
@@ -1574,18 +1575,53 @@ async function getInvoiceByReference(req, res) {
 }
 
 // Return a simple HTML representation of the invoice (front-end can open and print to PDF)
+async function _buildInvoiceData(inv) {
+  const [rows] = await pool.query(
+    'SELECT id, email, nom, prenom FROM utilisateurs WHERE id = ? LIMIT 1',
+    [inv.utilisateur_id]
+  );
+  const user = (rows && rows[0]) || { email: '—', nom: '', prenom: '' };
+  const dateObj = new Date(inv.created_at || inv.createdAt || Date.now());
+  const invoiceNumber = `INV-${dateObj.getFullYear()}${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(inv.id).padStart(5, '0')}`;
+  const amount = Number(inv.amount || inv.montant || 0);
+  const currency = inv.currency || 'XOF';
+
+  let planName = 'Portefolia Premium';
+  if (inv.plan_id) {
+    try {
+      const p = await planModel.getPlanById(inv.plan_id);
+      if (p && p.name) planName = p.name;
+    } catch (e) { /* ignore */ }
+  }
+
+  let dateEcheance = null;
+  if (inv.abonnement_id) {
+    try {
+      const [abRows] = await pool.query('SELECT date_echeance FROM abonnements WHERE id = ? LIMIT 1', [inv.abonnement_id]);
+      if (abRows && abRows[0]) dateEcheance = abRows[0].date_echeance;
+    } catch (e) { /* ignore */ }
+  }
+
+  return {
+    invoiceNumber,
+    client: { prenom: user.prenom || '', nom: user.nom || '', email: user.email || '' },
+    planName,
+    montant: amount,
+    currency,
+    reference: inv.reference || inv.reference_transaction || null,
+    date_paiement: dateObj,
+    date_echeance: dateEcheance,
+  };
+}
+
 async function getInvoiceHtml(req, res) {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).send('Invalid id');
     const inv = await invoiceModel.findById(id);
     if (!inv) return res.status(404).send('Not found');
-    const [rows] = await pool.query('SELECT id, email, nom, prenom FROM utilisateurs WHERE id = ? LIMIT 1', [inv.utilisateur_id]);
-    const user = rows && rows[0] ? rows[0] : { email: '—', nom: '', prenom: '' };
-    const invoiceNumber = `INV-${new Date(inv.created_at || inv.createdAt || Date.now()).toISOString().slice(0, 7).replace('-', '')}-${inv.id}`;
-    const amount = (Number(inv.amount || inv.montant || 0));
-    const currency = inv.currency || 'XOF';
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Facture ${invoiceNumber}</title><style>body{font-family:Arial,Helvetica,sans-serif;padding:20px;color:#111}h1{color:#111}table{width:100%;border-collapse:collapse}td,th{padding:8px;border:1px solid #ddd}</style></head><body><h1>Facture ${invoiceNumber}</h1><p>Date: ${new Date(inv.created_at || inv.createdAt || Date.now()).toLocaleString('fr-FR')}</p><h2>Client</h2><p>${user.prenom || ''} ${user.nom || ''}<br/>${user.email || ''}</p><h2>Détails</h2><table><tr><th>Description</th><th>Montant</th></tr><tr><td>Facture #${inv.id}${inv.plan_id ? ' — plan ' + (inv.plan_id) : ''}</td><td style="text-align:right">${amount.toLocaleString('fr-FR')} ${currency}</td></tr><tr><td style="text-align:right;font-weight:bold">Total</td><td style="text-align:right;font-weight:bold">${amount.toLocaleString('fr-FR')} ${currency}</td></tr></table><p>Référence: ${inv.reference || '—'}</p><p>Merci pour votre paiement.</p></body></html>`;
+    const data = await _buildInvoiceData(inv);
+    const html = buildInvoiceHtml(data);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.send(html);
   } catch (err) {
@@ -1594,38 +1630,29 @@ async function getInvoiceHtml(req, res) {
   }
 }
 
-// Generate PDF for invoice (uses puppeteer if available). Returns PDF binary.
 async function getInvoicePdf(req, res) {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).send('Invalid id');
-    // reuse HTML generation
     const inv = await invoiceModel.findById(id);
     if (!inv) return res.status(404).send('Not found');
+    const data = await _buildInvoiceData(inv);
+    const html = buildInvoiceHtml(data);
 
-    // build same HTML as getInvoiceHtml
-    const [rows] = await pool.query('SELECT id, email, nom, prenom FROM utilisateurs WHERE id = ? LIMIT 1', [inv.utilisateur_id]);
-    const user = rows && rows[0] ? rows[0] : { email: '—', nom: '', prenom: '' };
-    const invoiceNumber = `INV-${new Date(inv.created_at || inv.createdAt || Date.now()).toISOString().slice(0, 7).replace('-', '')}-${inv.id}`;
-    const amount = (Number(inv.amount || inv.montant || 0));
-    const currency = inv.currency || 'XOF';
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Facture ${invoiceNumber}</title><style>body{font-family:Arial,Helvetica,sans-serif;padding:20px;color:#111}h1{color:#111}table{width:100%;border-collapse:collapse}td,th{padding:8px;border:1px solid #ddd}</style></head><body><h1>Facture ${invoiceNumber}</h1><p>Date: ${new Date(inv.created_at || inv.createdAt || Date.now()).toLocaleString('fr-FR')}</p><h2>Client</h2><p>${user.prenom || ''} ${user.nom || ''}<br/>${user.email || ''}</p><h2>Détails</h2><table><tr><th>Description</th><th>Montant</th></tr><tr><td>Facture #${inv.id}${inv.plan_id ? ' — plan ' + (inv.plan_id) : ''}</td><td style="text-align:right">${amount.toLocaleString('fr-FR')} ${currency}</td></tr><tr><td style="text-align:right;font-weight:bold">Total</td><td style="text-align:right;font-weight:bold">${amount.toLocaleString('fr-FR')} ${currency}</td></tr></table><p>Référence: ${inv.reference || '—'}</p><p>Merci pour votre paiement.</p></body></html>`;
-
-    // Try to use puppeteer if installed
     try {
       const puppeteer = require('puppeteer');
-      const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+      const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
+      await page.setContent(html, { waitUntil: 'load', timeout: 20000 });
       const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
       await browser.close();
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="invoice-${inv.id}.pdf"`);
-      return res.send(pdfBuffer);
+      res.setHeader('Content-Disposition', `attachment; filename="facture-portefolia-${data.invoiceNumber}.pdf"`);
+      return res.send(Buffer.from(pdfBuffer));
     } catch (e) {
-      console.warn('puppeteer not available or failed, falling back to HTML:', e.message || e);
-      // fallback: return HTML as text with content-type that browser can render
+      console.warn('getInvoicePdf: puppeteer non disponible, fallback HTML:', e.message);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `inline; filename="facture-portefolia-${data.invoiceNumber}.html"`);
       return res.send(html);
     }
   } catch (err) {

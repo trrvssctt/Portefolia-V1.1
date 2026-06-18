@@ -2,7 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
 const { pool } = require('../db');
-const { generateReceiptPDF } = require('../utils/generateReceiptPDF');
+const { generateReceiptPDF, buildReceiptHtml } = require('../utils/generateReceiptPDF');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
@@ -160,7 +160,26 @@ async function getMyReceiptPDF(req, res) {
     });
 
     if (!pdfBuffer) {
-      return res.status(500).json({ error: 'Génération du PDF échouée' });
+      // Puppeteer non disponible sur ce serveur → on sert le HTML (imprimable en PDF via le navigateur)
+      const receiptData = {
+        receiptNumber,
+        type:            isCommandeNFC ? 'commande_nfc' : 'abonnement',
+        client:          { prenom: row.prenom || '', nom: row.nom || '', email: row.email || '' },
+        plan:            { name: row.plan_name || 'Portefolia Premium' },
+        numero_commande: row.numero_commande || null,
+        montant:         Number(isCommandeNFC ? (row.commande_montant || row.montant) : row.montant) || 0,
+        duree_mois:      row.duree_mois ?? 1,
+        reference_wave:  row.reference_wave || row.reference_transaction || null,
+        moyen_paiement:  row.moyen_paiement || 'wave',
+        date_paiement:   now,
+        date_echeance:   isCommandeNFC ? null : (row.date_echeance ?? null),
+      };
+      const html = buildReceiptHtml(receiptData);
+      res.set({
+        'Content-Type':        'text/html; charset=utf-8',
+        'Content-Disposition': `inline; filename="recu-portefolia-${receiptNumber}.html"`,
+      });
+      return res.send(html);
     }
 
     res.set({

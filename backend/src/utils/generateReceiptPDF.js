@@ -194,4 +194,4 @@ async function generateReceiptPDF(data) {
   }
 }
 
-module.exports = { generateReceiptPDF };
+module.exports = { generateReceiptPDF, buildReceiptHtml };
