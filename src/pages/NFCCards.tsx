@@ -512,12 +512,12 @@ const NFCCards = () => {
               <NFCStat icon={<Zap size={18} />}         label="Prix unitaire" value="30 000 F" />
             </div>
 
-            {/* ── Suivi commandes ── */}
-            {orders.filter(o => o.statut !== 'Annulée').length > 0 && (
+            {/* ── Suivi commandes (uniquement paiements non finalisés) ── */}
+            {orders.filter(o => o.statut !== 'Annulée' && o.paiement_statut !== 'payé').length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-[#71717A] uppercase tracking-wide">Suivi des commandes</p>
                 {orders
-                  .filter(o => o.statut !== 'Annulée')
+                  .filter(o => o.statut !== 'Annulée' && o.paiement_statut !== 'payé')
                   .map(order => {
                     const ps = order.paiement_statut || 'non_payé';
                     const dateStr = new Date(order.date_commande || order.created_at || order.ordered_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -849,79 +849,101 @@ const NFCCards = () => {
 
       {/* ── Modal paiement obligatoire ───────────────────────── */}
       {paymentOrder && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
-            <div className="text-center">
-              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <CreditCard className="text-green-600" size={28} />
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center"
+          onClick={() => setPaymentOrder(null)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[92vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Drag handle mobile */}
+            <div className="flex justify-center pt-3 pb-1 sm:hidden">
+              <div className="w-10 h-1 rounded-full bg-gray-200" />
+            </div>
+
+            <div className="px-5 pb-6 pt-3 sm:p-6 space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Paiement requis</h2>
+                  <p className="text-xs text-gray-500 mt-0.5 font-mono">#{paymentOrder.numero}</p>
+                </div>
+                <button
+                  onClick={() => setPaymentOrder(null)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <h2 className="text-xl font-bold text-gray-900">Paiement requis</h2>
-              <p className="text-sm text-gray-500 mt-1">Commande <span className="font-mono font-semibold">#{paymentOrder.numero}</span></p>
-            </div>
 
-            {/* Montant */}
-            <div className="bg-green-50 rounded-xl p-4 text-center">
-              <p className="text-3xl font-bold text-green-700">{Number(paymentOrder.montant).toLocaleString()} F CFA</p>
-              <p className="text-sm text-green-600 mt-1">Montant à régler</p>
-            </div>
-
-            {/* Mode de paiement */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700">Mode de paiement</label>
-              <div className="grid grid-cols-2 gap-3">
-                {(['wave', 'orange_money'] as const).map(mode => (
-                  <button
-                    key={mode}
-                    onClick={() => setPaymentMode(mode)}
-                    className={`p-3 rounded-xl border-2 text-sm font-semibold transition-all ${paymentMode === mode ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
-                  >
-                    {mode === 'wave' ? '🌊 Wave' : '🟠 Orange Money'}
-                  </button>
-                ))}
+              {/* Montant */}
+              <div className="bg-green-50 rounded-xl px-4 py-3 flex items-center justify-between">
+                <p className="text-sm text-green-600 font-medium">Montant à régler</p>
+                <p className="text-2xl font-bold text-green-700">{Number(paymentOrder.montant).toLocaleString()} F CFA</p>
               </div>
-            </div>
 
-            {/* Numéro à payer */}
-            <div className="bg-blue-50 rounded-xl p-4 text-center">
-              <p className="text-xs text-blue-600 font-medium uppercase tracking-wide mb-1">
-                {paymentMode === 'wave' ? 'Numéro Wave' : 'Numéro Orange Money'} à créditer
-              </p>
-              <p className="text-2xl font-bold text-blue-800">+221 78 131 13 71</p>
-              <p className="text-xs text-blue-500 mt-1">Portefolia</p>
-            </div>
+              {/* Mode de paiement */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Mode de paiement</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['wave', 'orange_money'] as const).map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => setPaymentMode(mode)}
+                      className={`py-2.5 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${paymentMode === mode ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600'}`}
+                    >
+                      {mode === 'wave' ? '🌊 Wave' : '🟠 Orange Money'}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-            {/* Référence transaction */}
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-gray-700">
-                Référence de transaction <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={paymentRef}
-                onChange={e => setPaymentRef(e.target.value)}
-                placeholder="Ex: W-1234567890"
-                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-              />
-              <p className="text-xs text-gray-400">Copiez la référence reçue par SMS après le paiement</p>
-            </div>
+              {/* Numéro à créditer */}
+              <div className="bg-blue-50 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] text-blue-500 font-medium uppercase tracking-wide">
+                    {paymentMode === 'wave' ? 'Numéro Wave' : 'Numéro Orange Money'} à créditer
+                  </p>
+                  <p className="text-lg font-bold text-blue-800 mt-0.5">+221 78 131 13 71</p>
+                  <p className="text-[11px] text-blue-400">Portefolia</p>
+                </div>
+                <CreditCard className="text-blue-300 shrink-0" size={28} />
+              </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setPaymentOrder(null)}
-                className="flex-1 py-3 rounded-xl border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-              >
-                Payer plus tard
-              </button>
-              <button
-                onClick={handleSubmitPayment}
-                disabled={paymentSubmitting || !paymentRef.trim()}
-                className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
-              >
-                {paymentSubmitting ? 'Envoi…' : 'Confirmer le paiement'}
-              </button>
+              {/* Référence transaction */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Référence de transaction <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={paymentRef}
+                  onChange={e => setPaymentRef(e.target.value)}
+                  placeholder="Ex: W-1234567890"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 bg-gray-50"
+                />
+                <p className="text-[11px] text-gray-400">Référence reçue par SMS après le virement</p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setPaymentOrder(null)}
+                  className="flex-1 h-11 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  Plus tard
+                </button>
+                <button
+                  onClick={handleSubmitPayment}
+                  disabled={paymentSubmitting || !paymentRef.trim()}
+                  className="flex-2 h-11 px-5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
+                >
+                  {paymentSubmitting ? 'Envoi…' : 'Confirmer le paiement'}
+                </button>
+              </div>
+              <p className="text-[11px] text-center text-gray-400">L'admin validera votre paiement sous 24h</p>
             </div>
-            <p className="text-xs text-center text-gray-400">L'admin validera votre paiement sous 24h</p>
           </div>
         </div>
       )}
