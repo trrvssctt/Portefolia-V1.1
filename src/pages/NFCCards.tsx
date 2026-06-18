@@ -14,14 +14,16 @@ import { useAuth } from "@/hooks/useAuth";
 
 /* ─── helpers ─────────────────────────────────────────────── */
 const NFC_STATUS = {
-  active:   { label: 'Active',     tint: '#E8F5E9', color: '#1B5E20', dot: '#2E7D32' },
-  pending:  { label: 'En attente', tint: '#FEF3E2', color: '#B45309', dot: '#F59E0B' },
-  inactive: { label: 'Inactive',   tint: '#FEE2E2', color: '#B91C1C', dot: '#EF4444' },
+  active:   { label: 'Active',          tint: '#E8F5E9', color: '#1B5E20', dot: '#2E7D32' },
+  livree:   { label: 'Prête à activer', tint: '#DBEAFE', color: '#1D4ED8', dot: '#3B82F6' },
+  pending:  { label: 'En fabrication',  tint: '#FEF3E2', color: '#B45309', dot: '#F59E0B' },
+  inactive: { label: 'Inactive',        tint: '#FEE2E2', color: '#B91C1C', dot: '#EF4444' },
 };
 
-function getCardStatus(card: any): 'active' | 'pending' | 'inactive' {
-  if (card.is_active)    return 'active';
-  if (card.activated_at) return 'inactive';
+function getCardStatus(card: any): 'active' | 'livree' | 'pending' | 'inactive' {
+  if (card.is_active)                 return 'active';
+  if (card.statut === 'Livrée')       return 'livree';
+  if (card.activated_at)              return 'inactive';
   return 'pending';
 }
 
@@ -40,6 +42,49 @@ function NFCStat({ icon, label, value }: { icon: React.ReactNode; label: string;
   );
 }
 
+/* ─── Stepper progression fabrication ─────────────────────── */
+const CARD_STEPS = [
+  { key: 'En_attente',    label: 'En attente',    desc: 'Commande reçue' },
+  { key: 'En_traitement', label: 'En traitement', desc: 'Fabrication en cours' },
+  { key: 'Gravée',        label: 'Gravée',        desc: 'Gravure terminée' },
+  { key: 'Livrée',        label: 'Livrée',        desc: 'Prête à activer' },
+];
+
+function CardProgressStepper({ statut }: { statut: string }) {
+  const currentIdx = CARD_STEPS.findIndex(s => s.key === statut);
+  const idx = currentIdx === -1 ? 0 : currentIdx;
+  return (
+    <div className="w-full mt-3 mb-1">
+      <div className="flex items-center">
+        {CARD_STEPS.map((step, i) => {
+          const done    = i < idx;
+          const current = i === idx;
+          return (
+            <div key={step.key} className="flex items-center flex-1 last:flex-none">
+              <div className="flex flex-col items-center">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
+                  done    ? 'bg-[#2E7D32] text-white' :
+                  current ? 'bg-[#1B5E20] text-white ring-2 ring-[#2E7D32]/30' :
+                             'bg-[#E7E7EA] text-[#71717A]'
+                }`}>
+                  {done ? <CheckCircle size={12} /> : <span>{i + 1}</span>}
+                </div>
+                <span className={`text-[9px] mt-1 font-medium whitespace-nowrap ${current ? 'text-[#1B5E20]' : done ? 'text-[#71717A]' : 'text-[#A1A1AA]'}`}>
+                  {step.label}
+                </span>
+              </div>
+              {i < CARD_STEPS.length - 1 && (
+                <div className={`flex-1 h-0.5 mx-1 mb-4 rounded-full ${i < idx ? 'bg-[#2E7D32]' : 'bg-[#E7E7EA]'}`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-[#71717A] mt-1 text-center">{CARD_STEPS[idx]?.desc}</p>
+    </div>
+  );
+}
+
 /* ─── NFCCardItem ──────────────────────────────────────────── */
 function NFCCardItem({ card, onActivate, onDeactivate, onViewPortfolio }: {
   card: any;
@@ -50,11 +95,16 @@ function NFCCardItem({ card, onActivate, onDeactivate, onViewPortfolio }: {
   const status = getCardStatus(card);
   const s = NFC_STATUS[status];
   const isActive = status === 'active';
+  const isLivree = card.statut === 'Livrée';
 
   const cardBg = isActive
     ? 'linear-gradient(140deg, #2E7D32, #1B5E20)'
-    : status === 'pending'
-    ? 'linear-gradient(140deg, #F59E0B, #D97706)'
+    : isLivree
+    ? 'linear-gradient(140deg, #1565C0, #1E40AF)'
+    : card.statut === 'Gravée'
+    ? 'linear-gradient(140deg, #7C3AED, #5B21B6)'
+    : card.statut === 'En_traitement'
+    ? 'linear-gradient(140deg, #0369A1, #0284C7)'
     : 'linear-gradient(140deg, #A1A1AA, #71717A)';
 
   return (
@@ -72,25 +122,28 @@ function NFCCardItem({ card, onActivate, onDeactivate, onViewPortfolio }: {
               <h3 className="font-semibold text-[#18181B] text-sm leading-tight line-clamp-1">
                 {card.portfolios?.title || 'Portfolio'}
               </h3>
-              <span
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0"
-                style={{ background: s.tint, color: s.color }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.dot }} />
-                {s.label}
-              </span>
-            </div>
-            <p className="text-xs font-mono text-[#71717A]/80 mt-1">UID : {card.card_uid || '—'}</p>
-            <div className="flex flex-wrap gap-x-3 mt-2 text-xs text-[#71717A]">
-              {card.ordered_at && (
-                <span>Commandée le {new Date(card.ordered_at).toLocaleDateString('fr-FR')}</span>
-              )}
-              {card.activated_at && (
-                <span>· Activée le {new Date(card.activated_at).toLocaleDateString('fr-FR')}</span>
+              {isLivree && (
+                <span
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium shrink-0"
+                  style={{ background: s.tint, color: s.color }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.dot }} />
+                  {s.label}
+                </span>
               )}
             </div>
+            <p className="text-xs font-mono text-[#71717A]/80 mt-1">UID : {card.card_uid || card.uid_nfc || '—'}</p>
+            {card.ordered_at && (
+              <p className="text-xs text-[#71717A] mt-1">
+                Commandée le {new Date(card.ordered_at).toLocaleDateString('fr-FR')}
+                {card.activated_at && <span> · Activée le {new Date(card.activated_at).toLocaleDateString('fr-FR')}</span>}
+              </p>
+            )}
           </div>
         </div>
+
+        {/* Stepper visible uniquement si pas encore livrée */}
+        {!isLivree && <CardProgressStepper statut={card.statut} />}
 
         <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[#E7E7EA]">
           {card.portfolios?.slug && (
@@ -101,21 +154,27 @@ function NFCCardItem({ card, onActivate, onDeactivate, onViewPortfolio }: {
               <Eye size={14} /> Voir portfolio
             </button>
           )}
-          {isActive ? (
-            <button
-              onClick={() => onDeactivate(card.id)}
-              className="flex-1 h-9 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B]/70 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-1.5"
-            >
-              <XCircle size={13} /> Désactiver
-            </button>
+          {isLivree ? (
+            isActive ? (
+              <button
+                onClick={() => onDeactivate(card.id)}
+                className="flex-1 h-9 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B]/70 hover:bg-zinc-50 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <XCircle size={13} /> Désactiver
+              </button>
+            ) : (
+              <button
+                onClick={() => onActivate(card.id)}
+                className="flex-1 h-9 rounded-[10px] text-sm font-semibold text-white transition-colors flex items-center justify-center gap-1.5"
+                style={{ background: '#2E7D32' }}
+              >
+                <Zap size={14} /> {card.activated_at ? 'Réactiver' : 'Activer'}
+              </button>
+            )
           ) : (
-            <button
-              onClick={() => onActivate(card.id)}
-              className="flex-1 h-9 rounded-[10px] text-sm font-semibold text-white transition-colors flex items-center justify-center gap-1.5"
-              style={{ background: '#2E7D32' }}
-            >
-              <Zap size={14} /> {card.activated_at ? 'Réactiver' : 'Activer'}
-            </button>
+            <span className="flex-1 h-9 rounded-[10px] border border-dashed border-[#E7E7EA] text-xs text-[#71717A] flex items-center justify-center gap-1.5">
+              <Clock size={12} /> En cours de traitement
+            </span>
           )}
         </div>
       </div>
@@ -137,6 +196,12 @@ const NFCCards = () => {
   const [orderItems, setOrderItems]     = useState<LocalOrderItem[]>([]);
   const [pendingItem, setPendingItem]   = useState<LocalOrderItem>({ portfolio_id: '', quantity: 1 });
   const [submitting, setSubmitting]     = useState(false);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [cancelConfirm, setCancelConfirm] = useState<number | null>(null);
+  const [paymentOrder, setPaymentOrder] = useState<{ id: number; numero: string; montant: number } | null>(null);
+  const [paymentRef, setPaymentRef]     = useState('');
+  const [paymentMode, setPaymentMode]   = useState<'wave' | 'orange_money'>('wave');
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
 
   const [searchTerm, setSearchTerm]     = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending'>('all');
@@ -171,7 +236,8 @@ const NFCCards = () => {
     navigate('/upgrade');
   };
 
-  const loadData = async () => {
+  const loadData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const token = localStorage.getItem('token');
       const pRes  = await fetch(`${API_BASE}/api/portfolios`, { headers: { Authorization: `Bearer ${token}` } });
@@ -201,26 +267,47 @@ const NFCCards = () => {
       const allCards: any[] = [];
       for (const oc of ordersWithCards) {
         const ord = oc.order || {};
+        if (ord.statut === 'Annulée') continue;
         for (const card of (oc.cards || [])) {
           const portfolioSlug = card.lien_portfolio || card.lienPortfolio || card.portfolio_slug || '';
           const matching      = normalizedPortfolios.find((p: any) => (p.slug || '') === portfolioSlug);
           allCards.push({
             ...card,
-            order_id:   ord.id,
-            ordered_at: ord.date_commande || ord.created_at || ord.ordered_at,
-            statut:     ord.statut || ord.status || 'pending',
+            order_id:        ord.id,
+            ordered_at:      ord.date_commande || ord.created_at || ord.ordered_at,
+            statut:          card.statut || 'En_attente',
+            commande_statut: ord.statut || 'En_attente',
+            paiement_statut: ord.paiement_statut || 'non_payé',
             portfolios: { title: matching ? (matching.title || matching.titre) : (portfolioSlug || 'Portfolio'), slug: portfolioSlug },
           });
         }
       }
       setNfcCards(allCards);
+      setOrders(ordersWithCards.map(oc => oc.order).filter(Boolean));
     } catch (error: any) {
-      console.error('Error loading data:', error);
-      toast({ title: "Erreur", description: "Impossible de charger les données", variant: "destructive" });
+      if (!silent) {
+        console.error('Error loading data:', error);
+        toast({ title: "Erreur", description: "Impossible de charger les données", variant: "destructive" });
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
+
+  // Polling silencieux toutes les 5s si des commandes ou cartes sont en cours de traitement
+  const hasPendingOrders = useMemo(
+    () => orders.some(o => o.statut !== 'Annulée' && (o.paiement_statut === 'non_payé' || o.paiement_statut === 'en_attente_validation')),
+    [orders]
+  );
+  const hasCardsInProgress = useMemo(
+    () => nfcCards.some(c => c.statut === 'En_attente' || c.statut === 'En_traitement' || c.statut === 'Gravée'),
+    [nfcCards]
+  );
+  useEffect(() => {
+    if (!hasPendingOrders && !hasCardsInProgress) return;
+    const id = setInterval(() => loadData(true), 5000);
+    return () => clearInterval(id);
+  }, [hasPendingOrders, hasCardsInProgress]);
 
   const filteredAndSortedCards = useMemo(() => {
     let filtered = [...nfcCards];
@@ -260,7 +347,9 @@ const NFCCards = () => {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Erreur lors de la commande');
-      toast({ title: 'Commande effectuée !', description: `Commande ${json.order?.numero_commande || json.order?.id || ''} créée avec succès.` });
+      // Ouvrir le modal de paiement
+      setPaymentOrder({ id: json.order.id, numero: json.order.numero_commande, montant: json.order.montant_total });
+      setPaymentRef('');
       setShowOrderForm(false);
       setOrderItems([]);
       setPendingItem({ portfolio_id: '', quantity: 1 });
@@ -269,6 +358,48 @@ const NFCCards = () => {
       toast({ title: "Erreur", description: error.message || "Impossible de passer la commande", variant: "destructive" });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSubmitPayment = async () => {
+    if (!paymentOrder) return;
+    if (!paymentRef.trim()) {
+      toast({ title: 'Erreur', description: 'Entrez votre référence de transaction', variant: 'destructive' });
+      return;
+    }
+    setPaymentSubmitting(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}/api/commandes/${paymentOrder.id}/paiement`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ mode: paymentMode, reference: paymentRef.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Erreur');
+      toast({ title: 'Preuve envoyée !', description: 'L\'admin va valider votre paiement sous peu.' });
+      setPaymentOrder(null);
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message, variant: 'destructive' });
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  };
+
+  const cancelOrder = async (orderId: number) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}/api/commandes/${orderId}/annuler`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Erreur');
+      toast({ title: 'Commande annulée', description: 'La commande a été annulée avec succès.' });
+      setCancelConfirm(null);
+      await loadData();
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -381,6 +512,102 @@ const NFCCards = () => {
               <NFCStat icon={<Zap size={18} />}         label="Prix unitaire" value="30 000 F" />
             </div>
 
+            {/* ── Suivi commandes ── */}
+            {orders.filter(o => o.statut !== 'Annulée').length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-[#71717A] uppercase tracking-wide">Suivi des commandes</p>
+                {orders
+                  .filter(o => o.statut !== 'Annulée')
+                  .map(order => {
+                    const ps = order.paiement_statut || 'non_payé';
+                    const dateStr = new Date(order.date_commande || order.created_at || order.ordered_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+                    const montantStr = `${Number(order.montant_total).toLocaleString()} F CFA`;
+
+                    if (ps === 'non_payé') return (
+                      <div key={order.id} className="bg-orange-50 border border-orange-200 rounded-2xl px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-mono font-semibold text-sm text-orange-800">#{order.numero_commande}</p>
+                          <p className="text-xs text-orange-600 mt-0.5">{dateStr} · <span className="font-semibold">{montantStr}</span></p>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-orange-700 bg-orange-100 px-2 py-0.5 rounded-full mt-1">
+                            <Clock size={10} /> En attente de paiement
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {cancelConfirm === order.id ? (
+                            <>
+                              <span className="text-xs text-red-700 font-medium">Confirmer ?</span>
+                              <button onClick={() => cancelOrder(order.id)} className="h-8 px-3 rounded-[8px] bg-red-600 text-white text-xs font-semibold hover:bg-red-700 transition-colors">Oui</button>
+                              <button onClick={() => setCancelConfirm(null)} className="h-8 px-3 rounded-[8px] border border-gray-300 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">Non</button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => { setPaymentOrder({ id: order.id, numero: order.numero_commande, montant: order.montant_total }); setPaymentRef(''); }}
+                                className="h-8 px-3 rounded-[8px] text-xs font-semibold text-white transition-colors"
+                                style={{ background: '#2E7D32' }}
+                              >Payer</button>
+                              <button
+                                onClick={() => setCancelConfirm(order.id)}
+                                className="h-8 px-3 rounded-[8px] border border-red-300 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors flex items-center gap-1"
+                              ><XCircle size={12} /> Annuler</button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+
+                    if (ps === 'en_attente_validation') return (
+                      <div key={order.id} className="bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-mono font-semibold text-sm text-blue-800">#{order.numero_commande}</p>
+                          <p className="text-xs text-blue-600 mt-0.5">{dateStr} · <span className="font-semibold">{montantStr}</span></p>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full mt-1">
+                            <Clock size={10} /> Paiement en cours de validation
+                          </span>
+                          {order.paiement_reference && (
+                            <p className="text-xs text-blue-500 mt-1 font-mono">Réf : {order.paiement_reference}</p>
+                          )}
+                        </div>
+                        <p className="text-xs text-blue-500 shrink-0">Réponse sous 24h</p>
+                      </div>
+                    );
+
+                    if (ps === 'refusé') return (
+                      <div key={order.id} className="bg-red-50 border border-red-200 rounded-2xl px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-mono font-semibold text-sm text-red-800">#{order.numero_commande}</p>
+                          <p className="text-xs text-red-600 mt-0.5">{dateStr} · <span className="font-semibold">{montantStr}</span></p>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-700 bg-red-100 px-2 py-0.5 rounded-full mt-1">
+                            <XCircle size={10} /> Paiement refusé
+                          </span>
+                          {order.paiement_note && (
+                            <p className="text-xs text-red-500 mt-1">Note admin : {order.paiement_note}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => { setPaymentOrder({ id: order.id, numero: order.numero_commande, montant: order.montant_total }); setPaymentRef(''); }}
+                          className="h-8 px-3 rounded-[8px] text-xs font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors shrink-0"
+                        >Réessayer</button>
+                      </div>
+                    );
+
+                    // payé
+                    return (
+                      <div key={order.id} className="bg-green-50 border border-green-200 rounded-2xl px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-mono font-semibold text-sm text-green-800">#{order.numero_commande}</p>
+                          <p className="text-xs text-green-600 mt-0.5">{dateStr} · <span className="font-semibold">{montantStr}</span></p>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full mt-1">
+                            <CheckCircle size={10} /> Paiement validé — {order.statut}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                }
+              </div>
+            )}
+
             {/* ── Filter bar ── */}
             {nfcCards.length > 0 && (
               <div className="bg-white rounded-2xl border border-[#E7E7EA] p-2.5 flex items-center gap-2.5">
@@ -401,8 +628,9 @@ const NFCCards = () => {
                   >
                     <option value="all">Tous statuts</option>
                     <option value="active">Actives</option>
+                    <option value="livree">Prêtes à activer</option>
                     <option value="inactive">Inactives</option>
-                    <option value="pending">En attente</option>
+                    <option value="pending">En fabrication</option>
                   </select>
                   <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#71717A]" />
                 </div>
@@ -615,6 +843,85 @@ const NFCCards = () => {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal paiement obligatoire ───────────────────────── */}
+      {paymentOrder && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+            <div className="text-center">
+              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <CreditCard className="text-green-600" size={28} />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">Paiement requis</h2>
+              <p className="text-sm text-gray-500 mt-1">Commande <span className="font-mono font-semibold">#{paymentOrder.numero}</span></p>
+            </div>
+
+            {/* Montant */}
+            <div className="bg-green-50 rounded-xl p-4 text-center">
+              <p className="text-3xl font-bold text-green-700">{Number(paymentOrder.montant).toLocaleString()} F CFA</p>
+              <p className="text-sm text-green-600 mt-1">Montant à régler</p>
+            </div>
+
+            {/* Mode de paiement */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">Mode de paiement</label>
+              <div className="grid grid-cols-2 gap-3">
+                {(['wave', 'orange_money'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setPaymentMode(mode)}
+                    className={`p-3 rounded-xl border-2 text-sm font-semibold transition-all ${paymentMode === mode ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                  >
+                    {mode === 'wave' ? '🌊 Wave' : '🟠 Orange Money'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Numéro à payer */}
+            <div className="bg-blue-50 rounded-xl p-4 text-center">
+              <p className="text-xs text-blue-600 font-medium uppercase tracking-wide mb-1">
+                {paymentMode === 'wave' ? 'Numéro Wave' : 'Numéro Orange Money'} à créditer
+              </p>
+              <p className="text-2xl font-bold text-blue-800">+221 78 131 13 71</p>
+              <p className="text-xs text-blue-500 mt-1">Portefolia</p>
+            </div>
+
+            {/* Référence transaction */}
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-gray-700">
+                Référence de transaction <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={paymentRef}
+                onChange={e => setPaymentRef(e.target.value)}
+                placeholder="Ex: W-1234567890"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+              />
+              <p className="text-xs text-gray-400">Copiez la référence reçue par SMS après le paiement</p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setPaymentOrder(null)}
+                className="flex-1 py-3 rounded-xl border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                Payer plus tard
+              </button>
+              <button
+                onClick={handleSubmitPayment}
+                disabled={paymentSubmitting || !paymentRef.trim()}
+                className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
+              >
+                {paymentSubmitting ? 'Envoi…' : 'Confirmer le paiement'}
+              </button>
+            </div>
+            <p className="text-xs text-center text-gray-400">L'admin validera votre paiement sous 24h</p>
           </div>
         </div>
       )}

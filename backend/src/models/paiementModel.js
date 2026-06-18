@@ -29,11 +29,16 @@ async function init() {
       `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'paiements' AND COLUMN_NAME IN ('metadata', 'image_paiement','invoice_id','motif_remboursement','abonnement_id')`
     );
     const existing = (cols || []).map(c => c.COLUMN_NAME);
-    // Ensure commande_id is nullable to support abonnement-linked paiements
+    // Ensure commande_id and abonnement_id are both nullable
     try {
       await pool.query(`ALTER TABLE paiements MODIFY commande_id INT DEFAULT NULL`);
     } catch (e) {
       // ignore if not supported or no change needed
+    }
+    try {
+      await pool.query(`ALTER TABLE paiements MODIFY abonnement_id INT DEFAULT NULL`);
+    } catch (e) {
+      // ignore
     }
     if (!existing.includes('metadata')) {
       try { await pool.query(`ALTER TABLE paiements ADD COLUMN metadata JSON DEFAULT NULL`); } catch (e) { console.warn('Could not add metadata column', e.message || e); }
@@ -52,6 +57,17 @@ async function init() {
     if (!existing.includes('motif_remboursement')) {
       try { await pool.query(`ALTER TABLE paiements ADD COLUMN motif_remboursement VARCHAR(1024) DEFAULT NULL`); } catch (e) { console.warn('Could not add motif_remboursement column', e.message || e); }
     }
+    // Colonne type_paiement : abonnement | reabonnement | upgrade | commande_nfc
+    try {
+      const [tpCols] = await pool.query(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'paiements' AND COLUMN_NAME = 'type_paiement'`
+      );
+      if (!tpCols || tpCols.length === 0) {
+        await pool.query(`ALTER TABLE paiements ADD COLUMN type_paiement VARCHAR(50) NOT NULL DEFAULT 'abonnement'`);
+        // Tagger les enregistrements existants liés à des commandes NFC
+        await pool.query(`UPDATE paiements SET type_paiement = 'commande_nfc' WHERE commande_id IS NOT NULL AND type_paiement = 'abonnement'`);
+      }
+    } catch (e) { console.warn('Could not add type_paiement column', e.message || e); }
   } catch (err) {
     // If the DB doesn't support JSON or INFORMATION_SCHEMA access, ignore and let other queries fail visibly.
     console.warn('paiementModel.init: could not ensure metadata column exists', err.message || err);
@@ -69,8 +85,8 @@ async function createPaiement(data) {
     montant: data.montant || 0,
     statut: data.statut || data.status || 'En_attente',
     metadata: data.metadata ? JSON.stringify(data.metadata) : null,
-    // Some deployments have image_paiement column NOT NULL; ensure we don't insert null values
     image_paiement: (data.image_paiement || data.image) ? (data.image_paiement || data.image) : '',
+    type_paiement: data.type_paiement || (data.commande_id ? 'commande_nfc' : 'abonnement'),
   };
   const keys = Object.keys(payload).join(', ');
   const placeholders = Object.keys(payload).map(() => '?').join(', ');
@@ -125,6 +141,9 @@ async function list({ page = 1, limit = 50, status = null, user_id = null, from 
 SELECT paiements.*,
        paiements.reference_transaction AS reference,
        paiements.statut AS status,
+       COALESCE(paiements.type_paiement,
+         IF(paiements.commande_id IS NOT NULL, 'commande_nfc', 'abonnement')
+       ) AS type_paiement,
        c.numero_commande,
        COALESCE(c.utilisateur_id, a.utilisateur_id) AS utilisateur_id,
        COALESCE(

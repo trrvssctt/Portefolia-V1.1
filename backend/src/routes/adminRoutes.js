@@ -48,6 +48,8 @@ router.put('/portfolios/:id/feature', auth, adminAuth, adminController.featurePo
 router.get('/commandes', auth, adminAuth, adminController.adminListCommandes);
 router.get('/commandes/:id', auth, adminAuth, adminController.adminGetCommande);
 router.put('/commandes/:id/status', auth, adminAuth, adminController.adminUpdateCommandeStatus);
+router.put('/commandes/:id/valider-paiement', auth, adminAuth, adminController.adminValiderPaiement);
+router.put('/commandes/:id/refuser-paiement', auth, adminAuth, adminController.adminRefuserPaiement);
 router.get('/commandes/:id/invoice/pdf', auth, adminAuth, adminController.getCommandeInvoicePdf);
 
 // Analytics & reports
@@ -61,6 +63,7 @@ router.get('/cartes', auth, adminAuth, adminController.listCartes);
 router.get('/cartes/:id', auth, adminAuth, adminController.getCarte);
 router.put('/cartes/:id/assign-uid', auth, adminAuth, adminController.assignUidCarte);
 router.put('/cartes/:id/status', auth, adminAuth, adminController.setCarteStatus);
+router.put('/cartes/:id', auth, adminAuth, adminController.updateCarte);
 router.delete('/cartes/:id', auth, adminAuth, adminController.deleteCarte);
 
 // Paiements admin (delegated to dedicated routes file)

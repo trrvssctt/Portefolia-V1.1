@@ -1,8 +1,7 @@
 'use strict';
 
-const ASSET_BASE = process.env.EMAIL_ASSET_BASE || 'https://portefolia.tech';
-const LOGO_URL   = `${ASSET_BASE}/lovable-uploads/logo_portefolia_remove_bg.png`;
-const FRONTEND   = process.env.FRONTEND_BASE   || 'https://portefolia.tech';
+const LOGO_URL = 'https://portefolia.tech/lovable-uploads/logo_portefolia_remove_bg.png';
+const FRONTEND = 'https://portefolia.tech';
 
 function fmtFcfa(n) {
   return `${Math.round(n).toLocaleString('fr-FR')} FCFA`;
@@ -13,10 +12,11 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-function buildReceiptHtml({ receiptNumber, client, plan, montant, duree_mois, reference_wave, moyen_paiement, date_paiement, date_echeance }) {
+function buildReceiptHtml({ receiptNumber, type, client, plan, numero_commande, montant, duree_mois, reference_wave, moyen_paiement, date_paiement, date_echeance }) {
+  const isNFC = type === 'commande_nfc';
   const moyenLabel = moyen_paiement
-    ? moyen_paiement.charAt(0).toUpperCase() + moyen_paiement.slice(1).toLowerCase()
-    : 'Wave Money';
+    ? moyen_paiement.charAt(0).toUpperCase() + moyen_paiement.slice(1).replace(/_/g, ' ')
+    : 'Mobile Money';
   const dureeLabel = duree_mois === 12 ? '1 an' : duree_mois === 1 ? '1 mois' : `${duree_mois} mois`;
 
   return `<!DOCTYPE html>
@@ -110,8 +110,8 @@ function buildReceiptHtml({ receiptNumber, client, plan, montant, duree_mois, re
   <table class="rec">
     <thead class="th">
       <tr>
-        <th style="width:55%">Description</th>
-        <th>Durée</th>
+        <th style="width:${isNFC ? '70%' : '55%'}">Description</th>
+        ${isNFC ? '' : '<th>Durée</th>'}
         <th>Montant HT</th>
         <th>Montant TTC</th>
       </tr>
@@ -119,15 +119,19 @@ function buildReceiptHtml({ receiptNumber, client, plan, montant, duree_mois, re
     <tbody>
       <tr>
         <td>
-          <strong>Abonnement ${plan.name}</strong><br>
-          <span style="font-size:11px;color:#6b7280">Accès complet à la plateforme Portefolia</span>
+          ${isNFC
+            ? `<strong>Carte NFC Portefolia</strong><br>
+               <span style="font-size:11px;color:#6b7280">Commande N° ${numero_commande || '—'} · Carte NFC personnalisée</span>`
+            : `<strong>${plan.name}</strong><br>
+               <span style="font-size:11px;color:#6b7280">Accès complet à la plateforme Portefolia</span>`
+          }
         </td>
-        <td>${dureeLabel}</td>
+        ${isNFC ? '' : `<td>${dureeLabel}</td>`}
         <td>${fmtFcfa(montant)}</td>
         <td>${fmtFcfa(montant)}</td>
       </tr>
       <tr class="total">
-        <td colspan="3">Total payé</td>
+        <td colspan="${isNFC ? '2' : '3'}">Total payé</td>
         <td>${fmtFcfa(montant)}</td>
       </tr>
     </tbody>
@@ -140,7 +144,7 @@ function buildReceiptHtml({ receiptNumber, client, plan, montant, duree_mois, re
       <span>${moyenLabel}</span>
     </div>
     <div class="pill">
-      <label>Référence Wave</label>
+      <label>Référence transaction</label>
       <span>${reference_wave || '—'}</span>
     </div>
     <div class="pill">
@@ -149,7 +153,7 @@ function buildReceiptHtml({ receiptNumber, client, plan, montant, duree_mois, re
     </div>
   </div>
 
-  ${date_echeance ? `
+  ${!isNFC && date_echeance ? `
   <div class="validity">
     <p>Abonnement actif jusqu'au <strong>${fmtDate(date_echeance)}</strong>.
     Renouvelez avant cette date pour conserver l'accès à votre espace.</p>

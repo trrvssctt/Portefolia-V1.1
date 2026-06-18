@@ -8,11 +8,42 @@ async function init() {
       uid_nfc VARCHAR(150) UNIQUE NOT NULL,
       lien_portfolio TEXT,
       design TEXT,
-      statut ENUM('En_attente','Gravée','Envoyée','Active') DEFAULT 'En_attente',
-      date_activation TIMESTAMP NULL,
+      statut VARCHAR(50) DEFAULT 'En_attente',
+      is_active TINYINT(1) NOT NULL DEFAULT 0,
+      activated_at TIMESTAMP NULL DEFAULT NULL,
+      date_activation TIMESTAMP NULL DEFAULT NULL,
+      notes TEXT DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
       CONSTRAINT fk_carte_commande FOREIGN KEY (commande_id) REFERENCES commandes(id) ON DELETE CASCADE
     ) ENGINE=InnoDB;
   `);
+
+  // Migrations pour tables existantes
+  const [cols] = await pool.query(
+    `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'cartes_nfc'`
+  ).catch(() => [[]]);
+  const existing = (cols || []).map(c => c.COLUMN_NAME);
+
+  if (!existing.includes('is_active')) {
+    await pool.query(`ALTER TABLE cartes_nfc ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 0`).catch(() => {});
+  }
+  if (!existing.includes('activated_at')) {
+    await pool.query(`ALTER TABLE cartes_nfc ADD COLUMN activated_at TIMESTAMP NULL DEFAULT NULL`).catch(() => {});
+  }
+  if (!existing.includes('notes')) {
+    await pool.query(`ALTER TABLE cartes_nfc ADD COLUMN notes TEXT DEFAULT NULL`).catch(() => {});
+  }
+  if (!existing.includes('created_at')) {
+    await pool.query(`ALTER TABLE cartes_nfc ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
+  }
+  if (!existing.includes('updated_at')) {
+    await pool.query(`ALTER TABLE cartes_nfc ADD COLUMN updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP`).catch(() => {});
+  }
+  // Migrer ENUM → VARCHAR pour accepter tous les statuts
+  await pool.query(
+    `ALTER TABLE cartes_nfc MODIFY COLUMN statut VARCHAR(50) DEFAULT 'En_attente'`
+  ).catch(() => {});
 }
 
 async function createCarte(data) {
@@ -73,8 +104,18 @@ async function assignUid(id, uid) {
   return await findById(id);
 }
 
+async function activate(id) {
+  await pool.query('UPDATE cartes_nfc SET is_active = 1, activated_at = NOW() WHERE id = ?', [id]);
+  return await findById(id);
+}
+
+async function deactivate(id) {
+  await pool.query('UPDATE cartes_nfc SET is_active = 0 WHERE id = ?', [id]);
+  return await findById(id);
+}
+
 async function deleteCarte(id) {
   await pool.query('DELETE FROM cartes_nfc WHERE id = ?', [id]);
 }
 
-module.exports = { init, createCarte, findByCommande, findById, findAll, updateCarte, setStatus, assignUid, deleteCarte };
+module.exports = { init, createCarte, findByCommande, findById, findAll, updateCarte, setStatus, assignUid, activate, deactivate, deleteCarte };

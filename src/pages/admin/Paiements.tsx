@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   AlertCircle, CheckCircle2, RefreshCw, Search, TrendingUp, XCircle,
   ExternalLink, Download, Filter, DollarSign, CreditCard, Calendar,
-  Eye, Clock, Receipt, Banknote, User, X, ChevronLeft, ChevronRight,
+  Eye, Clock, Receipt, Banknote, User, X, ChevronLeft, ChevronRight, Mail,
 } from 'lucide-react';
 import { UserPaiementHistorique } from '@/components/admin/UserPaiementHistorique';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +22,7 @@ type Paiement = {
   payment_method: string | null;
   montant: number;
   status: string;
+  type_paiement: string;
   date_paiement: string | null;
   created_at: string;
   notes?: string;
@@ -42,6 +43,14 @@ const STATUS_PILL: Record<string, { c: string; bg: string; label: string }> = {
   refunded:  { c: '#7C3AED', bg: '#F3EEFF', label: 'Remboursé' },
   upcoming:  { c: '#7C3AED', bg: '#F3EEFF', label: 'À venir' },
   cancelled: { c: '#52525B', bg: '#F4F4F5', label: 'Annulé' },
+};
+
+// ─── Type badges ──────────────────────────────────────────────────────────────
+const TYPE_BADGE: Record<string, { c: string; bg: string; label: string }> = {
+  abonnement:   { c: '#2E7D32', bg: '#EAF5EB', label: 'Abonnement' },
+  reabonnement: { c: '#0369a1', bg: '#e0f2fe', label: 'Réabonnement' },
+  upgrade:      { c: '#92400e', bg: '#fef3c7', label: 'Upgrade' },
+  commande_nfc: { c: '#6d28d9', bg: '#ede9fe', label: 'Carte NFC' },
 };
 
 const PAYMENT_METHODS = [
@@ -66,6 +75,16 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
+function TypeBadge({ type }: { type: string }) {
+  const t = TYPE_BADGE[type] ?? { c: '#52525B', bg: '#F4F4F5', label: type };
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+      style={{ color: t.c, background: t.bg }}>
+      {t.label}
+    </span>
+  );
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function AdminPaiements() {
   const { toast } = useToast();
@@ -76,6 +95,7 @@ export default function AdminPaiements() {
   const [refreshing, setRefreshing]       = useState(false);
   const [search, setSearch]               = useState('');
   const [statusFilter, setStatusFilter]   = useState('all');
+  const [typeFilter, setTypeFilter]       = useState('all');
   const [methodFilter, setMethodFilter]   = useState('all');
   const [dateFilter, setDateFilter]       = useState('all');
   const [sortBy, setSortBy]               = useState<'date' | 'user' | 'amount' | 'status'>('date');
@@ -85,6 +105,7 @@ export default function AdminPaiements() {
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [newStatus, setNewStatus]         = useState('');
   const [notes, setNotes]                 = useState('');
+  const [sendingEmail, setSendingEmail]   = useState(false);
   const [stats, setStats] = useState({
     total: 0, paid: 0, pending: 0, failed: 0, refunded: 0,
     totalRevenue: 0, avgAmount: 0, todayRevenue: 0,
@@ -139,26 +160,31 @@ export default function AdminPaiements() {
       const json = await res.json();
       const items = statusFilter === 'upcoming' ? (json.upcoming || []) : (json.paiements || json.items || []);
 
-      const normalized: Paiement[] = items.map((p: any) => ({
-        id: p.id,
-        reference: p.reference || p.reference_transaction || null,
-        numero_commande: p.numero_commande || p.order_number || null,
-        commande_id: p.commande_id || p.order_id || null,
-        utilisateur_id: p.utilisateur_id || p.user_id || null,
-        user_name: p.user_name
-          || (p.utilisateur_prenom ? `${p.utilisateur_prenom} ${p.utilisateur_nom || ''}`.trim() : null)
-          || p.user_prenom || null,
-        user_email: p.user_email || p.utilisateur_email || null,
-        image_paiement: p.image_paiement || p.payment_image || null,
-        payment_method: p.moyen_paiement || p.payment_method || 'Manual',
-        montant: Number(p.montant || p.montant_total || p.amount || 0),
-        status: canonicalStatus(p.status || p.statut || 'pending'),
-        date_paiement: p.date_paiement || p.created_at || p.createdAt || null,
-        created_at: p.created_at || p.createdAt || new Date().toISOString(),
-        notes: p.notes || p.commentaire || null,
-        invoice_id: p.invoice_id || p.facture_id || null,
-        motif_remboursement: p.motif_remboursement || p.motif || p.refund_reason || null,
-      }));
+      const normalized: Paiement[] = items.map((p: any) => {
+        const commandeId = p.commande_id || p.order_id || null;
+        const rawType = p.type_paiement || (commandeId ? 'commande_nfc' : 'abonnement');
+        return {
+          id: p.id,
+          reference: p.reference || p.reference_transaction || null,
+          numero_commande: p.numero_commande || p.order_number || null,
+          commande_id: commandeId,
+          utilisateur_id: p.utilisateur_id || p.user_id || null,
+          user_name: p.user_name
+            || (p.utilisateur_prenom ? `${p.utilisateur_prenom} ${p.utilisateur_nom || ''}`.trim() : null)
+            || p.user_prenom || null,
+          user_email: p.user_email || p.utilisateur_email || null,
+          image_paiement: p.image_paiement || p.payment_image || null,
+          payment_method: p.moyen_paiement || p.payment_method || 'Manual',
+          montant: Number(p.montant || p.montant_total || p.amount || 0),
+          status: canonicalStatus(p.status || p.statut || 'pending'),
+          type_paiement: rawType,
+          date_paiement: p.date_paiement || p.created_at || p.createdAt || null,
+          created_at: p.created_at || p.createdAt || new Date().toISOString(),
+          notes: p.notes || p.commentaire || null,
+          invoice_id: p.invoice_id || p.facture_id || null,
+          motif_remboursement: p.motif_remboursement || p.motif || p.refund_reason || null,
+        };
+      });
 
       setPaiements(normalized);
 
@@ -213,6 +239,7 @@ export default function AdminPaiements() {
       const cf = canonicalStatus(statusFilter);
       list = list.filter(p => p.status === cf);
     }
+    if (typeFilter !== 'all') list = list.filter(p => p.type_paiement === typeFilter);
     if (methodFilter !== 'all') list = list.filter(p => p.payment_method === methodFilter);
     if (dateFilter !== 'all') {
       const now = new Date();
@@ -263,6 +290,27 @@ export default function AdminPaiements() {
       loadPaiements();
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const resendEmail = async (paiementId: number) => {
+    setSendingEmail(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}/api/admin/paiements/${paiementId}/send-email`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok) {
+        toast({ title: 'Email envoyé', description: `Confirmation envoyée à ${json?.sent_to || 'l\'utilisateur'}.` });
+      } else {
+        toast({ title: 'Erreur', description: json?.error || 'Impossible d\'envoyer l\'email.' });
+      }
+    } catch {
+      toast({ title: 'Erreur réseau', description: 'Vérifiez votre connexion.' });
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -408,6 +456,21 @@ export default function AdminPaiements() {
               className="w-full h-9 pl-9 pr-3 rounded-lg bg-zinc-50 border border-transparent focus:border-[#E7E7EA] outline-none text-sm text-[#18181B]" />
           </div>
 
+          {/* Type tabs */}
+          <div className="flex flex-wrap items-center gap-2">
+            {([['all', 'Tous types'], ['abonnement', 'Abonnement'], ['reabonnement', 'Réabonnement'], ['upgrade', 'Upgrade'], ['commande_nfc', 'Carte NFC']] as const).map(([k, label]) => {
+              const active = typeFilter === k;
+              const t = k !== 'all' ? TYPE_BADGE[k] : null;
+              return (
+                <button key={k} onClick={() => setTypeFilter(k)}
+                  className={`px-3 h-8 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${active ? 'text-white' : 'border border-[#E7E7EA] text-zinc-500 hover:bg-zinc-50'}`}
+                  style={active ? { background: t ? t.c : '#1B5E20' } : undefined}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Status tabs + filters */}
           <div className="flex flex-wrap items-center gap-2">
             {STATUS_TABS.map(([k, label]) => (
@@ -491,6 +554,7 @@ export default function AdminPaiements() {
                   <tr className="text-left text-xs font-bold uppercase tracking-wide text-zinc-400 border-b border-[#E7E7EA]">
                     <th className="py-3 px-5">Référence</th>
                     <th className="py-3 px-3">Client</th>
+                    <th className="py-3 px-3">Type</th>
                     <th className="py-3 px-3">Méthode</th>
                     <th className="py-3 px-3 text-right">Montant</th>
                     <th className="py-3 px-3">Statut</th>
@@ -513,6 +577,9 @@ export default function AdminPaiements() {
                         {p.user_email && (
                           <p className="text-xs text-zinc-400 truncate max-w-[160px]">{p.user_email}</p>
                         )}
+                      </td>
+                      <td className="py-3 px-3">
+                        <TypeBadge type={p.type_paiement} />
                       </td>
                       <td className="py-3 px-3">
                         <span className="flex items-center gap-1.5 text-sm text-[#18181B]">
@@ -608,11 +675,15 @@ export default function AdminPaiements() {
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Stats */}
               <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-[#E7E7EA] p-3">
+                  <p className="text-[10px] font-bold uppercase text-zinc-400 mb-1">Type</p>
+                  <TypeBadge type={selectedPaiement.type_paiement} />
+                </div>
                 {[
                   ['Montant', formatCurrency(selectedPaiement.montant)],
                   ['Méthode', getMethodLabel(selectedPaiement.payment_method || '')],
                   ['Date', formatDate(selectedPaiement.date_paiement)],
-                  ['Commande', `#${selectedPaiement.numero_commande || '—'}`],
+                  ...(selectedPaiement.numero_commande ? [['N° commande', `#${selectedPaiement.numero_commande}`]] : []),
                 ].map(([l, v]) => (
                   <div key={l} className="rounded-xl border border-[#E7E7EA] p-3">
                     <p className="text-[10px] font-bold uppercase text-zinc-400 mb-0.5">{l}</p>
@@ -688,15 +759,25 @@ export default function AdminPaiements() {
             </div>
 
             {/* Footer */}
-            <div className="border-t border-[#E7E7EA] p-4 flex items-center gap-2 shrink-0">
-              <button onClick={() => openInvoice(selectedPaiement)}
-                className="flex-1 h-10 rounded-lg border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 flex items-center justify-center gap-1.5 transition-colors">
-                <Receipt size={14} /> Facture
-              </button>
-              <button onClick={() => { setUpdateDialogOpen(true); setNewStatus(selectedPaiement.status); }}
-                className="flex-1 h-10 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-1.5"
-                style={{ background: '#2E7D32' }}>
-                <RefreshCw size={14} /> Modifier statut
+            <div className="border-t border-[#E7E7EA] p-4 flex flex-col gap-2 shrink-0">
+              <div className="flex items-center gap-2">
+                <button onClick={() => openInvoice(selectedPaiement)}
+                  className="flex-1 h-10 rounded-lg border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 flex items-center justify-center gap-1.5 transition-colors">
+                  <Receipt size={14} /> Facture
+                </button>
+                <button onClick={() => { setUpdateDialogOpen(true); setNewStatus(selectedPaiement.status); }}
+                  className="flex-1 h-10 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-1.5"
+                  style={{ background: '#2E7D32' }}>
+                  <RefreshCw size={14} /> Modifier statut
+                </button>
+              </div>
+              <button
+                onClick={() => resendEmail(selectedPaiement.id)}
+                disabled={sendingEmail}
+                className="w-full h-10 rounded-lg border border-blue-200 text-sm font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Mail size={14} />
+                {sendingEmail ? 'Envoi en cours…' : 'Renvoyer l\'email de confirmation'}
               </button>
             </div>
           </div>

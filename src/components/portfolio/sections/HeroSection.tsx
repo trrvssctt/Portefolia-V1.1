@@ -3,6 +3,7 @@ import {
   Download, Share2, MapPin, Phone, Copy, Check,
   Globe, Linkedin, Github, Twitter, Facebook, Instagram, Building2,
 } from "lucide-react";
+import { downloadCV } from "@/utils/downloadCV";
 
 interface HeroSectionProps {
   portfolio: any;
@@ -110,11 +111,12 @@ export const HeroSection = ({ portfolio, onShare }: HeroSectionProps) => {
 
             <div className="flex flex-wrap gap-2 mt-4">
               {portfolio.cv_url && (
-                <a href={portfolio.cv_url} target="_blank" rel="noopener noreferrer"
+                <button
+                  onClick={() => downloadCV(portfolio.cv_url, portfolio.full_name || portfolio.nom || 'Profil')}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
                   style={{ backgroundColor: themeColor }}>
                   <Download className="w-4 h-4" /> Télécharger CV
-                </a>
+                </button>
               )}
               <button onClick={onShare}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-white border border-gray-200 text-gray-700 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">

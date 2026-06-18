@@ -10,6 +10,7 @@ const invoiceModel = require('../models/invoiceModel');
 const planModel = require('../models/planModel');
 const abonnementModel = require('../models/abonnementModel');
 const sendEmail = require('../utils/sendEmail');
+const { emailPaiementCommandeValide, emailCommandeLivree } = require('../utils/emailTemplates');
 const checkoutModel = require('../models/checkoutModel');
 
 async function listUsers(req, res) {
@@ -1095,16 +1096,35 @@ async function adminListCommandes(req, res) {
     const page = Number(req.query.page) || 1;
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const offset = (page - 1) * limit;
-    // filters: status, user_id, date_from, date_to
     const where = [];
     const params = [];
-    if (req.query.status) { where.push('statut = ?'); params.push(req.query.status); }
-    if (req.query.user_id) { where.push('utilisateur_id = ?'); params.push(Number(req.query.user_id)); }
-    if (req.query.date_from) { where.push('date_commande >= ?'); params.push(req.query.date_from); }
-    if (req.query.date_to) { where.push('date_commande <= ?'); params.push(req.query.date_to); }
+    if (req.query.status) { where.push('c.statut = ?'); params.push(req.query.status); }
+    if (req.query.user_id) { where.push('c.utilisateur_id = ?'); params.push(Number(req.query.user_id)); }
+    if (req.query.date_from) { where.push('c.date_commande >= ?'); params.push(req.query.date_from); }
+    if (req.query.date_to) { where.push('c.date_commande <= ?'); params.push(req.query.date_to); }
     const whereSql = where.length ? ('WHERE ' + where.join(' AND ')) : '';
-    const [rows] = await pool.query(`SELECT * FROM commandes ${whereSql} ORDER BY date_commande DESC LIMIT ? OFFSET ?`, [...params, limit, offset]);
-    return res.json({ commandes: rows, page, limit });
+    const [rows] = await pool.query(`
+      SELECT
+        c.*,
+        c.date_commande AS ordered_at,
+        u.email AS utilisateur_email,
+        u.prenom AS utilisateur_prenom,
+        u.nom AS utilisateur_nom,
+        u.photo_profil AS utilisateur_avatar
+      FROM commandes c
+      LEFT JOIN utilisateurs u ON u.id = c.utilisateur_id
+      ${whereSql}
+      ORDER BY c.date_commande DESC LIMIT ? OFFSET ?
+    `, [...params, limit, offset]);
+    const commandes = rows.map(r => ({
+      ...r,
+      utilisateur: {
+        first_name: r.utilisateur_prenom || '',
+        last_name: r.utilisateur_nom || '',
+        profile_image_url: r.utilisateur_avatar || null,
+      },
+    }));
+    return res.json({ commandes, page, limit });
   } catch (err) {
     console.error('admin.adminListCommandes error:', err);
     return res.status(500).json({ error: 'Server error' });
@@ -1130,10 +1150,102 @@ async function adminUpdateCommandeStatus(req, res) {
     const id = Number(req.params.id);
     const { statut } = req.body;
     if (!id || !statut) return res.status(400).json({ error: 'Invalid payload' });
+    const commande = await commandeModelLocal.findById(id);
+    if (!commande) return res.status(404).json({ error: 'Commande introuvable' });
+    if (commande.paiement_statut !== 'payé') {
+      return res.status(400).json({ error: 'Paiement non encore validé. Validez le paiement avant de traiter la commande.' });
+    }
     const updated = await commandeModelLocal.updateStatus(id, statut);
+    // Email de livraison
+    if (statut === 'Livrée') {
+      try {
+        const user = await userModel.findById(commande.utilisateur_id);
+        if (user && user.email) {
+          const tpl = emailCommandeLivree({
+            prenom: user.prenom || user.nom || 'Client',
+            numero_commande: commande.numero_commande,
+            montant: commande.montant_total,
+          });
+          await sendEmail(user.email, tpl.subject, tpl.html);
+        }
+      } catch (mailErr) {
+        console.warn('adminUpdateCommandeStatus: email livraison non envoyé', mailErr.message);
+      }
+    }
     return res.json({ commande: updated });
   } catch (err) {
     console.error('admin.adminUpdateCommandeStatus error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+async function adminValiderPaiement(req, res) {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const commande = await commandeModelLocal.findById(id);
+    if (!commande) return res.status(404).json({ error: 'Commande introuvable' });
+    if (commande.paiement_statut === 'payé') return res.status(400).json({ error: 'Paiement déjà validé' });
+    const { note } = req.body;
+    const updated = await commandeModelLocal.updatePaiement(id, {
+      paiement_statut: 'payé',
+      paiement_note: note || null,
+    });
+    // Mettre à jour l'entrée paiements (confirmé)
+    try {
+      await pool.query(
+        "UPDATE paiements SET statut = 'confirmed', updated_at = NOW() WHERE commande_id = ?",
+        [id]
+      );
+    } catch (pErr) {
+      console.warn('adminValiderPaiement: paiements update failed', pErr.message);
+    }
+
+    // Email de confirmation au client
+    try {
+      const user = await userModel.findById(commande.utilisateur_id);
+      if (user && user.email) {
+        const tpl = emailPaiementCommandeValide({
+          prenom: user.prenom || user.nom || 'Client',
+          numero_commande: commande.numero_commande,
+          montant: commande.montant_total,
+          paiement_mode: commande.paiement_mode,
+        });
+        await sendEmail(user.email, tpl.subject, tpl.html);
+      }
+    } catch (mailErr) {
+      console.warn('adminValiderPaiement: email non envoyé', mailErr.message);
+    }
+    return res.json({ commande: updated });
+  } catch (err) {
+    console.error('admin.adminValiderPaiement error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+async function adminRefuserPaiement(req, res) {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const commande = await commandeModelLocal.findById(id);
+    if (!commande) return res.status(404).json({ error: 'Commande introuvable' });
+    const { note } = req.body;
+    const updated = await commandeModelLocal.updatePaiement(id, {
+      paiement_statut: 'refusé',
+      paiement_note: note || null,
+    });
+    // Mettre à jour l'entrée paiements (échec)
+    try {
+      await pool.query(
+        "UPDATE paiements SET statut = 'failed', updated_at = NOW() WHERE commande_id = ?",
+        [id]
+      );
+    } catch (pErr) {
+      console.warn('adminRefuserPaiement: paiements update failed', pErr.message);
+    }
+    return res.json({ commande: updated });
+  } catch (err) {
+    console.error('admin.adminRefuserPaiement error:', err);
     return res.status(500).json({ error: 'Server error' });
   }
 }
@@ -1201,8 +1313,33 @@ async function getCommandeInvoicePdf(req, res) {
 // --- Cartes admin ---
 async function listCartes(req, res) {
   try {
-    const q = await carteModel.findAll({ page: req.query.page, limit: req.query.limit, statut: req.query.statut, commande_id: req.query.commande_id });
-    return res.json(q);
+    const limit = Math.min(Number(req.query.limit) || 100, 1000);
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const offset = (page - 1) * limit;
+    const where = [];
+    const params = [];
+    if (req.query.statut) { where.push('cn.statut = ?'); params.push(req.query.statut); }
+    if (req.query.commande_id) { where.push('cn.commande_id = ?'); params.push(Number(req.query.commande_id)); }
+    const whereSql = where.length ? ('WHERE ' + where.join(' AND ')) : '';
+    const [rows] = await pool.query(`
+      SELECT
+        cn.*,
+        COALESCE(cn.created_at, c.date_commande) AS created_at,
+        c.date_commande,
+        c.statut AS commande_statut,
+        c.paiement_statut,
+        u.email AS client_email,
+        TRIM(CONCAT(COALESCE(u.prenom, ''), ' ', COALESCE(u.nom, ''))) AS client_name,
+        u.photo_profil AS client_avatar,
+        p.titre AS portfolio_title
+      FROM cartes_nfc cn
+      LEFT JOIN commandes c ON c.id = cn.commande_id
+      LEFT JOIN utilisateurs u ON u.id = c.utilisateur_id
+      LEFT JOIN portfolios p ON p.url_slug = cn.lien_portfolio
+      ${whereSql}
+      ORDER BY cn.id DESC LIMIT ? OFFSET ?
+    `, [...params, limit, offset]);
+    return res.json({ cartes: rows, page, limit });
   } catch (err) {
     console.error('admin.listCartes error:', err);
     return res.status(500).json({ error: 'Server error' });
@@ -1243,6 +1380,24 @@ async function setCarteStatus(req, res) {
     return res.json({ carte: updated });
   } catch (err) {
     console.error('admin.setCarteStatus error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+async function updateCarte(req, res) {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'Invalid id' });
+    const allowed = ['statut', 'notes', 'design', 'lien_portfolio', 'uid_nfc'];
+    const patch = {};
+    for (const k of allowed) {
+      if (req.body[k] !== undefined) patch[k] = req.body[k];
+    }
+    if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'No valid fields' });
+    const updated = await carteModel.updateCarte(id, patch);
+    return res.json({ carte: updated });
+  } catch (err) {
+    console.error('admin.updateCarte error:', err);
     return res.status(500).json({ error: 'Server error' });
   }
 }
@@ -1664,8 +1819,8 @@ module.exports = {
   listUsers, listCommandes, getUser, activateUser, deactivateUser, deleteUser, permanentDeleteUser,
   updateUser, getUserPlans, changeUserPlan, getUserCartes,
   listPortfolios, getPortfolio, updatePortfolioAdmin, deletePortfolio, featurePortfolio,
-  adminListCommandes, adminGetCommande, adminUpdateCommandeStatus,
-  listCartes, getCarte, assignUidCarte, setCarteStatus, deleteCarte,
+  adminListCommandes, adminGetCommande, adminUpdateCommandeStatus, adminValiderPaiement, adminRefuserPaiement,
+  listCartes, getCarte, assignUidCarte, setCarteStatus, updateCarte, deleteCarte,
   listPaiements, getPaiement, updatePaiementStatus,
   listNotifications, createNotification
 };

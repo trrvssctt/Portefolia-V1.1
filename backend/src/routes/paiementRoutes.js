@@ -25,4 +25,9 @@ router.put('/:id/status', auth, adminAuth, async (req, res) => {
   return paiementController.updateStatus(req, res);
 });
 
+// POST /:id/send-email -> resend confirmation email
+router.post('/:id/send-email', auth, adminAuth, async (req, res) => {
+  return paiementController.sendConfirmationEmail(req, res);
+});
+
 module.exports = router;

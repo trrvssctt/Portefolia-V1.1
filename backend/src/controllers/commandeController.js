@@ -1,6 +1,8 @@
 const commandeModel = require('../models/commandeModel');
 const carteModel = require('../models/carteModel');
 const portfolioModel = require('../models/portfolioModel');
+const paiementModel = require('../models/paiementModel');
+const { pool } = require('../db');
 const fs = require('fs');
 const path = require('path');
 
@@ -15,23 +17,47 @@ function genCardUid() {
 async function createOrder(req, res) {
   try {
     const userId = req.userId;
-    const { portfolio_id, quantity = 1, adresse_livraison } = req.body;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-    if (!portfolio_id) return res.status(400).json({ error: 'portfolio_id required' });
 
-    const portfolio = await portfolioModel.findById(portfolio_id);
-    if (!portfolio || String(portfolio.utilisateur_id) !== String(userId)) return res.status(403).json({ error: 'Forbidden' });
+    const { adresse_livraison } = req.body;
 
+    // Accepte { items: [{portfolio_id, quantity}] } OU { portfolio_id, quantity }
+    let items = req.body.items;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      const { portfolio_id, quantity = 1 } = req.body;
+      if (!portfolio_id) return res.status(400).json({ error: 'portfolio_id required' });
+      items = [{ portfolio_id, quantity }];
+    }
+
+    // Vérifier que tous les portfolios appartiennent à l'utilisateur
+    const resolvedItems = [];
+    for (const item of items) {
+      const { portfolio_id, quantity = 1 } = item;
+      if (!portfolio_id) return res.status(400).json({ error: 'portfolio_id required dans chaque item' });
+      const portfolio = await portfolioModel.findById(portfolio_id);
+      if (!portfolio || String(portfolio.utilisateur_id) !== String(userId)) {
+        return res.status(403).json({ error: `Portfolio ${portfolio_id} non autorisé` });
+      }
+      resolvedItems.push({ portfolio, quantity: Number(quantity) });
+    }
+
+    const montant = resolvedItems.reduce((sum, it) => sum + it.quantity * 30000, 0);
     const numero = genOrderNumber();
-    const montant = quantity * 30000;
-    const order = await commandeModel.createCommande({ utilisateur_id: userId, numero_commande: numero, montant_total: montant, adresse_livraison, type_commande: 'commande_carte' });
+    const order = await commandeModel.createCommande({
+      utilisateur_id: userId,
+      numero_commande: numero,
+      montant_total: montant,
+      adresse_livraison,
+      type_commande: 'commande_carte',
+    });
 
-    // create cartes linked to order
     const cards = [];
-    for (let i=0;i<quantity;i++) {
-      const uid = genCardUid();
-      const card = await carteModel.createCarte({ commande_id: order.id, uid_nfc: uid, lien_portfolio: portfolio.url_slug });
-      cards.push(card);
+    for (const { portfolio, quantity } of resolvedItems) {
+      for (let i = 0; i < quantity; i++) {
+        const uid = genCardUid();
+        const card = await carteModel.createCarte({ commande_id: order.id, uid_nfc: uid, lien_portfolio: portfolio.url_slug });
+        cards.push(card);
+      }
     }
 
     return res.status(201).json({ order, cards });
@@ -145,6 +171,25 @@ async function getOrder(req, res) {
     if (!order) return res.status(404).json({ error: 'Not found' });
     if (String(order.utilisateur_id) !== String(req.userId)) return res.status(403).json({ error: 'Forbidden' });
     const cards = await carteModel.findByCommande(order.id);
+
+    // Si commandes.paiement_statut n'est pas encore à jour, on cross-check la table paiements
+    if (!order.paiement_statut || order.paiement_statut === 'non_payé' || order.paiement_statut === 'en_attente_validation') {
+      const [paiRows] = await pool.query(
+        "SELECT statut FROM paiements WHERE commande_id = ? ORDER BY id DESC LIMIT 1",
+        [id]
+      );
+      if (paiRows && paiRows.length > 0) {
+        const ps = (paiRows[0].statut || '').toLowerCase();
+        if (ps === 'confirmed' || ps === 'paid' || ps === 'réussi' || ps === 'reussi') {
+          order.paiement_statut = 'payé';
+        } else if (ps === 'pending_admin' || ps === 'pending') {
+          order.paiement_statut = 'en_attente_validation';
+        } else if (ps === 'failed') {
+          order.paiement_statut = 'refusé';
+        }
+      }
+    }
+
     return res.json({ order, cards });
   } catch (err) {
     console.error('Error fetching order:', err);
@@ -164,4 +209,72 @@ async function updateOrderStatus(req, res) {
   }
 }
 
-module.exports = { createOrder, createPublicOrder, listOrders, getOrder, updateOrderStatus };
+// Utilisateur soumet une preuve de paiement (Wave ref, etc.)
+async function submitPaymentProof(req, res) {
+  try {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const id = Number(req.params.id);
+    const order = await commandeModel.findById(id);
+    if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+    if (String(order.utilisateur_id) !== String(userId)) return res.status(403).json({ error: 'Forbidden' });
+    if (order.paiement_statut === 'payé') return res.status(400).json({ error: 'Paiement déjà validé' });
+
+    const { mode, reference } = req.body;
+    if (!mode || !reference) return res.status(400).json({ error: 'mode et reference requis' });
+
+    const updated = await commandeModel.updatePaiement(id, {
+      paiement_statut: 'en_attente_validation',
+      paiement_mode: mode,
+      paiement_reference: reference,
+    });
+
+    // Créer ou mettre à jour l'entrée dans la table paiements
+    try {
+      const [existing] = await pool.query('SELECT id FROM paiements WHERE commande_id = ? LIMIT 1', [id]);
+      if (existing.length > 0) {
+        await pool.query(
+          'UPDATE paiements SET statut = ?, moyen_paiement = ?, reference_transaction = ?, updated_at = NOW() WHERE id = ?',
+          ['pending_admin', mode, reference, existing[0].id]
+        );
+      } else {
+        // INSERT sans abonnement_id pour éviter la contrainte NOT NULL sur cette colonne
+        await pool.query(
+          'INSERT INTO paiements (commande_id, moyen_paiement, reference_transaction, montant, statut, image_paiement, type_paiement) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [id, mode, reference, order.montant_total, 'pending_admin', '', 'commande_nfc']
+        );
+      }
+    } catch (pErr) {
+      console.warn('submitPaymentProof: paiements insert failed', pErr.message);
+    }
+
+    return res.json({ order: updated });
+  } catch (err) {
+    console.error('submitPaymentProof error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+async function cancelOrder(req, res) {
+  try {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const id = Number(req.params.id);
+    const order = await commandeModel.findById(id);
+    if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+    if (String(order.utilisateur_id) !== String(userId)) return res.status(403).json({ error: 'Forbidden' });
+    if (order.paiement_statut !== 'non_payé') {
+      return res.status(400).json({ error: 'Impossible d\'annuler : un paiement a déjà été enregistré sur cette commande' });
+    }
+    if (order.statut === 'Annulée') {
+      return res.status(400).json({ error: 'Commande déjà annulée' });
+    }
+    const updated = await commandeModel.updateStatus(id, 'Annulée');
+    return res.json({ order: updated });
+  } catch (err) {
+    console.error('cancelOrder error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+module.exports = { createOrder, createPublicOrder, listOrders, getOrder, updateOrderStatus, submitPaymentProof, cancelOrder };

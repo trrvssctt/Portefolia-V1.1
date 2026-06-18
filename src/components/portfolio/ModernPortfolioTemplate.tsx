@@ -6,6 +6,7 @@ import {
   Linkedin, Twitter, Facebook, Instagram, Globe, ArrowLeft,
   Copy, Check, FolderOpen, Briefcase, Cpu,
 } from "lucide-react";
+import { downloadCV } from "@/utils/downloadCV";
 
 // ── Same props as before ──────────────────────────────────────────────────────
 interface ModernPortfolioTemplateProps {
@@ -142,11 +143,12 @@ function TopBar({ portfolio, accent, dark, onCopy, copied }: {
             {copied ? 'Copié !' : 'Copier le lien'}
           </button>
           {portfolio.cv_url && (
-            <a href={portfolio.cv_url} target="_blank" rel="noopener noreferrer"
+            <button
+              onClick={() => downloadCV(portfolio.cv_url, portfolio.full_name || portfolio.nom || 'Profil')}
               className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-sm font-semibold text-white transition-colors"
               style={{ background: accent }}>
               <Download size={14} /> CV
-            </a>
+            </button>
           )}
         </div>
       </div>

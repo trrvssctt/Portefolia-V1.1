@@ -8,6 +8,8 @@ router.post('/', auth, commandeController.createOrder);
 router.get('/', auth, commandeController.listOrders);
 router.get('/:id', auth, commandeController.getOrder);
 router.put('/:id/status', auth, commandeController.updateOrderStatus);
+router.put('/:id/paiement', auth, commandeController.submitPaymentProof);
+router.put('/:id/annuler', auth, commandeController.cancelOrder);
 
 // public order creation (guests)
 router.post('/public', commandeController.createPublicOrder);

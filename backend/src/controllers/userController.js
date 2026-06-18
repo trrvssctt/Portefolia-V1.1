@@ -106,16 +106,17 @@ async function getMyReceiptPDF(req, res) {
     if (!utilisateur_id) return res.status(401).json({ error: 'Unauthorized' });
     if (!paiementId)    return res.status(400).json({ error: 'ID invalide' });
 
-    // Récupère le paiement + abonnement + plan + utilisateur en une requête
+    // Récupère le paiement + abonnement + plan + commande + utilisateur en une requête
     const [[row]] = await pool.query(`
       SELECT
         p.id, p.montant, p.statut, p.moyen_paiement, p.reference_transaction,
-        p.date_paiement, p.created_at,
+        p.date_paiement, p.created_at, p.commande_id,
         a.id AS abo_id, a.utilisateur_id AS abo_utilisateur_id,
         a.duree_mois, a.date_echeance, a.reference_wave,
         pl.name AS plan_name,
         u.nom, u.prenom, u.email,
-        c.utilisateur_id AS commande_utilisateur_id
+        c.utilisateur_id AS commande_utilisateur_id,
+        c.numero_commande, c.montant_total AS commande_montant
       FROM paiements p
       LEFT JOIN abonnements a  ON a.id = p.abonnement_id
       LEFT JOIN plans       pl ON pl.id = a.plan_id
@@ -143,16 +144,19 @@ async function getMyReceiptPDF(req, res) {
     const receiptMonth  = String(now.getMonth() + 1).padStart(2, '0');
     const receiptNumber = `RECU-${now.getFullYear()}${receiptMonth}-${String(paiementId).padStart(5, '0')}`;
 
+    const isCommandeNFC = !!(row.commande_id && !row.abo_id);
     const pdfBuffer = await generateReceiptPDF({
       receiptNumber,
-      client:         { prenom: row.prenom || '', nom: row.nom || '', email: row.email || '' },
-      plan:           { name: row.plan_name || 'Abonnement' },
-      montant:        Number(row.montant || 0),
-      duree_mois:     row.duree_mois ?? 1,
-      reference_wave: row.reference_wave || row.reference_transaction || null,
-      moyen_paiement: row.moyen_paiement || 'wave',
-      date_paiement:  now,
-      date_echeance:  row.date_echeance ?? null,
+      type:            isCommandeNFC ? 'commande_nfc' : 'abonnement',
+      client:          { prenom: row.prenom || '', nom: row.nom || '', email: row.email || '' },
+      plan:            { name: row.plan_name || 'Portefolia Premium' },
+      numero_commande: row.numero_commande || null,
+      montant:         Number(isCommandeNFC ? (row.commande_montant || row.montant) : row.montant) || 0,
+      duree_mois:      row.duree_mois ?? 1,
+      reference_wave:  row.reference_wave || row.reference_transaction || null,
+      moyen_paiement:  row.moyen_paiement || 'wave',
+      date_paiement:   now,
+      date_echeance:   isCommandeNFC ? null : (row.date_echeance ?? null),
     });
 
     if (!pdfBuffer) {

@@ -99,6 +99,8 @@ app.get('/', (req, res) => res.json({ok: true}));
 
 // Mount order routes
 app.use('/api/commandes', commandeRoutes);
+// NFC cartes (user activate/deactivate)
+app.use('/api/cartes', require('./routes/carteRoutes'));
 // NFC card plans (public)
 app.use('/api/nfc-cards', carteVisiteRoutes);
 // Template routes (public + admin)

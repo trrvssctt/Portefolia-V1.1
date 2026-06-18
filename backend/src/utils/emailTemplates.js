@@ -514,6 +514,81 @@ function emailComptabiliteValidation({ client_prenom, client_nom, client_email, 
   };
 }
 
+// ─── Paiement commande NFC validé ─────────────────────────────────────────────
+function emailPaiementCommandeValide({ prenom = '', numero_commande, montant, paiement_mode }) {
+  const modeLabel = paiement_mode === 'wave' ? 'Wave' : paiement_mode === 'orange_money' ? 'Orange Money' : paiement_mode || 'Mobile Money';
+  const body = `
+    <p style="margin:0 0 20px;font-size:15px;color:#374151;">Bonjour <strong>${prenom}</strong>,</p>
+    <p style="margin:0 0 20px;font-size:15px;color:#374151;">
+      Bonne nouvelle ! Votre paiement pour la commande
+      <strong style="color:#1b5e20;">#${numero_commande}</strong> a été <strong>validé</strong> par notre équipe.
+    </p>
+    <table cellpadding="0" cellspacing="0" width="100%" style="background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;margin:0 0 28px;padding:20px 24px;">
+      <tr>
+        <td style="font-size:13px;color:#166534;padding:4px 0;"><strong>N° commande :</strong></td>
+        <td style="font-size:13px;color:#166534;padding:4px 0;text-align:right;font-family:monospace;">#${numero_commande}</td>
+      </tr>
+      <tr>
+        <td style="font-size:13px;color:#166534;padding:4px 0;"><strong>Montant :</strong></td>
+        <td style="font-size:13px;color:#166534;padding:4px 0;text-align:right;">${fmtFcfa(montant)}</td>
+      </tr>
+      <tr>
+        <td style="font-size:13px;color:#166534;padding:4px 0;"><strong>Mode :</strong></td>
+        <td style="font-size:13px;color:#166534;padding:4px 0;text-align:right;">${modeLabel}</td>
+      </tr>
+    </table>
+    <p style="margin:0 0 20px;font-size:15px;color:#374151;">
+      Votre carte NFC est maintenant en cours de <strong>préparation et gravure</strong>. Vous serez notifié dès qu'elle sera expédiée.
+    </p>
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+      <tr>
+        <td style="background:#2E7D32;border-radius:10px;padding:14px 32px;text-align:center;">
+          <a href="${FRONTEND}/dashboard/nfc-cards" style="color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Suivre ma commande</a>
+        </td>
+      </tr>
+    </table>
+  `;
+  return {
+    subject: `✅ Paiement validé — Commande #${numero_commande}`,
+    html: wrap({ header: 'Paiement confirmé 🎉', subheader: 'Votre carte NFC est en préparation', body }),
+  };
+}
+
+// ─── Commande NFC livrée ───────────────────────────────────────────────────────
+function emailCommandeLivree({ prenom = '', numero_commande, montant }) {
+  const body = `
+    <p style="margin:0 0 20px;font-size:15px;color:#374151;">Bonjour <strong>${prenom}</strong>,</p>
+    <p style="margin:0 0 20px;font-size:15px;color:#374151;">
+      Votre carte NFC Portefolia (commande <strong style="color:#1b5e20;">#${numero_commande}</strong>)
+      a été <strong>livrée</strong> avec succès. Elle est maintenant prête à être activée !
+    </p>
+    <table cellpadding="0" cellspacing="0" width="100%" style="background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;margin:0 0 28px;padding:20px 24px;">
+      <tr>
+        <td style="font-size:13px;color:#166534;padding:4px 0;"><strong>N° commande :</strong></td>
+        <td style="font-size:13px;color:#166534;padding:4px 0;text-align:right;font-family:monospace;">#${numero_commande}</td>
+      </tr>
+      <tr>
+        <td style="font-size:13px;color:#166534;padding:4px 0;"><strong>Montant réglé :</strong></td>
+        <td style="font-size:13px;color:#166534;padding:4px 0;text-align:right;">${fmtFcfa(montant)}</td>
+      </tr>
+    </table>
+    <p style="margin:0 0 20px;font-size:15px;color:#374151;">
+      Connectez-vous à votre espace pour <strong>activer votre carte</strong> et commencer à partager votre portfolio d'un simple geste NFC.
+    </p>
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto;">
+      <tr>
+        <td style="background:#2E7D32;border-radius:10px;padding:14px 32px;text-align:center;">
+          <a href="${FRONTEND}/dashboard/nfc-cards" style="color:#ffffff;font-size:15px;font-weight:700;text-decoration:none;">Activer ma carte NFC</a>
+        </td>
+      </tr>
+    </table>
+  `;
+  return {
+    subject: `📦 Carte NFC livrée — Commande #${numero_commande}`,
+    html: wrap({ header: 'Votre carte NFC est arrivée !', subheader: 'Activez-la dès maintenant', body }),
+  };
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -524,4 +599,6 @@ module.exports = {
   emailCompteExpire,
   emailComptabiliteValidation,
   emailBienvenueVerification,
+  emailPaiementCommandeValide,
+  emailCommandeLivree,
 };

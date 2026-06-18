@@ -447,8 +447,14 @@ export default function AdminCartes() {
     } catch (error) { console.error('Export error:', error); }
   };
 
-  const formatDate = (dateString: string) =>
-    format(new Date(dateString), "dd MMM yyyy HH:mm", { locale: fr });
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return '—';
+    try {
+      const d = new Date(dateString);
+      if (isNaN(d.getTime()) || d.getFullYear() < 2000) return '—';
+      return format(d, "dd MMM yyyy HH:mm", { locale: fr });
+    } catch { return '—'; }
+  };
 
   const TABS = [
     { key: 'list' as const,      label: 'Registre NFC' },
@@ -940,8 +946,8 @@ export default function AdminCartes() {
                   onChange={e => setSelectedCarte({ ...selectedCarte, statut: e.target.value, norm_statut: e.target.value } as any)}
                   className="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#2E7D32]/20 focus:border-[#2E7D32]"
                 >
-                  {Object.entries(S).map(([k, c]) => (
-                    <option key={k} value={k}>{c.label}</option>
+                  {(['En_attente', 'En_traitement', 'Gravée', 'Livrée'] as const).map(k => (
+                    <option key={k} value={k}>{S[k].label}</option>
                   ))}
                 </select>
               </div>

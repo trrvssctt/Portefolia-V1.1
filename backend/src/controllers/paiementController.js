@@ -6,6 +6,7 @@ const userModel = require('../models/userModel');
 const planModel = require('../models/planModel');
 const commandeModelLocal = require('../models/commandeModel');
 const sendEmail = require('../utils/sendEmail');
+const { emailPaiementCommandeValide } = require('../utils/emailTemplates');
 const abonnementModel = require('../models/abonnementModel');
 
 // Normalize status strings (remove diacritics and lowercase)
@@ -223,9 +224,35 @@ async function updateStatus(req, res) {
 
           // Attempt to send invoice email to user
                     try {
+                        const isCommandeNFC = !!(updated && updated.commande_id);
                         const user = await userModel.findById(userId);
-                        console.log('[paiementController.updateStatus] found user for email:', user && user.email);
-                        if (user && user.email) {
+                        console.log('[paiementController.updateStatus] found user for email:', user && user.email, 'isCommandeNFC:', isCommandeNFC);
+
+                        // For NFC card orders: update commandes.paiement_statut and send the right email
+                        if (isCommandeNFC) {
+                          try {
+                            await commandeModelLocal.updatePaiement(updated.commande_id, { paiement_statut: 'payé' });
+                          } catch (cErr) {
+                            console.warn('paiementController: could not update commandes.paiement_statut', cErr.message);
+                          }
+                          if (user && user.email) {
+                            try {
+                              const commande = await commandeModelLocal.findById(updated.commande_id);
+                              const tpl = emailPaiementCommandeValide({
+                                prenom: user.prenom || user.nom || 'Client',
+                                numero_commande: commande ? commande.numero_commande : updated.commande_id,
+                                montant: commande ? commande.montant_total : updated.montant,
+                                paiement_mode: commande ? commande.paiement_mode : null,
+                              });
+                              await sendEmail(user.email, tpl.subject, tpl.html);
+                              console.log('[paiementController.updateStatus] NFC order email sent to', user.email);
+                            } catch (mailErr) {
+                              console.warn('paiementController: NFC order email non envoyé', mailErr.message);
+                            }
+                          }
+                        }
+
+                        if (user && user.email && !isCommandeNFC) {
               const loginUrl = `${process.env.APP_URL || 'http://localhost:3000'}/auth`;
                                         const invoiceUrl = `${process.env.APP_URL || 'http://localhost:3000'}/admin/invoices/${invoice.id}`;
 
@@ -239,423 +266,92 @@ async function updateStatus(req, res) {
                                                     planName = p.name || planName;
                                                     planDescription = p.description || planDescription;
                                                 }
-                                            } else if (updated && updated.commande_id) {
-                                                try {
-                                                    const commande = await commandeModelLocal.findById(updated.commande_id);
-                                                    if (commande) planName = commande.type_commande || planName;
-                                                } catch (e) { /* ignore */ }
                                             }
                                         } catch (e) { /* ignore */ }
 
-                                        const emailBody = `
-                <!DOCTYPE html>
+                                        const emailBody = `<!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facture - Portefolia</title>
-    <style>
-        /* Styles pour la facture */
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            margin: 0;
-            padding: 20px;
-            background-color: #f9fafb;
-        }
-        
-        .invoice-container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            overflow: hidden;
-        }
-        
-        .invoice-header {
-            background: linear-gradient(135deg, #28A745 0%, #20c997 100%);
-            color: white;
-            padding: 40px;
-            text-align: center;
-        }
-        
-        .logo-container {
-            margin-bottom: 20px;
-        }
-        
-        .logo {
-            max-height: 60px;
-            width: auto;
-        }
-        
-        .company-info {
-            margin-top: 20px;
-            opacity: 0.9;
-        }
-        
-        .invoice-content {
-            padding: 40px;
-        }
-        
-        .customer-info {
-            background: #f8f9fa;
-            padding: 25px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-        }
-        
-        .invoice-details {
-            margin: 30px 0;
-        }
-        
-        .detail-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        
-        .detail-item {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 6px;
-            border-left: 4px solid #28A745;
-        }
-        
-        .detail-label {
-            font-size: 12px;
-            color: #6c757d;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 600;
-            margin-bottom: 5px;
-        }
-        
-        .detail-value {
-            font-size: 16px;
-            font-weight: 600;
-            color: #212529;
-        }
-        
-        .invoice-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 30px 0;
-            background: white;
-        }
-        
-        .invoice-table th {
-            background: #f8f9fa;
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
-            color: #495057;
-            border-bottom: 2px solid #dee2e6;
-        }
-        
-        .invoice-table td {
-            padding: 15px;
-            border-bottom: 1px solid #e9ecef;
-        }
-        
-        .total-section {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-top: 30px;
-        }
-        
-        .total-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-        }
-        
-        .total-amount {
-            font-size: 24px;
-            font-weight: 700;
-            color: #28A745;
-        }
-        
-        .invoice-footer {
-            text-align: center;
-            padding: 30px;
-            background: #f8f9fa;
-            border-top: 1px solid #e9ecef;
-            margin-top: 40px;
-        }
-        
-        .cta-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            margin: 30px 0;
-        }
-        
-        .btn {
-            display: inline-block;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 6px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-primary {
-            background: #28A745;
-            color: white;
-        }
-        
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .status-paid {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .contact-info {
-            display: flex;
-            justify-content: space-around;
-            flex-wrap: wrap;
-            margin-top: 30px;
-            padding-top: 30px;
-            border-top: 1px solid #e9ecef;
-        }
-        
-        .contact-item {
-            text-align: center;
-            margin: 10px;
-            min-width: 200px;
-        }
-        
-        @media (max-width: 768px) {
-            .invoice-content {
-                padding: 20px;
-            }
-            
-            .detail-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .cta-buttons {
-                flex-direction: column;
-            }
-            
-            .btn {
-                width: 100%;
-                text-align: center;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Confirmation de paiement - Portefolia</title>
 </head>
-<body>
-    <div class="invoice-container">
-        <!-- En-tête avec logo -->
-        <div class="invoice-header">
-            <div class="logo-container">
-                <!-- Remplacer src par l'URL de votre logo -->
-                <img src="../../../assets/logo_portefolia_remove_bg.png" alt="Portefolia Logo" class="logo">
-                <h1 style="margin: 10px 0 5px 0; font-size: 32px;">Portefolia</h1>
-                <p style="margin: 0; opacity: 0.9;">Votre portfolio numérique professionnel</p>
-            </div>
-            
-            <div class="company-info">
-                <p style="margin: 5px 0;">
-                    <strong>Numéro SIRET:</strong> 123 456 789 00012
-                </p>
-                <p style="margin: 5px 0;">
-                    <strong>Siège social:</strong> 123 Avenue de l'Innovation, 75000 Paris
-                </p>
-                <p style="margin: 5px 0;">
-                    <strong>TVA:</strong> FR 12 345 678 901
-                </p>
-            </div>
-        </div>
-        
-        <!-- Contenu principal -->
-        <div class="invoice-content">
-            <!-- Salutation personnalisée -->
-            <div style="margin-bottom: 30px;">
-                <h2 style="color: #28A745; margin-bottom: 10px;">Bonjour ${user.prenom || user.nom || 'Cher client'},</h2>
-                <p style="font-size: 16px; color: #495057;">
-                    Nous vous remercions pour votre confiance. Nous confirmons la réception de votre paiement 
-                    et avons généré votre facture. Vous trouverez ci-dessous le détail de votre transaction.
-                </p>
-            </div>
-            
-            <!-- Informations client -->
-            <div class="customer-info">
-                <h3 style="margin-top: 0; color: #495057;">Informations client</h3>
-                <div style="display: flex; flex-wrap: wrap; gap: 20px;">
-                    <div>
-                        <strong>${user.prenom} ${user.nom}</strong><br>
-                        ${user.email || ''}<br>
-                        ${user.phone || ''}<br>
-                        ${user.address || 'Adresse non spécifiée'}
-                    </div>
-                    <div>
-                        <strong>Date de facturation:</strong> ${new Date().toLocaleDateString('fr-FR', { 
-                            day: 'numeric', 
-                            month: 'long', 
-                            year: 'numeric' 
-                        })}<br>
-                        <strong>Statut:</strong> 
-                        <span class="status-badge status-paid">Payé</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Détails de la facture -->
-            <div class="invoice-details">
-                <h3 style="color: #495057; margin-bottom: 20px;">Détails de la facture</h3>
-                
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <div class="detail-label">Numéro de facture</div>
-                        <div class="detail-value">${invoice.id}</div>
-                    </div>
-                    
-                    <div class="detail-item">
-                        <div class="detail-label">Référence transaction</div>
-                        <div class="detail-value">${reference}</div>
-                    </div>
-                    
-                    <div class="detail-item">
-                        <div class="detail-label">Date de paiement</div>
-                        <div class="detail-value">${new Date().toLocaleDateString('fr-FR')}</div>
-                    </div>
-                    
-                    <div class="detail-item">
-                        <div class="detail-label">Méthode de paiement</div>
-                        <div class="detail-value">Carte bancaire</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Tableau des articles -->
-            <table class="invoice-table">
-                <thead>
-                    <tr>
-                        <th>Description</th>
-                        <th>Quantité</th>
-                        <th>Prix unitaire</th>
-                        <th>Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>
-                            <strong>Abonnement ${planName || 'Premium'}</strong><br>
-                            <small style="color: #6c757d;">
-                                ${planDescription || 'Accès complet à toutes les fonctionnalités'}
-                            </small>
-                        </td>
-                        <td>1</td>
-                        <td>${amount} ${currency}</td>
-                        <td>${amount} ${currency}</td>
-                    </tr>
-                </tbody>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Helvetica Neue',Arial,sans-serif;-webkit-text-size-adjust:100%;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.09);">
+        <tr>
+          <td style="background:#2E7D32;padding:32px 40px 24px;text-align:center;">
+            <img src="https://portefolia.tech/lovable-uploads/logo_portefolia_remove_bg.png" alt="Portefolia" width="160" style="display:block;margin:0 auto 4px;max-width:160px;" onerror="this.style.display='none'">
+            <p style="margin:10px 0 0;font-size:13px;color:rgba(255,255,255,.80);">Confirmation de paiement</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8fdf8;border-bottom:1px solid #e8f5e9;padding:18px 40px;text-align:center;">
+            <p style="margin:0;font-size:18px;font-weight:700;color:#1b5e20;">Paiement confirmé</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:36px 40px;">
+            <p style="font-size:16px;color:#111827;margin:0 0 8px;">Bonjour <strong>${user.prenom || user.nom || 'Client'}</strong>,</p>
+            <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 28px;">
+              Votre paiement a bien été validé. Voici le récapitulatif de votre transaction.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin:0 0 28px;">
+              <tr><td style="padding:20px 24px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="font-size:13px;color:#64748b;padding:7px 0;border-top:1px solid #e2e8f0;">N° facture</td>
+                    <td align="right" style="font-size:13px;font-weight:700;color:#111827;padding:7px 0;border-top:1px solid #e2e8f0;">#${invoice.id}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:13px;color:#64748b;padding:7px 0;border-top:1px solid #e2e8f0;">Référence</td>
+                    <td align="right" style="font-size:13px;font-weight:700;color:#1d4ed8;padding:7px 0;border-top:1px solid #e2e8f0;">${reference}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:13px;color:#64748b;padding:7px 0;border-top:1px solid #e2e8f0;">Service</td>
+                    <td align="right" style="font-size:13px;font-weight:700;color:#111827;padding:7px 0;border-top:1px solid #e2e8f0;">${planName}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:13px;color:#64748b;padding:7px 0;border-top:1px solid #e2e8f0;">Montant</td>
+                    <td align="right" style="font-size:13px;font-weight:700;color:#2E7D32;padding:7px 0;border-top:1px solid #e2e8f0;">${Math.round(Number(amount)).toLocaleString('fr-FR')} ${currency}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size:13px;color:#64748b;padding:7px 0;border-top:1px solid #e2e8f0;">Date</td>
+                    <td align="right" style="font-size:13px;font-weight:700;color:#111827;padding:7px 0;border-top:1px solid #e2e8f0;">${new Date().toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'})}</td>
+                  </tr>
+                </table>
+              </td></tr>
             </table>
-            
-            <!-- Section total -->
-            <div class="total-section">
-                <div class="total-row">
-                    <span>Sous-total:</span>
-                    <span>${amount} ${currency}</span>
-                </div>
-                <div class="total-row">
-                    <span>TVA (20%):</span>
-                    <span>${(parseFloat(amount) * 0.20).toFixed(2)} ${currency}</span>
-                </div>
-                <div class="total-row" style="border-top: 2px solid #dee2e6; padding-top: 15px;">
-                    <strong style="font-size: 18px;">Total TTC:</strong>
-                    <span class="total-amount">${(parseFloat(amount) * 1.20).toFixed(2)} ${currency}</span>
-                </div>
-            </div>
-            
-            <!-- Boutons d'action -->
-            <div class="cta-buttons">
-                <a href="${invoiceUrl}" class="btn btn-primary" style="background: #28A745;">
-                    📄 Télécharger la facture PDF
-                </a>
-                <a href="${loginUrl}" class="btn btn-secondary" style="background: #6c757d;">
-                    🔗 Accéder à mon compte
-                </a>
-            </div>
-            
-            <!-- Informations complémentaires -->
-            <div style="margin-top: 30px; padding: 20px; background: #e8f5e8; border-radius: 8px; border-left: 4px solid #28A745;">
-                <h4 style="margin-top: 0; color: #155724;">📋 Informations importantes</h4>
-                <ul style="margin-bottom: 0; color: #155724;">
-                    <li>Cette facture est disponible dans votre espace client</li>
-                    <li>Conservez cette facture pour vos déclarations fiscales</li>
-                    <li>Pour toute question, contactez notre service client</li>
-                    <li>Votre abonnement est automatiquement renouvelé</li>
-                </ul>
-            </div>
-        </div>
-        
-        <!-- Pied de page -->
-        <div class="invoice-footer">
-            <div class="contact-info">
-                <div class="contact-item">
-                    <strong>📞 Support technique</strong><br>
-                    <a href="tel:+33123456789" style="color: #28A745;">+33 1 23 45 67 89</a><br>
-                    support@portefolia.com
-                </div>
-                
-                <div class="contact-item">
-                    <strong>🏢 Siège social</strong><br>
-                    123 Avenue de l'Innovation<br>
-                    75000 Paris, France
-                </div>
-                
-                <div class="contact-item">
-                    <strong>🌐 Site web</strong><br>
-                    <a href="https://portefolia.tech" style="color: #28A745;">www.portefolia.tech</a><br>
-                    <a href="https://blog.portefolia.tech" style="color: #28A745;">Blog</a>
-                </div>
-            </div>
-            
-            <p style="margin: 20px 0 0 0; font-size: 12px; color: #6c757d;">
-                <strong>Conditions générales:</strong> Cette facture est établie conformément à nos CGV disponibles sur notre site web.<br>
-                <strong>Paiement:</strong> Le paiement est dû à réception de la facture. Tout retard de paiement entraînera des frais.<br>
-                <strong>Confidentialité:</strong> Vos données sont protégées conformément au RGPD.
+            <p style="text-align:center;margin:28px 0 12px;">
+              <a href="${loginUrl}" style="display:inline-block;background:#2E7D32;color:#ffffff;font-size:15px;font-weight:700;padding:14px 40px;border-radius:10px;text-decoration:none;" target="_blank" rel="noopener">Accéder à mon compte</a>
             </p>
-            
-            <p style="margin: 30px 0 0 0; color: #495057;">
-                Cordialement,<br>
-                <strong>L'équipe Portefolia</strong><br>
-                Votre succès est notre priorité
+            <p style="font-size:12px;color:#94a3b8;text-align:center;margin:8px 0 0;">
+              Conservez la référence <strong>${reference}</strong> pour tout suivi.
             </p>
-        </div>
-    </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center;">
+            <p style="margin:0 0 6px;font-size:12px;color:#94a3b8;">
+              Besoin d'aide ?
+              <a href="mailto:support@portefolia.tech" style="color:#2E7D32;text-decoration:none;font-weight:600;">support@portefolia.tech</a>
+            </p>
+            <p style="margin:0;font-size:11px;color:#cbd5e1;">
+              &copy; ${new Date().getFullYear()} Portefolia &middot;
+              <a href="https://portefolia.tech/mentions-legales" style="color:#94a3b8;text-decoration:none;">Mentions légales</a>
+              &middot;
+              <a href="https://portefolia.tech/confidentialite" style="color:#94a3b8;text-decoration:none;">Confidentialité</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
 </body>
-</html>
-              `;
+</html>`;
 
-                            await sendEmail(user.email, 'Confirmation de paiement et facture', emailBody, { text: `Facture ${invoice.id} - ${amount} ${currency}` });
+                            await sendEmail(user.email, `✅ Paiement confirmé — Facture #${invoice.id}`, emailBody, { text: `Facture ${invoice.id} - ${amount} ${currency}` });
                             console.log(`[paiementController.updateStatus] sendEmail OK to ${user.email} for invoice ${invoice.id}`);
             }
           } catch (e) {
@@ -1275,4 +971,103 @@ async function upcoming(req, res) {
   }
 }
 
-module.exports = { listAdmin, getById, updateStatus, upcoming };
+async function sendConfirmationEmail(req, res) {
+  try {
+    const id = Number(req.params.id);
+    const paiement = await paiementModel.findById(id);
+    if (!paiement) return res.status(404).json({ error: 'Paiement introuvable' });
+
+    const userId = paiement.utilisateur_id;
+    if (!userId) return res.status(400).json({ error: 'Aucun utilisateur associé' });
+
+    const user = await userModel.findById(userId);
+    if (!user || !user.email) return res.status(400).json({ error: 'Email utilisateur introuvable' });
+
+    const isCommandeNFC = !!(paiement.commande_id);
+
+    if (isCommandeNFC) {
+      const commande = await commandeModelLocal.findById(paiement.commande_id);
+      const tpl = emailPaiementCommandeValide({
+        prenom: user.prenom || user.nom || 'Client',
+        numero_commande: commande ? commande.numero_commande : paiement.commande_id,
+        montant: commande ? commande.montant_total : paiement.montant,
+        paiement_mode: commande ? commande.paiement_mode : null,
+      });
+      await sendEmail(user.email, tpl.subject, tpl.html);
+    } else {
+      // Abonnement / réabonnement / upgrade
+      const amount = paiement.montant || 0;
+      const currency = 'FCFA';
+      const reference = paiement.reference_transaction || paiement.reference || `PAY-${paiement.id}`;
+      let planName = 'Premium';
+      try {
+        if (paiement.abonnement_id) {
+          const [abRows] = await pool.query(
+            'SELECT p.name FROM abonnements a LEFT JOIN plans p ON p.id = a.plan_id WHERE a.id = ? LIMIT 1',
+            [paiement.abonnement_id]
+          );
+          if (abRows && abRows[0] && abRows[0].name) planName = abRows[0].name;
+        }
+      } catch (e) { /* ignore */ }
+
+      const loginUrl = `${process.env.APP_URL || 'https://portefolia.tech'}/auth`;
+      const emailBody = `<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.09);">
+        <tr><td style="background:#2E7D32;padding:32px 40px 24px;text-align:center;">
+          <img src="https://portefolia.tech/lovable-uploads/logo_portefolia_remove_bg.png" alt="Portefolia" width="160" style="display:block;margin:0 auto 4px;max-width:160px;" onerror="this.style.display='none'">
+          <p style="margin:10px 0 0;font-size:13px;color:rgba(255,255,255,.80);">Confirmation de paiement</p>
+        </td></tr>
+        <tr><td style="background:#f8fdf8;border-bottom:1px solid #e8f5e9;padding:18px 40px;text-align:center;">
+          <p style="margin:0;font-size:18px;font-weight:700;color:#1b5e20;">Paiement confirmé ✅</p>
+        </td></tr>
+        <tr><td style="padding:36px 40px;">
+          <p style="font-size:16px;color:#111827;margin:0 0 8px;">Bonjour <strong>${user.prenom || user.nom || 'Client'}</strong>,</p>
+          <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 28px;">Votre paiement a bien été validé. Voici le récapitulatif de votre transaction.</p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin:0 0 28px;">
+            <tr><td style="padding:20px 24px;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="font-size:13px;color:#64748b;padding:7px 0;border-top:1px solid #e2e8f0;">Référence</td>
+                  <td align="right" style="font-size:13px;font-weight:700;color:#1d4ed8;padding:7px 0;border-top:1px solid #e2e8f0;">${reference}</td>
+                </tr>
+                <tr>
+                  <td style="font-size:13px;color:#64748b;padding:7px 0;border-top:1px solid #e2e8f0;">Service</td>
+                  <td align="right" style="font-size:13px;font-weight:700;color:#111827;padding:7px 0;border-top:1px solid #e2e8f0;">${planName}</td>
+                </tr>
+                <tr>
+                  <td style="font-size:13px;color:#64748b;padding:7px 0;border-top:1px solid #e2e8f0;">Montant</td>
+                  <td align="right" style="font-size:13px;font-weight:700;color:#2E7D32;padding:7px 0;border-top:1px solid #e2e8f0;">${Math.round(Number(amount)).toLocaleString('fr-FR')} ${currency}</td>
+                </tr>
+                <tr>
+                  <td style="font-size:13px;color:#64748b;padding:7px 0;border-top:1px solid #e2e8f0;">Date</td>
+                  <td align="right" style="font-size:13px;font-weight:700;color:#111827;padding:7px 0;border-top:1px solid #e2e8f0;">${new Date().toLocaleDateString('fr-FR', {day:'numeric',month:'long',year:'numeric'})}</td>
+                </tr>
+              </table>
+            </td></tr>
+          </table>
+          <p style="text-align:center;margin:28px 0 12px;">
+            <a href="${loginUrl}" style="display:inline-block;background:#2E7D32;color:#ffffff;font-size:15px;font-weight:700;padding:14px 40px;border-radius:10px;text-decoration:none;">Accéder à mon compte</a>
+          </p>
+        </td></tr>
+        <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#94a3b8;">Besoin d'aide ? <a href="mailto:support@portefolia.tech" style="color:#2E7D32;text-decoration:none;font-weight:600;">support@portefolia.tech</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+      await sendEmail(user.email, `✅ Paiement confirmé — Référence ${reference}`, emailBody);
+    }
+
+    return res.json({ ok: true, sent_to: user.email });
+  } catch (err) {
+    console.error('paiementController.sendConfirmationEmail error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+module.exports = { listAdmin, getById, updateStatus, upcoming, sendConfirmationEmail };

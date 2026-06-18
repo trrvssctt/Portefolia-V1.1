@@ -15,6 +15,19 @@ async function init() {
       CONSTRAINT fk_commande_utilisateur FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id) ON DELETE CASCADE
     ) ENGINE=InnoDB;
   `);
+  // Migration : s'assurer que l'ENUM statut inclut toutes les valeurs (Gravée + Annulée)
+  await pool.query(`
+    ALTER TABLE commandes
+    MODIFY COLUMN statut ENUM('En_attente','En_traitement','Gravée','Expédiée','Livrée','Annulée')
+    NOT NULL DEFAULT 'En_attente'
+  `).catch(() => {});
+
+  // Migration : colonnes paiement
+  await pool.query(`ALTER TABLE commandes ADD COLUMN IF NOT EXISTS paiement_statut VARCHAR(50) NOT NULL DEFAULT 'non_payé'`).catch(() => {});
+  await pool.query(`ALTER TABLE commandes ADD COLUMN IF NOT EXISTS paiement_mode VARCHAR(50) DEFAULT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE commandes ADD COLUMN IF NOT EXISTS paiement_reference VARCHAR(255) DEFAULT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE commandes ADD COLUMN IF NOT EXISTS paiement_date TIMESTAMP NULL DEFAULT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE commandes ADD COLUMN IF NOT EXISTS paiement_note TEXT DEFAULT NULL`).catch(() => {});
 }
 
 async function createCommande(data) {
@@ -56,4 +69,18 @@ async function updateStatus(id, statut) {
   return await findById(id);
 }
 
-module.exports = { init, createCommande, findById, findByUser, updateStatus };
+async function updatePaiement(id, { paiement_statut, paiement_mode, paiement_reference, paiement_note }) {
+  const fields = [];
+  const vals = [];
+  if (paiement_statut !== undefined) { fields.push('paiement_statut = ?'); vals.push(paiement_statut); }
+  if (paiement_mode !== undefined)   { fields.push('paiement_mode = ?');   vals.push(paiement_mode); }
+  if (paiement_reference !== undefined) { fields.push('paiement_reference = ?'); vals.push(paiement_reference); }
+  if (paiement_note !== undefined)   { fields.push('paiement_note = ?');   vals.push(paiement_note); }
+  if (paiement_statut === 'payé')    { fields.push('paiement_date = NOW()'); }
+  if (fields.length === 0) return await findById(id);
+  vals.push(id);
+  await pool.query(`UPDATE commandes SET ${fields.join(', ')} WHERE id = ?`, vals);
+  return await findById(id);
+}
+
+module.exports = { init, createCommande, findById, findByUser, updateStatus, updatePaiement };
