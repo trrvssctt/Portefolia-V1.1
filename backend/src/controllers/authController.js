@@ -88,7 +88,7 @@ async function register(req, res) {
     await userModel.setVerificationToken(user.id, verifToken, verifExpires);
   } catch (e) { console.warn('register: could not set verification token:', e.message); }
 
-  const FRONTEND_BASE = process.env.FRONTEND_BASE || 'http://localhost:8080';
+  const FRONTEND_BASE = process.env.FRONTEND_BASE || 'https://portefolia.tech';
   const verify_url = `${FRONTEND_BASE}/verify-email?token=${verifToken}`;
 
   try {
@@ -285,7 +285,7 @@ async function login(req, res) {
               const pai0 = await pam0.createPaiement({ abonnement_id: abo0.id, montant: montant0, statut: 'pending', metadata: { plan_id: plan_id0, purpose: 'renewal', duration_months: 1 } });
               const co0  = await cm0.createCheckout({ utilisateur_id: user.id, plan_id: plan_id0, abonnement_id: abo0.id, paiement_id: pai0.id, metadata: { plan: plan0, duration_months: 1, discount_percent: 0 }, checkout_type: 'renewal' });
               checkoutToken = co0.token;
-              checkoutUrl   = `${process.env.FRONTEND_BASE || 'http://localhost:8080'}/checkout?token=${co0.token}`;
+              checkoutUrl   = `${process.env.FRONTEND_BASE || 'https://portefolia.tech'}/checkout?token=${co0.token}`;
             }
           }
         } catch (e) { console.warn('login: could not create renewal checkout (inactive+expired)', e?.message); }
@@ -329,7 +329,7 @@ async function login(req, res) {
             paiement_id: paiement.id, metadata: { plan, duration_months: 1, discount_percent: 0 },
           });
           checkoutToken = checkout.token;
-          checkoutUrl   = `${process.env.FRONTEND_BASE || 'http://localhost:8080'}/checkout?token=${checkout.token}`;
+          checkoutUrl   = `${process.env.FRONTEND_BASE || 'https://portefolia.tech'}/checkout?token=${checkout.token}`;
         } catch (e) { console.warn('login: could not create renewal checkout', e?.message); }
 
         return res.status(403).json({
@@ -359,7 +359,7 @@ async function login(req, res) {
       if (pendingCheckouts && pendingCheckouts.length) {
         const isPendingAdmin = pendingCheckouts[0].status === 'pending_admin';
         const checkoutToken = pendingCheckouts[0].token;
-        const checkoutUrl = `${process.env.FRONTEND_BASE || 'http://localhost:8080'}/checkout?token=${checkoutToken}`;
+        const checkoutUrl = `${process.env.FRONTEND_BASE || 'https://portefolia.tech'}/checkout?token=${checkoutToken}`;
         if (isPendingAdmin) {
           return res.status(403).json({
             error: 'Votre paiement est en cours de validation par notre équipe. Vous recevrez un email avec votre lien de connexion dès que le paiement sera confirmé.',
@@ -423,7 +423,7 @@ async function login(req, res) {
             paiement_id: paiement.id, metadata: { plan, duration_months: 1, discount_percent: 0 },
           });
           checkoutToken = checkout.token;
-          checkoutUrl   = `${process.env.FRONTEND_BASE || 'http://localhost:8080'}/checkout?token=${checkout.token}`;
+          checkoutUrl   = `${process.env.FRONTEND_BASE || 'https://portefolia.tech'}/checkout?token=${checkout.token}`;
         }
       } catch (e) { console.warn('login: could not create renewal checkout (active path)', e?.message); }
 

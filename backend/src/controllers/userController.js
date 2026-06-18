@@ -733,13 +733,13 @@ async function adminCreateUser(req, res) {
             
             <!-- Bouton de connexion -->
             <div class="cta-section">
-                <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}" class="login-btn">
+                <a href="${process.env.FRONTEND_URL || 'https://portefolia.tech'}" class="login-btn">
                     🚀 Me connecter à mon compte
                 </a>
                 <p style="margin-top: 15px; color: #6c757d;">
                     ou copiez ce lien : <br>
                     <code style="background: #f8f9fa; padding: 5px 10px; border-radius: 4px;">
-                        ${process.env.FRONTEND_URL || 'http://localhost:5173'}
+                        ${process.env.FRONTEND_URL || 'https://portefolia.tech'}
                     </code>
                 </p>
             </div>
