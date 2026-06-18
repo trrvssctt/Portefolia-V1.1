@@ -347,12 +347,14 @@ export default function HistoriqueUserPaiement() {
         toast({ title: 'Erreur', description: (err as any).error || 'Impossible de générer le reçu', variant: 'destructive' });
         return;
       }
+      const contentType = res.headers.get('Content-Type') || '';
+      const ext = contentType.includes('pdf') ? 'pdf' : 'html';
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       const ref = p.reference_transaction || p.reference || String(p.id);
       a.href = url;
-      a.download = `recu-portefolia-${ref}.pdf`;
+      a.download = `recu-portefolia-${ref}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -368,7 +370,6 @@ export default function HistoriqueUserPaiement() {
   const downloadInvoicePDF = async (p: Paiement) => {
     const invoiceId = p.invoice_id;
     if (!invoiceId || downloadingInvoiceId === Number(invoiceId)) return;
-    if (p.invoice_url) { window.open(p.invoice_url, '_blank'); return; }
     const token = localStorage.getItem('token');
     if (!token) return;
     setDownloadingInvoiceId(Number(invoiceId));
@@ -382,22 +383,17 @@ export default function HistoriqueUserPaiement() {
         return;
       }
       const contentType = res.headers.get('Content-Type') || '';
-      if (contentType.includes('pdf')) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `facture-portefolia-${invoiceId}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        toast({ title: 'Facture téléchargée' });
-      } else {
-        const html = await res.text();
-        const win = window.open('', '_blank');
-        if (win) { win.document.write(html); win.document.close(); }
-      }
+      const ext = contentType.includes('pdf') ? 'pdf' : 'html';
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `facture-portefolia-${invoiceId}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: 'Facture téléchargée' });
     } catch {
       toast({ title: 'Erreur', description: 'Impossible de télécharger la facture', variant: 'destructive' });
     } finally {

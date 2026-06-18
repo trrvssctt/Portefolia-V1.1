@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const userModel = require('../models/userModel');
 const { pool } = require('../db');
 const { generateReceiptPDF, buildReceiptHtml } = require('../utils/generateReceiptPDF');
+const { buildInvoiceHtml } = require('../utils/buildInvoiceHtml');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
@@ -177,7 +178,7 @@ async function getMyReceiptPDF(req, res) {
       const html = buildReceiptHtml(receiptData);
       res.set({
         'Content-Type':        'text/html; charset=utf-8',
-        'Content-Disposition': `inline; filename="recu-portefolia-${receiptNumber}.html"`,
+        'Content-Disposition': `attachment; filename="recu-portefolia-${receiptNumber}.html"`,
       });
       return res.send(html);
     }
@@ -219,55 +220,16 @@ async function getMyInvoicePDF(req, res) {
     const amount   = Number(inv.amount || inv.montant || 0);
     const currency = inv.currency || 'XOF';
 
-    const html = `<!DOCTYPE html>
-<html lang="fr">
-<head><meta charset="UTF-8"><title>Facture ${invoiceNumber}</title>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Helvetica Neue',Arial,sans-serif;background:#fff;color:#111;padding:40px}
-  .hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px}
-  .hdr h1{font-size:28px;font-weight:900;color:#1b5e20}
-  .hdr .meta{text-align:right;font-size:13px;color:#6b7280}
-  .div{height:3px;background:linear-gradient(to right,#2E7D32,#1BC29A);border-radius:2px;margin:0 0 28px}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-bottom:28px}
-  .box h3{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#9ca3af;font-weight:700;margin-bottom:8px}
-  .box p{font-size:14px;font-weight:600;color:#111}
-  .box .sub{font-size:12px;color:#6b7280;font-weight:400}
-  table{width:100%;border-collapse:collapse;border-radius:8px;overflow:hidden;margin-bottom:20px}
-  thead th{background:#2E7D32;color:#fff;padding:12px 16px;text-align:left;font-size:12px;font-weight:700;text-transform:uppercase}
-  thead th:last-child{text-align:right}
-  tbody td{padding:14px 16px;border-top:1px solid #e5e7eb;font-size:13px}
-  tbody td:last-child{text-align:right;font-weight:700;color:#2E7D32}
-  .total-row td{background:#f0fdf4;border-top:2px solid #2E7D32;font-weight:800;font-size:14px}
-  .footer{margin-top:40px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af}
-</style>
-</head>
-<body>
-  <div class="hdr">
-    <div><h1>Portefolia</h1><p style="font-size:13px;color:#6b7280;margin-top:4px">contact@portefolia.tech</p></div>
-    <div class="meta">
-      <p style="font-size:20px;font-weight:700;color:#111">FACTURE</p>
-      <p>N° ${invoiceNumber}</p>
-      <p style="margin-top:4px">Date : ${new Date(inv.created_at || Date.now()).toLocaleDateString('fr-FR')}</p>
-    </div>
-  </div>
-  <div class="div"></div>
-  <div class="grid">
-    <div class="box"><h3>Émetteur</h3><p>Portefolia</p><p class="sub">comptabilite@portefolia.tech</p></div>
-    <div class="box"><h3>Client</h3><p>${(user?.prenom || '')} ${(user?.nom || '')}</p><p class="sub">${user?.email || ''}</p></div>
-  </div>
-  <table>
-    <thead><tr><th>Description</th><th>Référence</th><th>Montant</th></tr></thead>
-    <tbody>
-      <tr><td>Abonnement Portefolia</td><td style="font-family:monospace;font-size:12px">${inv.reference || '—'}</td><td>${amount.toLocaleString('fr-FR')} ${currency}</td></tr>
-      <tr class="total-row"><td colspan="2" style="text-align:right">Total</td><td>${amount.toLocaleString('fr-FR')} ${currency}</td></tr>
-    </tbody>
-  </table>
-  <div class="footer">
-    <p>Portefolia · contact@portefolia.tech · Merci pour votre confiance.</p>
-    <p>Ce document est généré automatiquement et constitue votre facture officielle.</p>
-  </div>
-</body></html>`;
+    const html = buildInvoiceHtml({
+      invoiceNumber,
+      client:        { prenom: user?.prenom || '', nom: user?.nom || '', email: user?.email || '' },
+      planName:      inv.plan_name || 'Abonnement Portefolia',
+      montant:       amount,
+      currency,
+      reference:     inv.reference || null,
+      date_paiement: inv.created_at || new Date(),
+      date_echeance: inv.date_echeance || null,
+    });
 
     try {
       const puppeteer = require('puppeteer');
@@ -284,7 +246,10 @@ async function getMyInvoicePDF(req, res) {
       return res.end(Buffer.from(pdfBuffer));
     } catch (e) {
       console.warn('getMyInvoicePDF: puppeteer failed, returning HTML:', e.message);
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.set({
+        'Content-Type':        'text/html; charset=utf-8',
+        'Content-Disposition': `attachment; filename="facture-portefolia-${invoiceNumber}.html"`,
+      });
       return res.send(html);
     }
   } catch (err) {
