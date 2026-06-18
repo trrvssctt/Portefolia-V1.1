@@ -141,7 +141,7 @@ const Auth = () => {
         localStorage.removeItem(DRAFT_KEY);
         return;
       }
-      if (draft.firstName || draft.email) {
+      if (draft.firstName || draft.lastName) {
         setDraftBanner({ firstName: draft.firstName || '', email: draft.email || '', planSlug: draft.planSlug || null });
         setActiveTab('signup');
       }
@@ -330,9 +330,10 @@ const Auth = () => {
           return;
         }
         // Redirection Business
-        if (roleStr === 'business_admin') { navigate('/business/dashboard'); return; }
-        if (roleStr === 'business_member') { navigate('/business/member'); return; }
+        if (roleStr === 'business_admin') { clearDraft(); navigate('/business/dashboard'); return; }
+        if (roleStr === 'business_member') { clearDraft(); navigate('/business/member'); return; }
 
+        clearDraft();
         const redirectTo = searchParams.get('redirect') || '/dashboard';
         navigate(redirectTo);
       }
