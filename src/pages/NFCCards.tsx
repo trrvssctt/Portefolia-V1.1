@@ -610,9 +610,10 @@ const NFCCards = () => {
 
             {/* ── Filter bar ── */}
             {nfcCards.length > 0 && (
-              <div className="bg-white rounded-2xl border border-[#E7E7EA] p-2.5 flex items-center gap-2.5">
-                <div className="relative flex-1">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#71717A]" />
+              <div className="bg-white rounded-2xl border border-[#E7E7EA] p-3 flex flex-col gap-2">
+                {/* Recherche — pleine largeur */}
+                <div className="relative">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#71717A]" />
                   <input
                     placeholder="Rechercher par portfolio…"
                     value={searchTerm}
@@ -620,32 +621,35 @@ const NFCCards = () => {
                     className="w-full h-9 pl-9 pr-3 rounded-[10px] bg-zinc-50 border border-transparent focus:border-[#E7E7EA] outline-none text-sm text-[#18181B] placeholder:text-[#71717A]"
                   />
                 </div>
-                <div className="relative">
-                  <select
-                    value={statusFilter}
-                    onChange={e => setStatusFilter(e.target.value as any)}
-                    className="h-9 pl-3 pr-8 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B]/70 appearance-none bg-white outline-none hover:bg-zinc-50 transition-colors cursor-pointer"
-                  >
-                    <option value="all">Tous statuts</option>
-                    <option value="active">Actives</option>
-                    <option value="livree">Prêtes à activer</option>
-                    <option value="inactive">Inactives</option>
-                    <option value="pending">En fabrication</option>
-                  </select>
-                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#71717A]" />
-                </div>
-                <div className="relative">
-                  <select
-                    value={sortBy}
-                    onChange={e => setSortBy(e.target.value as any)}
-                    className="h-9 pl-3 pr-8 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B]/70 appearance-none bg-white outline-none hover:bg-zinc-50 transition-colors cursor-pointer"
-                  >
-                    <option value="newest">Plus récent</option>
-                    <option value="oldest">Plus ancien</option>
-                    <option value="status">Statut</option>
-                    <option value="portfolio">Portfolio</option>
-                  </select>
-                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[#71717A]" />
+                {/* Statut + Tri — côte à côte, chacun flex-1 */}
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <select
+                      value={statusFilter}
+                      onChange={e => setStatusFilter(e.target.value as any)}
+                      className="w-full h-9 pl-3 pr-7 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B]/70 appearance-none bg-white outline-none cursor-pointer"
+                    >
+                      <option value="all">Tous statuts</option>
+                      <option value="active">Actives</option>
+                      <option value="livree">Prêtes à activer</option>
+                      <option value="inactive">Inactives</option>
+                      <option value="pending">En fabrication</option>
+                    </select>
+                    <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[#71717A]" />
+                  </div>
+                  <div className="relative flex-1">
+                    <select
+                      value={sortBy}
+                      onChange={e => setSortBy(e.target.value as any)}
+                      className="w-full h-9 pl-3 pr-7 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B]/70 appearance-none bg-white outline-none cursor-pointer"
+                    >
+                      <option value="newest">Plus récent</option>
+                      <option value="oldest">Plus ancien</option>
+                      <option value="status">Statut</option>
+                      <option value="portfolio">Portfolio</option>
+                    </select>
+                    <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-[#71717A]" />
+                  </div>
                 </div>
               </div>
             )}
