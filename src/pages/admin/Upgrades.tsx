@@ -430,10 +430,9 @@ export default function AdminUpgrades() {
                             </button>
                             {!isFinal && (
                               <>
-                                <button onClick={() => { setSelectedUpgrade(upgrade); setReference(upgrade.reference_transaction || ''); setPaymentMethod(upgrade.payment_method || 'wave'); setImageUrl(upgrade.image_paiement || ''); setNotes(upgrade.notes || ''); }}
+                                <button onClick={() => { openDrawer(upgrade); }}
                                   className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-green-50 transition-colors"
-                                  style={{ color: '#2E7D32' }} title="Approuver"
-                                  onClick={() => { openDrawer(upgrade); }}>
+                                  style={{ color: '#2E7D32' }} title="Approuver">
                                   <Check size={14} />
                                 </button>
                                 <button onClick={() => { setSelectedUpgrade(upgrade); setRejectDialogOpen(true); }}
