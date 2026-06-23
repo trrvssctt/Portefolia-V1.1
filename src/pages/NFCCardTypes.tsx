@@ -1,410 +1,209 @@
-// src/pages/NFCCardTypes.tsx
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import {
-  Check,
-  Sparkles,
-  Package,
-  Truck,
-  Palette,
-  Zap,
-  Copy,
-  ArrowRight,
-  ArrowLeft,
-  Star,
-  ShieldCheck,
-  PackageCheck,
-  CreditCard,
-  AlertTriangle,
-} from 'lucide-react';
-import confetti from 'canvas-confetti';
+import { Wifi, Link, CreditCard, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_BASE || (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://portefolia.tech');
 
-type ProductType = 'simple-nfc' | 'custom-nfc';
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const features = [
+  {
+    icon: CreditCard,
+    title: 'Métal gravé laser',
+    desc: 'Finition premium, votre nom gravé avec précision',
+  },
+  {
+    icon: Wifi,
+    title: 'NFC intégré',
+    desc: 'Un tap = accès direct à votre portfolio complet',
+  },
+  {
+    icon: Link,
+    title: 'Lien intelligent',
+    desc: 'Toujours à jour — modifiez votre portfolio sans changer de carte',
+  },
+];
 
 export default function NFCCardTypes() {
   const navigate = useNavigate();
-  const { toast } = useToast();
-
-  const [plans, setPlans] = useState<any[]>([]);
-  const [loadingPlans, setLoadingPlans] = useState(true);
-  const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [orderNumber, setOrderNumber] = useState<string | null>(null);
-
-  // Confirmation dialog
-  const [confirmOpen, setConfirmOpen] = useState(false);
-
-  const [form, setForm] = useState({
-    nom: '',
-    prenom: '',
-    email: '',
-    telephone: '',
-    profession: '',
-    site: '',
-    quantity: 1,
-    adresse_livraison: '',
-    logo_url: '',
-  });
-
-  const openForm = (plan: any) => {
-    setSelectedPlan(plan);
-    setShowForm(true);
-    setMessage(null);
-    setOrderNumber(null);
-  };
-
-  const formatPrice = (centsOrMajor: any) => {
-    const n = Number(centsOrMajor ?? 0);
-    return n.toLocaleString('fr-FR') + ' F CFA';
-  };
-
-  // Chargement des cartes NFC depuis le backend
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoadingPlans(true);
-        const res = await fetch(`${API_BASE}/api/nfc-cards`);
-        const text = await res.text();
-        let json: any = null;
-        try { json = text ? JSON.parse(text) : null; } catch (e) {
-          throw new Error(text || 'Réponse invalide');
-        }
-        if (!res.ok) throw new Error(json?.error || 'Impossible de charger les cartes');
-        if (mounted) setPlans(json.cards || []);
-      } catch (e: any) {
-        toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
-      } finally {
-        if (mounted) setLoadingPlans(false);
-      }
-    })();
-    return () => { mounted = false };
-  }, [toast]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setForm(s => ({
-      ...s,
-      [name]: name === 'quantity' ? Math.max(1, Number(value) || 1) : value,
-    }));
-  };
-
-  // Calcul du prix total
-  const unitPrice = selectedPlan
-    ? Number(selectedPlan.price_cents ?? selectedPlan.price ?? 0)
-    : 0;
-  const totalAmount = unitPrice * form.quantity;
+  const [email, setEmail]         = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [alreadyIn, setAlreadyIn] = useState(false);
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlan) return;
-
-    // Ouvre la confirmation
-    setConfirmOpen(true);
-  };
-
-  const confirmAndSend = async () => {
-    setConfirmOpen(false);
-    setSubmitting(true);
-
+    if (!email.trim()) { setError('Veuillez saisir votre email.'); return; }
+    if (!EMAIL_RE.test(email.trim())) { setError('Format d\'email invalide.'); return; }
+    setError('');
+    setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/commandes/public`, {
+      const res = await fetch(`${API_BASE}/api/nfc/waitlist`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          plan_id: selectedPlan.id,
-          quantity: form.quantity,
-          nom: form.nom,
-          prenom: form.prenom,
-          email: form.email,
-          telephone: form.telephone,
-          profession: form.profession,
-          site: form.site,
-          adresse_livraison: form.adresse_livraison || null,
-          logo_url: form.logo_url || null,
-        }),
+        body: JSON.stringify({ email: email.trim() }),
       });
-
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Erreur lors de la commande');
-
-      const numero = json.order.numero_commande;
-      setOrderNumber(numero);
-      setMessage(`Commande ${numero} créée avec succès ! Nous vous contactons sous 24h.`);
-
-      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-      toast({ title: 'Commande reçue !', description: `Référence : ${numero}` });
-
-      setTimeout(() => {
-        setShowForm(false);
-        setForm({
-          nom: '', prenom: '', email: '', telephone: '', profession: '',
-          site: '', quantity: 1, adresse_livraison: '', logo_url: '',
-        });
-      }, 5000);
-    } catch (err: any) {
-      toast({ title: 'Erreur', description: err.message, variant: 'destructive' });
-      setMessage(err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const copyOrderNumber = () => {
-    if (orderNumber) {
-      navigator.clipboard.writeText(orderNumber);
-      toast({ title: 'Copié !', description: 'Numéro copié' });
-    }
+      if (res.status === 409) {
+        setAlreadyIn(true);
+        setLoading(false);
+        return;
+      }
+    } catch {}
+    setLoading(false);
+    setSubmitted(true);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 py-12 px-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen" style={{ background: '#F9F9F9', fontFamily: 'Inter, sans-serif' }}>
+      {/* ── Header ── */}
+      <header style={{ background: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 60%, #1BC29A 100%)' }} className="relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-8 right-12 w-40 h-40 rounded-full border-2 border-white/30" />
+          <div className="absolute -bottom-8 -left-8 w-56 h-56 rounded-full border-2 border-white/20" />
+        </div>
+        <div className="relative max-w-4xl mx-auto px-6 py-10">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-white/70 hover:text-white text-sm mb-6 transition-colors"
+          >
+            <ArrowLeft size={16} /> Retour
+          </button>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+              <Wifi size={22} className="text-white" />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Carte NFC Portefolia</h1>
+          </div>
+          <p className="text-white/80 text-base mt-1 ml-[52px]">Expose Ton Futur, même hors ligne</p>
+        </div>
+      </header>
 
-        {/* Bouton retour */}
-        <div className="mb-8">
-          <Button variant="outline" onClick={() => navigate(-1)} className="flex items-center gap-2">
-            <ArrowLeft className="w-4 h-4" /> Retour
-          </Button>
+      {/* ── Main ── */}
+      <main className="max-w-4xl mx-auto px-6 py-12 space-y-12">
+
+        {/* Hero section */}
+        <div className="text-center space-y-4">
+          <span className="inline-block px-3 py-1 rounded-full text-xs font-bold text-white" style={{ background: '#F59E0B' }}>
+            Lancement imminent
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">Votre carte arrive bientôt</h2>
+          <p className="max-w-xl mx-auto text-gray-500 leading-relaxed">
+            Gravée à votre nom avec le lien vers votre portfolio, la carte NFC Portefolia vous permet de
+            partager votre profil d'un simple tap. Soyez parmi les premiers à la recevoir.
+          </p>
         </div>
 
-        {/* Hero */}
-        <div className="text-center mb-16">
-          <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 mb-6">
-            Cartes de Visite NFC <Sparkles className="inline-block w-12 h-12 ml-3 text-yellow-500" />
-          </h1>
-          <p className="text-xl text-gray-700 max-w-3xl mx-auto mb-8">
-            Partagez vos coordonnées en un tap. Moderne, écologique, inoubliable.
-          </p>
-          <div className="inline-flex items-center gap-4 bg-gradient-to-r from-[#28A745] to-emerald-600 text-white px-10 py-5 rounded-full text-xl font-bold shadow-2xl">
-            <Truck className="w-10 h-10" />
-            Paiement à la livraison • 100 % sécurisé
-            <ShieldCheck className="w-9 h-9" />
+        {/* Card preview + form */}
+        <div className="flex flex-col lg:flex-row items-center gap-12">
+
+          {/* Card visual */}
+          <div className="shrink-0 flex flex-col items-center gap-3">
+            <div
+              style={{
+                width: 340,
+                height: 215,
+                borderRadius: 12,
+                background: 'linear-gradient(135deg, #1A1A2E 0%, #16213E 60%, #0F3460 100%)',
+                boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+                padding: '28px 32px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Decorative circles */}
+              <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(43,196,154,0.1)' }} />
+              <div style={{ position: 'absolute', bottom: -20, left: 20, width: 80, height: 80, borderRadius: '50%', background: 'rgba(43,196,154,0.06)' }} />
+
+              {/* Top row */}
+              <div className="flex items-center justify-between relative">
+                <img src="/lovable-uploads/logo_portefolia_remove_bg.png" alt="Portefolia" style={{ height: 28, filter: 'brightness(0) invert(1)' }} />
+                <Wifi size={22} className="text-[#1BC29A]" />
+              </div>
+
+              {/* Bottom row */}
+              <div className="relative">
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginBottom: 4 }}>votre-nom.portefolia.tech</p>
+                <p style={{ color: '#fff', fontWeight: 700, fontSize: 18, letterSpacing: 0.5 }}>Votre Nom</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400">Aperçu du design</p>
+          </div>
+
+          {/* Waitlist form */}
+          <div className="flex-1 w-full max-w-sm mx-auto lg:mx-0">
+            {submitted ? (
+              <div className="text-center py-8 px-6 bg-white rounded-2xl border border-green-100 shadow-sm">
+                <CheckCircle2 size={44} className="text-[#2E7D32] mx-auto mb-4" />
+                <p className="font-semibold text-gray-900 text-lg mb-1">Vous êtes sur la liste !</p>
+                <p className="text-sm text-gray-500">Un email de confirmation vous a été envoyé. Nous vous préviendrons dès le lancement.</p>
+              </div>
+            ) : alreadyIn ? (
+              <div className="text-center py-8 px-6 bg-white rounded-2xl border border-amber-100 shadow-sm">
+                <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 size={26} className="text-amber-500" />
+                </div>
+                <p className="font-semibold text-gray-900 text-lg mb-1">Déjà inscrit(e) !</p>
+                <p className="text-sm text-gray-500">Votre email est déjà sur la liste d'attente. Vous serez notifié(e) dès le lancement.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Être notifié(e) du lancement
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => { setEmail(e.target.value); setError(''); }}
+                    placeholder="votre@email.com"
+                    className="w-full h-11 px-4 rounded-xl border text-sm outline-none transition-colors"
+                    style={{ borderColor: error ? '#EF4444' : '#E5E7EB', background: '#FAFAFA' }}
+                    onFocus={e => { if (!error) e.currentTarget.style.borderColor = '#2E7D32'; }}
+                    onBlur={e => { if (!error) e.currentTarget.style.borderColor = '#E5E7EB'; }}
+                  />
+                  {error && <p className="text-xs text-red-500 mt-1.5">{error}</p>}
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-11 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-70"
+                  style={{ background: 'linear-gradient(135deg, #2E7D32, #1BC29A)' }}
+                >
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+                  Je veux être notifié(e)
+                </button>
+                <p className="text-xs text-center leading-relaxed" style={{ color: '#9CA3AF' }}>
+                  Votre email ne sera utilisé que pour vous notifier du lancement des cartes NFC.
+                </p>
+              </form>
+            )}
           </div>
         </div>
 
-        {/* Cartes produits */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10 mb-20">
-          {loadingPlans ? (
-            <div className="col-span-full text-center py-20 text-xl">Chargement des cartes...</div>
-          ) : plans.length === 0 ? (
-            <div className="col-span-full text-center py-20 text-gray-600">Aucune carte disponible pour le moment.</div>
-          ) : (
-            plans.map((pl) => (
-              <Card key={pl.id} className={`hover:shadow-2xl transition-all duration-300 hover:-translate-y-4 border-2 ${pl.allow_design_custom ? 'border-[#28A745] shadow-xl' : ''}`}>
-                {pl.is_popular && (
-                  <div className="absolute -top-5 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-gradient-to-r from-[#28A745] to-emerald-600 text-white px-8 py-3 text-lg font-bold">
-                      <Star className="w-6 h-6 mr-2" /> Populaire
-                    </Badge>
+        {/* Features */}
+        <div>
+          <h3 className="text-center text-xl font-bold text-gray-900 mb-8">Ce qui vous attend</h3>
+          <div className="grid sm:grid-cols-3 gap-5">
+            {features.map(f => {
+              const Icon = f.icon;
+              return (
+                <div key={f.title} className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition-shadow text-center">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4" style={{ background: '#E8F5E9' }}>
+                    <Icon size={22} style={{ color: '#2E7D32' }} />
                   </div>
-                )}
-                <CardHeader className="text-center pb-8 pt-12">
-                  <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${pl.allow_design_custom ? 'bg-emerald-100' : 'bg-blue-100'}`}>
-                    {pl.allow_design_custom ? <Palette className="w-12 h-12 text-[#28A745]" /> : <Zap className="w-12 h-12 text-blue-600" />}
-                  </div>
-                  <CardTitle className="text-3xl">{pl.name}</CardTitle>
-                  <div className="mt-6">
-                    <span className="text-5xl font-bold">{formatPrice(pl.price_cents ?? pl.price)}</span>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-gray-700 text-center">{pl.description}</p>
-                  <ul className="space-y-3">
-                    {pl.allow_name && <li className="flex items-center gap-3"><Check className="w-5 h-5 text-green-600" />Nom & Prénom</li>}
-                    {pl.allow_email && <li className="flex items-center gap-3"><Check className="w-5 h-5 text-green-600" />Email</li>}
-                    {pl.allow_phone && <li className="flex items-center gap-3"><Check className="w-5 h-5 text-green-600" />Téléphone</li>}
-                    {pl.allow_job && <li className="flex items-center gap-3"><Check className="w-5 h-5 text-green-600" />Profession</li>}
-                    {pl.allow_website && <li className="flex items-center gap-3"><Check className="w-5 h-5 text-green-600" />Site web</li>}
-                    {pl.allow_logo && <li className="flex items-center gap-3"><Check className="w-5 h-5 text-green-600" />Logo</li>}
-                    {pl.allow_design_custom && <li className="flex items-center gap-3 font-bold text-[#28A745]"><Check className="w-5 h-5" />Design 100% personnalisé</li>}
-                  </ul>
-                </CardContent>
-                <CardFooter className="flex flex-col gap-4">
-                  <div className="w-full bg-green-50 border-2 border-green-200 rounded-xl p-5 text-center">
-                    <PackageCheck className="w-12 h-12 text-[#28A745] mx-auto mb-2" />
-                    <p className="font-bold text-green-800">Paiement à la livraison</p>
-                  </div>
-                  <Button
-                    size="lg"
-                    className={`w-full h-14 text-lg font-bold ${pl.allow_design_custom ? 'bg-[#28A745] hover:bg-[#218838]' : 'bg-blue-600 hover:bg-blue-700'}`}
-                    onClick={() => openForm(pl)}
-                  >
-                    Commander cette carte
-                    <ArrowRight className="ml-2 w-5 h-5" />
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))
-          )}
+                  <h4 className="font-bold text-gray-900 mb-2">{f.title}</h4>
+                  <p className="text-sm text-gray-500 leading-relaxed">{f.desc}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Formulaire */}
-        {showForm && selectedPlan && (
-          <Card className="max-w-4xl mx-auto border-2 border-dashed border-[#28A745] bg-white">
-            <CardHeader>
-              <CardTitle className="text-3xl text-center">
-                Finalisez votre commande
-                <Badge className="ml-4 text-lg" variant="secondary">
-                  {selectedPlan.name}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-
-            {/* Bannière paiement à la livraison */}
-            <div className="mx-8 mb-8">
-              <div className="bg-gradient-to-r from-[#28A745]/10 to-emerald-600/10 border-2 border-[#28A745]/40 rounded-2xl p-8 text-center">
-                <div className="flex items-center justify-center gap-5 text-[#28A745] font-bold text-xl">
-                  <CreditCard className="w-12 h-12" />
-                  <div>
-                    <p>Paiement à la livraison partout au Sénégal</p>
-                    <p className="text-base font-normal text-gray-700 mt-2">
-                      Espèces • Wave • Orange Money • Moov • Carte bancaire
-                    </p>
-                  </div>
-                  <ShieldCheck className="w-12 h-12" />
-                </div>
-              </div>
-            </div>
-
-            {/* Résumé du montant */}
-            <div className="mx-8 mb-8 bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-amber-300 rounded-2xl p-6">
-              <div className="flex justify-between items-center text-2xl font-bold text-gray-900">
-                <span>Montant total à payer à la livraison :</span>
-                <span className="text-4xl text-[#28A745]">
-                  {formatPrice(totalAmount)}
-                </span>
-              </div>
-              <p className="text-center text-gray-600 mt-2">
-                {form.quantity} × {selectedPlan.name} à {formatPrice(unitPrice)} l’unité
-              </p>
-            </div>
-
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div><Label>Nom *</Label><Input name="nom" value={form.nom} onChange={handleChange} required /></div>
-                  <div><Label>Prénom *</Label><Input name="prenom" value={form.prenom} onChange={handleChange} required /></div>
-                  <div><Label>Email *</Label><Input name="email" type="email" value={form.email} onChange={handleChange} required /></div>
-                  <div><Label>Téléphone WhatsApp</Label><Input name="telephone" value={form.telephone} onChange={handleChange} /></div>
-                  <div><Label>Profession</Label><Input name="profession" value={form.profession} onChange={handleChange} /></div>
-                  <div><Label>Site web / Réseaux</Label><Input name="site" value={form.site} onChange={handleChange} placeholder="linkedin.com/in/..." /></div>
-
-                  {selectedPlan.allow_design_custom && (
-                    <div className="md:col-span-2">
-                      <Label>Lien de votre logo (Google Drive, Imgur…)</Label>
-                      <Input name="logo_url" value={form.logo_url} onChange={handleChange} placeholder="https://..." />
-                      {form.logo_url && (
-                        <img src={form.logo_url} alt="Aperçu logo" className="mt-4 h-32 rounded-xl border shadow-lg mx-auto"
-                          onError={(e) => (e.currentTarget.style.display = 'none')} />
-                      )}
-                    </div>
-                  )}
-
-                  <div><Label>Quantité</Label><Input name="quantity" type="number" min="1" value={form.quantity} onChange={handleChange} /></div>
-                  <div><Label>Adresse de livraison (facultatif)</Label><Textarea name="adresse_livraison" value={form.adresse_livraison} onChange={handleChange} placeholder="Quartier, Ville..." /></div>
-                </div>
-
-                <div className="flex flex-col items-center gap-4 pt-8">
-                  <Button
-                    type="submit"
-                    size="lg"
-                    disabled={submitting}
-                    className="w-full max-w-lg text-xl h-16 bg-[#28A745] hover:bg-[#218838] font-bold"
-                  >
-                    {submitting ? 'Envoi en cours...' : 'Vérifier et confirmer la commande'}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                    Annuler
-                  </Button>
-                </div>
-
-                {message && (
-                  <div className={`text-center p-10 rounded-2xl border-2 ${orderNumber ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
-                    {orderNumber ? (
-                      <>
-                        <PackageCheck className="w-20 h-20 text-[#28A745] mx-auto mb-4" />
-                        <h3 className="text-3xl font-bold mb-4">Commande confirmée !</h3>
-                        <p className="text-xl mb-6">{message}</p>
-                        <div className="flex items-center justify-center gap-4">
-                          <code className="text-3xl font-bold text-[#28A745] bg-white px-8 py-4 rounded-xl border-4 border-[#28A745]/30">
-                            {orderNumber}
-                          </code>
-                          <Button size="lg" onClick={copyOrderNumber}><Copy className="w-6 h-6" /></Button>
-                        </div>
-                        <p className="mt-8 text-lg">Le livreur acceptera : <strong>espèces, Wave, Orange Money, Moov</strong></p>
-                      </>
-                    ) : (
-                      <p className="text-xl text-red-700">{message}</p>
-                    )}
-                  </div>
-                )}
-              </form>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Dialog de confirmation */}
-        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-2xl flex items-center gap-3">
-                <AlertTriangle className="w-8 h-8 text-amber-600" />
-                Confirmation de commande
-              </DialogTitle>
-            </DialogHeader>
-            <DialogDescription className="text-lg space-y-4">
-              <p>Vous êtes sur le point de commander :</p>
-              <Alert className="border-amber-200 bg-amber-50">
-                <AlertTitle className="text-xl font-bold text-gray-900">
-                  {form.quantity} × {selectedPlan?.name}
-                </AlertTitle>
-                <AlertDescription className="text-2xl font-bold text-[#28A745] mt-3">
-                  Total à payer à la livraison : {formatPrice(totalAmount)}
-                </AlertDescription>
-              </Alert>
-              <p className="font-medium">Cette action est irréversible. Êtes-vous sûr ?</p>
-            </DialogDescription>
-            <DialogFooter className="gap-3">
-              <Button variant="outline" onClick={() => setConfirmOpen(false)}>Annuler</Button>
-              <Button className="bg-[#28A745] hover:bg-[#218838]" onClick={confirmAndSend} disabled={submitting}>
-                Oui, confirmer la commande
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <div className="text-center mt-20 text-gray-700 text-xl">
-          Livraison partout au Sénégal • <strong>Paiement à la livraison</strong>
-        </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -44,6 +44,7 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
       title: "Cartes NFC",
       path: "/dashboard/nfc-cards",
       icon: CreditCard,
+      soon: true,
     },
   ];
 
@@ -84,6 +85,9 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
                   >
                     <Icon size={16} />
                     <span>{item.title}</span>
+                    {item.soon && (
+                      <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold text-white leading-none" style={{ background: '#F59E0B' }}>Soon</span>
+                    )}
                   </Button>
                 );
               })}
@@ -176,6 +180,9 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
                 >
                   <Icon size={14} />
                   <span className="text-xs">{item.title}</span>
+                  {item.soon && (
+                    <span className="ml-0.5 px-1 py-0.5 rounded-full text-[9px] font-bold text-white leading-none" style={{ background: '#F59E0B' }}>Soon</span>
+                  )}
                 </Button>
               );
             })}

@@ -460,9 +460,10 @@ const NFCCards = () => {
             {/* ── Header ── */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Wifi size={20} style={{ color: '#1B5E20' }} />
                   <h1 className="text-2xl sm:text-[28px] font-bold text-[#18181B] tracking-tight">Mes cartes NFC</h1>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ background: '#F59E0B' }}>Bientôt disponible</span>
                 </div>
                 <p className="text-[#71717A] text-sm mt-1">Partagez votre portfolio d'un simple geste.</p>
               </div>
@@ -471,16 +472,17 @@ const NFCCards = () => {
                   onClick={() => navigate('/nfc-types')}
                   className="h-10 px-4 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors"
                 >
-                  Types de cartes
+                  En savoir plus
                 </button>
-                <button
-                  onClick={() => setShowOrderForm(true)}
-                  disabled={portfolios.length === 0}
-                  className="flex items-center gap-1.5 h-10 px-4 rounded-[10px] text-sm font-semibold text-white transition-colors disabled:opacity-50"
-                  style={{ background: '#2E7D32' }}
-                >
-                  <Plus size={16} /> Commander
-                </button>
+                <div title="Disponible très prochainement">
+                  <button
+                    disabled
+                    className="flex items-center gap-1.5 h-10 px-4 rounded-[10px] text-sm font-semibold text-white cursor-not-allowed opacity-50"
+                    style={{ background: '#2E7D32' }}
+                  >
+                    <Plus size={16} /> Commander
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -665,13 +667,15 @@ const NFCCards = () => {
                   Commandez votre première carte NFC et partagez votre portfolio d'un simple geste.
                 </p>
                 {portfolios.length > 0 && (
-                  <button
-                    onClick={() => setShowOrderForm(true)}
-                    className="h-10 px-4 rounded-[10px] text-sm font-semibold text-white flex items-center gap-1.5 mx-auto transition-colors"
-                    style={{ background: '#2E7D32' }}
-                  >
-                    <Plus size={15} /> Commander ma première carte
-                  </button>
+                  <div title="Disponible très prochainement">
+                    <button
+                      disabled
+                      className="h-10 px-4 rounded-[10px] text-sm font-semibold text-white flex items-center gap-1.5 mx-auto cursor-not-allowed opacity-50"
+                      style={{ background: '#2E7D32' }}
+                    >
+                      <Plus size={15} /> Commander ma première carte
+                    </button>
+                  </div>
                 )}
               </div>
             ) : filteredAndSortedCards.length === 0 ? (

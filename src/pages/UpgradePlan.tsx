@@ -134,7 +134,7 @@ function PlanCard({ plan, tone, onChoose, isCurrent, canUpgrade }: {
 const FAQS = [
   ['Puis-je changer de formule à tout moment ?', 'Oui, vous pouvez passer à une formule supérieure quand vous le souhaitez.'],
   ['Comment se passe le paiement ?', 'Les paiements sont sécurisés via Wave. Vous recevez une facture après chaque règlement.'],
-  ['Les cartes NFC sont-elles incluses ?', 'La commande des cartes NFC est disponible dès la formule Pro. Le prix unitaire est de 30 000 F CFA.'],
+  ['Les cartes NFC sont-elles incluses ?', 'Les cartes NFC arrivent très prochainement (bientôt). La commande sera disponible dès la formule Pro au prix unitaire de 30 000 F CFA.'],
 ];
 
 export default function UpgradePlan() {

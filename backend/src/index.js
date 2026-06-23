@@ -125,6 +125,8 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/roles', rolesRoutes);
 // Business plan routes
 app.use('/api/business', businessRoutes);
+// NFC waitlist (public)
+app.use('/api/nfc', require('./routes/nfcRoutes'));
 
 // Webhooks (public endpoint) - keep minimal and verify signatures in production
 app.post('/webhooks/payment', (req, res) => adminController.paymentWebhook(req, res));
