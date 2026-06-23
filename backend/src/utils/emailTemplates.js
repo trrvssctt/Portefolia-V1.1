@@ -589,6 +589,44 @@ function emailCommandeLivree({ prenom = '', numero_commande, montant }) {
   };
 }
 
+// ─── Reset mot de passe ──────────────────────────────────────────────────────
+
+function emailResetMotDePasse({ prenom, reset_url }) {
+  const body = `
+    <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 20px">
+      Bonjour <strong>${prenom || 'utilisateur'}</strong>,
+    </p>
+    <p style="font-size:15px;color:#374151;line-height:1.7;margin:0 0 24px">
+      Vous avez demandé à réinitialiser votre mot de passe sur <strong>Portefolia</strong>.<br>
+      Cliquez sur le bouton ci-dessous pour vous connecter directement et choisir un nouveau mot de passe dans votre profil.
+    </p>
+
+    <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:16px 20px;margin:0 0 24px">
+      <p style="font-size:13px;color:#2E7D32;font-weight:700;margin:0 0 4px">⚠️ Lien valable 1 heure</p>
+      <p style="font-size:12px;color:#4CAF50;margin:0">Ce lien de connexion est à usage unique et expire dans 60 minutes.</p>
+    </div>
+
+    <div style="text-align:center;margin:28px 0">
+      <a href="${reset_url}"
+        style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#2E7D32,#1BC29A);color:#fff;
+               font-size:15px;font-weight:700;text-decoration:none;border-radius:10px;letter-spacing:-.2px">
+        Me connecter &amp; changer mon mot de passe →
+      </a>
+    </div>
+
+    <p style="font-size:12px;color:#9ca3af;line-height:1.6;margin:16px 0 0">
+      Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.
+      Votre mot de passe ne sera pas modifié tant que vous n'avez pas cliqué sur le lien.
+    </p>
+    <p style="font-size:12px;color:#9ca3af;margin:8px 0 0">
+      Problème ? Contactez-nous : <a href="mailto:${SUPPORT}" style="color:#2E7D32">${SUPPORT}</a>
+    </p>`;
+  return {
+    subject: '🔐 Réinitialisation de votre mot de passe — Portefolia',
+    html: wrap({ header: 'Réinitialisation du mot de passe', subheader: 'Lien de connexion sécurisé', body }),
+  };
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -601,4 +639,5 @@ module.exports = {
   emailBienvenueVerification,
   emailPaiementCommandeValide,
   emailCommandeLivree,
+  emailResetMotDePasse,
 };

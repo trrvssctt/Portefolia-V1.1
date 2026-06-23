@@ -35,6 +35,10 @@ router.post('/logout', auth.logout);
 // GET /api/auth/token/:token — magic-link single-use login
 router.get('/token/:token', authLimiter, auth.loginByToken);
 
+// Reset mot de passe
+router.post('/forgot-password', authLimiter, auth.forgotPassword);
+router.post('/confirm-reset',   authLimiter, auth.confirmReset);
+
 // GET /api/auth/subscription-status
 router.get('/subscription-status', authMiddleware, subscriptionStatus);
 

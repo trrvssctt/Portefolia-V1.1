@@ -2,7 +2,7 @@
 import React from 'react';
 import { usePlan } from '@/contexts/PlanContext';
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -100,6 +100,11 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-2 rounded-lg px-2 py-2 min-h-[44px] hover:bg-gray-100 transition-colors outline-none">
                   <Avatar className="h-8 w-8 shrink-0">
+                    <AvatarImage
+                      src={profile?.photo_profil || profile?.avatar_url || ''}
+                      alt={profile?.prenom || 'avatar'}
+                      className="object-cover"
+                    />
                     <AvatarFallback className="bg-[#2E7D32] text-white text-xs font-bold">
                       {profile?.prenom?.[0]?.toUpperCase() || profile?.nom?.[0]?.toUpperCase() || <User size={14} />}
                     </AvatarFallback>

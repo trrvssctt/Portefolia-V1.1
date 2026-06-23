@@ -135,6 +135,12 @@ app.post('/webhooks/payment', (req, res) => adminController.paymentWebhook(req, 
 (async () => {
   try {
     await db.testConnection();
+    // migration: colonnes reset mot de passe
+    try {
+      await db.pool.query(`ALTER TABLE utilisateurs
+        ADD COLUMN IF NOT EXISTS reset_password_token VARCHAR(255) NULL,
+        ADD COLUMN IF NOT EXISTS reset_password_expires DATETIME NULL`);
+    } catch (e) { console.warn('migration reset_password cols:', e.message); }
     // initialiser la table utilisateurs si besoin
     await userModel.init();
     // initialiser portfolios

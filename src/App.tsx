@@ -37,6 +37,7 @@ import Admin from "./pages/Admin";
 import AdminLayout from "./components/admin/AdminLayout";
 import TokenLogin from "./pages/auth/TokenLogin";
 import VerifyEmail from "./pages/auth/VerifyEmail";
+import ResetPassword from "./pages/auth/ResetPassword";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminUsers from "./pages/admin/Users";
 import AdminPortfolios from "./pages/admin/Portfolios";
@@ -128,6 +129,7 @@ function App() {
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/auth/token/:token" element={<TokenLogin />} />
                     <Route path="/verify-email" element={<VerifyEmail />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/pending-validation" element={<PendingValidation />} />
                     <Route path="/renouveler" element={<RenewSubscription />} />
                     <Route path="/compte-suspendu" element={<AccountSuspended />} />

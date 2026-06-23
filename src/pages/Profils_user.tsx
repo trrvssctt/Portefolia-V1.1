@@ -1,29 +1,16 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { isTokenExpired } from '@/utils/authUtils';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlan } from '@/contexts/PlanContext';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import BusinessNav from '@/components/business/BusinessNav';
-import { User, Shield, Sliders, Eye, EyeOff, Sparkles, Star, Zap, Crown } from 'lucide-react';
+import { User, Shield, Sliders, Sparkles, Star, Zap, Crown } from 'lucide-react';
+import { PasswordInput, PasswordStrengthBar } from '@/components/ui/PasswordHelper';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
 
-const getPasswordStrength = (pwd: string): { score: number; label: string; color: string } => {
-  if (!pwd) return { score: 0, label: '', color: '' };
-  let score = 0;
-  if (pwd.length >= 8) score++;
-  if (pwd.length >= 12) score++;
-  if (/[A-Z]/.test(pwd)) score++;
-  if (/[0-9]/.test(pwd)) score++;
-  if (/[^A-Za-z0-9]/.test(pwd)) score++;
-  if (score <= 1) return { score, label: 'Très faible', color: '#EF4444' };
-  if (score === 2) return { score, label: 'Faible', color: '#F97316' };
-  if (score === 3) return { score, label: 'Moyen', color: '#F59E0B' };
-  if (score === 4) return { score, label: 'Fort', color: '#3B82F6' };
-  return { score, label: 'Très fort', color: '#22C55E' };
-};
 
 const planMeta: Record<string, { label: string; icon: React.ReactNode }> = {
   free:     { label: 'Gratuit',  icon: <Star className="w-3 h-3" /> },
@@ -63,29 +50,6 @@ function Field({ label, value, editing, onChange }: {
   );
 }
 
-function PwdField({ label, value, onChange, show, onToggle }: {
-  label: string; value: string; onChange: (v: string) => void; show: boolean; onToggle: () => void;
-}) {
-  return (
-    <div>
-      <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide">{label}</label>
-      <div className="relative mt-1.5">
-        <input
-          type={show ? 'text' : 'password'}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder="••••••••"
-          autoComplete="new-password"
-          className="w-full h-11 px-3.5 pr-10 rounded-xl border border-[#E7E7EA] bg-white text-sm text-[#18181B] outline-none focus:border-[#2E7D32] transition-colors"
-        />
-        <button type="button" onClick={onToggle}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-[#18181B]">
-          {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -111,7 +75,14 @@ export default function ProfilsUserPage() {
   const planKey = isBusiness ? 'business' : getPlanKey(currentPlan);
   const planInfo = planMeta[planKey];
 
-  const [tab, setTab]             = useState<'infos' | 'security' | 'prefs'>('infos');
+  // Doit être déclaré AVANT le useState qui l'utilise
+  const [searchParams] = useSearchParams();
+  const forceChange    = searchParams.get('force_change') === '1';
+  const tabParam       = searchParams.get('tab');
+
+  const [tab, setTab]             = useState<'infos' | 'security' | 'prefs'>(
+    tabParam === 'security' ? 'security' : tabParam === 'prefs' ? 'prefs' : 'infos'
+  );
   const [isEditing, setIsEditing] = useState(false);
 
   const [form, setForm] = useState({
@@ -123,9 +94,6 @@ export default function ProfilsUserPage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword]               = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrent, setShowCurrent]         = useState(false);
-  const [showPwd, setShowPwd]                 = useState(false);
-  const [showConfirm, setShowConfirm]         = useState(false);
   const [saving, setSaving]                   = useState(false);
   const [uploading, setUploading]             = useState(false);
   const [abonnements, setAbonnements]         = useState<any[]>([]);
@@ -138,7 +106,6 @@ export default function ProfilsUserPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast }    = useToast();
   const navigate     = useNavigate();
-  const pwdStrength  = getPasswordStrength(password);
 
   // ── Auth guard ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -289,8 +256,10 @@ export default function ProfilsUserPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Erreur');
-      toast({ title: 'Mot de passe mis à jour' });
+      toast({ title: 'Mot de passe mis à jour avec succès !' });
       cancelPwd();
+      // Nettoyer l'URL (retirer force_change)
+      if (forceChange) navigate('/dashboard/profile', { replace: true });
     } catch (err: any) {
       toast({ title: 'Erreur', description: err.message, variant: 'destructive' });
     } finally {
@@ -318,7 +287,15 @@ export default function ProfilsUserPage() {
       if (!res.ok) throw new Error(json.error || "Échec de l'upload");
       if (json.url) {
         setForm(s => ({ ...s, photo_profil: json.url }));
-        toast({ title: 'Photo mise à jour' });
+        // Sauvegarder immédiatement l'URL en base
+        const token2 = localStorage.getItem('token');
+        await fetch(`${API_BASE}/api/users/me`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token2}` },
+          body: JSON.stringify({ avatar_url: json.url }),
+        });
+        try { await refreshProfile?.(); } catch { /* ignore */ }
+        toast({ title: 'Photo de profil mise à jour' });
       }
     } catch (e: any) {
       toast({ title: 'Erreur', description: e.message, variant: 'destructive' });
@@ -493,36 +470,51 @@ export default function ProfilsUserPage() {
               <div>
                 <h3 className="font-semibold text-[#18181B]">Sécurité</h3>
                 <p className="text-sm text-[#71717A] mt-0.5 mb-6">Modifiez votre mot de passe et gérez la connexion.</p>
-                <div className="space-y-5 max-w-md">
-                  <PwdField label="Mot de passe actuel"      value={currentPassword} onChange={setCurrentPassword} show={showCurrent} onToggle={() => setShowCurrent(v => !v)} />
-                  <PwdField label="Nouveau mot de passe"     value={password}        onChange={setPassword}        show={showPwd}     onToggle={() => setShowPwd(v => !v)} />
-                  {password && (
-                    <div className="space-y-1.5">
-                      <div className="flex gap-1">
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <div key={i} className="flex-1 h-1.5 rounded-full"
-                            style={{ background: i < pwdStrength.score ? pwdStrength.color : '#F4F4F5' }} />
-                        ))}
-                      </div>
-                      <p className="text-xs font-medium" style={{ color: pwdStrength.color }}>{pwdStrength.label}</p>
+
+                {/* Bannière reset mot de passe */}
+                {forceChange && (
+                  <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-200 bg-amber-50 mb-6">
+                    <Shield className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800">Sécurisez votre compte</p>
+                      <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                        Vous êtes connecté via un lien de réinitialisation. Veuillez définir un nouveau mot de passe sécurisé pour protéger votre compte.
+                      </p>
                     </div>
-                  )}
-                  <PwdField label="Confirmer le mot de passe" value={confirmPassword} onChange={setConfirmPassword} show={showConfirm} onToggle={() => setShowConfirm(v => !v)} />
-                </div>
-                <div className="mt-7 pt-6 border-t border-[#E7E7EA] space-y-5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-                        style={{ background: '#E8F5E9', color: '#1B5E20' }}>
-                        <Shield className="w-4 h-4" />
-                      </span>
-                      <div>
-                        <p className="text-sm font-medium text-[#18181B]">Double authentification</p>
-                        <p className="text-xs text-[#71717A]">Recommandée pour sécuriser votre compte</p>
-                      </div>
-                    </div>
-                    <Toggle on={false} onChange={() => {}} />
                   </div>
+                )}
+
+                <div className="space-y-5 max-w-md">
+                  {!forceChange && (
+                    <PasswordInput
+                      label="Mot de passe actuel"
+                      value={currentPassword}
+                      onChange={setCurrentPassword}
+                      placeholder="Votre mot de passe actuel"
+                    />
+                  )}
+                  <PasswordInput
+                    label="Nouveau mot de passe"
+                    value={password}
+                    onChange={setPassword}
+                    placeholder="8 caractères minimum"
+                    showStrength
+                    showGenerator
+                  />
+                  <PasswordInput
+                    label="Confirmer le mot de passe"
+                    value={confirmPassword}
+                    onChange={setConfirmPassword}
+                    placeholder="Confirmer le nouveau mot de passe"
+                  />
+                  {confirmPassword && password !== confirmPassword && (
+                    <p className="text-xs text-red-500 -mt-3">Les mots de passe ne correspondent pas</p>
+                  )}
+                  {confirmPassword && password === confirmPassword && (
+                    <p className="text-xs text-green-600 -mt-3">✓ Les mots de passe correspondent</p>
+                  )}
+                </div>
+                <div className="mt-7 pt-6 border-t border-[#E7E7EA]">
                   <div className="flex justify-end gap-2">
                     <button
                       onClick={cancelPwd}

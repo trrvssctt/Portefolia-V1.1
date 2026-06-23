@@ -5,7 +5,7 @@ const userModel = require('../models/userModel');
 const adminUserModel = require('../models/adminUserModel');
 const planModel = require('../models/planModel');
 const sendEmail = require('../utils/sendEmail');
-const { emailBienvenueVerification } = require('../utils/emailTemplates');
+const { emailBienvenueVerification, emailResetMotDePasse } = require('../utils/emailTemplates');
 const commandeModel = require('../models/commandeModel');
 const paiementModel = require('../models/paiementModel');
 const checkoutModel = require('../models/checkoutModel');
@@ -13,7 +13,7 @@ const abonnementModel = require('../models/abonnementModel');
 const refreshTokenModel = require('../models/refreshTokenModel');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
-const ACCESS_TOKEN_EXPIRES = process.env.ACCESS_TOKEN_EXPIRES || '15m';
+const ACCESS_TOKEN_EXPIRES = process.env.ACCESS_TOKEN_EXPIRES || '8h';
 const REFRESH_TOKEN_EXPIRES_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 30);
 
 // Strict email validation: local@domain.tld, no consecutive dots, no leading/trailing dots
@@ -734,3 +734,119 @@ async function resendVerification(req, res) {
 }
 
 module.exports.resendVerification = resendVerification;
+
+// ── Réinitialisation mot de passe ─────────────────────────────────────────────
+
+async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body || {};
+    const validation = validateEmail(email);
+    // Toujours répondre OK pour ne pas révéler l'existence du compte
+    if (!validation.valid) return res.json({ ok: true });
+
+    const user = await userModel.findByEmail(validation.normalized);
+    if (!user) return res.json({ ok: true });
+
+    const { pool } = require('../db');
+    const token = crypto.randomBytes(32).toString('hex');
+
+    // DATE_ADD(NOW(), INTERVAL 1 HOUR) — expiration calculée côté MySQL
+    // pour éviter tout décalage de fuseau horaire entre Node.js et le serveur MySQL
+    await pool.query(
+      `UPDATE utilisateurs
+         SET reset_password_token   = ?,
+             reset_password_expires = DATE_ADD(NOW(), INTERVAL 1 HOUR)
+       WHERE id = ?`,
+      [token, user.id]
+    );
+
+    const FRONTEND_BASE = process.env.FRONTEND_BASE || 'https://portefolia.tech';
+    const reset_url     = `${FRONTEND_BASE}/reset-password?token=${token}`;
+
+    const { subject, html } = emailResetMotDePasse({
+      prenom:    user.prenom || user.nom || 'utilisateur',
+      reset_url,
+    });
+
+    sendEmail(user.email, subject, html)
+      .catch(err => console.error('forgotPassword mail error:', err.message));
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('forgotPassword error:', err);
+    return res.status(500).json({ error: 'Erreur serveur' });
+  }
+}
+
+module.exports.forgotPassword = forgotPassword;
+
+async function confirmReset(req, res) {
+  try {
+    const { token } = req.body || {};
+    if (!token || typeof token !== 'string' || token.length < 16) {
+      return res.status(400).json({ error: 'Lien invalide ou expiré.' });
+    }
+
+    const { pool } = require('../db');
+    const [[user]] = await pool.query(
+      `SELECT id, nom, prenom, email, role, is_active
+       FROM utilisateurs
+       WHERE reset_password_token = ?
+         AND reset_password_expires > NOW()
+         AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')
+       LIMIT 1`,
+      [token]
+    );
+
+    if (!user) {
+      return res.status(400).json({ error: 'Ce lien a expiré ou a déjà été utilisé. Veuillez refaire une demande.' });
+    }
+
+    if (!user.is_active) {
+      return res.status(403).json({ error: 'Votre compte est inactif. Contactez le support.' });
+    }
+
+    // Invalider le token immédiatement (usage unique)
+    await pool.query(
+      'UPDATE utilisateurs SET reset_password_token = NULL, reset_password_expires = NULL WHERE id = ?',
+      [user.id]
+    );
+
+    await userModel.setLastLogin(user.id);
+
+    const accessToken = jwt.sign(
+      { sub: user.id, role: user.role || 'USER', email: user.email, password_reset: true },
+      JWT_SECRET,
+      { expiresIn: ACCESS_TOKEN_EXPIRES }
+    );
+
+    const refreshToken = crypto.randomBytes(40).toString('hex');
+    const expiresAt    = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
+
+    await refreshTokenModel.createRefreshToken({
+      utilisateur_id: user.id,
+      token:          refreshToken,
+      user_agent:     req.headers['user-agent'] || null,
+      ip:             req.ip,
+      expires_at:     expiresAt,
+    });
+
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure:   process.env.NODE_ENV === 'production',
+      sameSite: process.env.COOKIE_SAMESITE || (process.env.NODE_ENV === 'production' ? 'none' : 'lax'),
+      maxAge:   REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000,
+      path:     '/',
+    });
+
+    return res.json({
+      accessToken,
+      user: { id: user.id, prenom: user.prenom, nom: user.nom, email: user.email },
+    });
+  } catch (err) {
+    console.error('confirmReset error:', err);
+    return res.status(500).json({ error: 'Erreur serveur.' });
+  }
+}
+
+module.exports.confirmReset = confirmReset;

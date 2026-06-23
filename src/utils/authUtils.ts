@@ -157,8 +157,20 @@ export const signOutUser = async () => {
 };
 
 export const resetUserPassword = async (email: string) => {
-  // Reset password backend endpoint not implemented yet.
-  return { error: { message: "Fonctionnalité de réinitialisation non disponible pour l'instant" } };
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      return { error: { message: json.error || 'Erreur lors de la demande' } };
+    }
+    return { error: null };
+  } catch {
+    return { error: { message: 'Impossible de contacter le serveur.' } };
+  }
 };
 
 // Roles qui correspondent à l'administration interne Portefolia (panel /admin/*)
@@ -197,6 +209,34 @@ export const isBusinessRole = (role?: string | null): boolean => {
 export const getLoginRedirectUrl = (): string => {
   const token = localStorage.getItem('token');
   return getTokenRole(token) === 'admin' ? '/admin/sama_connection_page' : '/auth';
+};
+
+// Secondes restantes avant expiration du token (négatif si déjà expiré)
+export const getTokenSecondsLeft = (token?: string): number => {
+  if (!token) return -1;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return -1;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (payload?.exp) return Math.floor(payload.exp - Date.now() / 1000);
+    return 99999;
+  } catch { return -1; }
+};
+
+// Tente un refresh silencieux via le cookie httpOnly refresh_token
+// Retourne le nouveau token ou null en cas d'échec
+export const silentRefresh = async (): Promise<string | null> => {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      method:      'POST',
+      credentials: 'include',   // envoie le cookie refresh_token
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const newToken = json.accessToken || json.token || null;
+    if (newToken) localStorage.setItem('token', newToken);
+    return newToken;
+  } catch { return null; }
 };
 
 export const isTokenExpired = (token?: string) => {
