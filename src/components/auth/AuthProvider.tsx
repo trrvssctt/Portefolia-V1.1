@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { AuthContext } from '@/contexts/AuthContext';
-import { loadProfile, signInUser, signUpUser, resetUserPassword, signOutUser, isTokenExpired } from '@/utils/authUtils';
+import { loadProfile, signInUser, signUpUser, resetUserPassword, signOutUser, isTokenExpired, getTokenSecondsLeft, silentRefresh } from '@/utils/authUtils';
 import { useNavigate } from 'react-router-dom';
 
 const PLATFORM_ADMIN_ROLES = new Set(['admin', 'super_admin', 'moderateur', 'comptable', 'support']);
@@ -75,21 +75,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   });
 
-  // Interval + visibilitychange : vérifie l'expiry du token toutes les 60 s
+  // Interval + visibilitychange : refresh proactif si < 10 min restantes, logout si refresh impossible
   useEffect(() => {
-    const checkExpiry = () => {
+    const checkExpiry = async () => {
       const token = localStorage.getItem('token');
-      if (token && isTokenExpired(token)) autoLogoutRef.current();
+      if (!token) return;
+      const secsLeft = getTokenSecondsLeft(token);
+      if (secsLeft > 600) return;                       // > 10 min → rien à faire
+      // Token expiré ou < 10 min restantes → tenter un refresh silencieux
+      const newToken = await silentRefresh();
+      if (!newToken) {
+        // Refresh impossible (cookie absent ou révoqué) → déconnecter
+        if (isTokenExpired(token)) autoLogoutRef.current();
+      }
+      // Si refresh réussi, le token est déjà mis à jour dans localStorage
     };
-    const id = setInterval(checkExpiry, 60_000);
+    const id = setInterval(checkExpiry, 60_000);        // vérifier toutes les 60 s
     document.addEventListener('visibilitychange', checkExpiry);
+    checkExpiry();                                       // vérifier immédiatement au montage
     return () => {
       clearInterval(id);
       document.removeEventListener('visibilitychange', checkExpiry);
     };
   }, []);
 
-  // Intercepteur global fetch : logout silencieux sur toute réponse 401
+  // Intercepteur global fetch : sur 401, tenter un refresh silencieux avant de déconnecter
   useEffect(() => {
     const AUTH_PATHS = ['/auth/login', '/auth/logout', '/auth/refresh', '/auth/register', '/sama_connection_page'];
     const originalFetch = window.fetch.bind(window);
@@ -100,7 +110,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (token) {
           const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request)?.url ?? '';
           const isAuthEndpoint = AUTH_PATHS.some(p => url.includes(p));
-          if (!isAuthEndpoint) autoLogoutRef.current();
+          if (!isAuthEndpoint) {
+            // Tenter un refresh silencieux avant de déconnecter
+            const newToken = await silentRefresh();
+            if (!newToken) {
+              // Refresh impossible → déconnecter
+              autoLogoutRef.current();
+            }
+            // Si refresh réussi, la prochaine requête utilisera le nouveau token
+          }
         }
       }
       return response;
