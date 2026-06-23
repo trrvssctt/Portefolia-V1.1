@@ -14,6 +14,7 @@ import {
   CreditCard, Smartphone, Check, ChevronRight, Shield,
   Loader2, RotateCcw, X,
 } from "lucide-react";
+import { PasswordStrengthBar, PasswordInput } from '@/components/ui/PasswordHelper';
 
 const DRAFT_KEY = 'portefolia_signup_draft';
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -804,33 +805,35 @@ const Auth = () => {
                       {/* Mot de passe */}
                       <div>
                         <Label htmlFor="signup-password">Mot de passe</Label>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                          <Input id="signup-password" type={showPassword ? "text" : "password"}
-                            value={formData.password}
-                            onChange={(e) => handleInputChange('password', e.target.value)}
-                            placeholder="8 caractères minimum" className="pl-10 pr-10" required />
-                          <button type="button" onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
-                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                        </div>
+                        <PasswordInput
+                          id="signup-password"
+                          value={formData.password}
+                          onChange={v => handleInputChange('password', v)}
+                          placeholder="8 caractères minimum"
+                          showStrength
+                          showGenerator
+                          required
+                        />
                       </div>
 
                       {/* Confirmer mot de passe */}
                       <div>
                         <Label htmlFor="signup-confirmPassword">Confirmer le mot de passe</Label>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                          <Input id="signup-confirmPassword" type={showConfirmPassword ? "text" : "password"}
-                            value={formData.confirmPassword}
-                            onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                            placeholder="Confirmer le mot de passe" className="pl-10 pr-10" required />
-                          <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                            className="absolute right-3 top-3 text-gray-400 hover:text-gray-600">
-                            {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                        </div>
+                        <PasswordInput
+                          id="signup-confirmPassword"
+                          value={formData.confirmPassword}
+                          onChange={v => handleInputChange('confirmPassword', v)}
+                          placeholder="Confirmer le mot de passe"
+                          required
+                        />
+                        {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                          <p className="text-xs text-red-500 mt-1">Les mots de passe ne correspondent pas</p>
+                        )}
+                        {formData.confirmPassword && formData.password === formData.confirmPassword && (
+                          <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                            <Check size={11} /> Les mots de passe correspondent
+                          </p>
+                        )}
                       </div>
 
                       {/* CTA Step 1 */}
