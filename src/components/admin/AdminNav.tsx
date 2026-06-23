@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, UserCheck, Briefcase, CreditCard,
   TrendingUp, Banknote, BarChart3, FileText, BookOpen,
-  UserCog, LogOut, Waves, Receipt, Menu, X,
+  UserCog, LogOut, Waves, Receipt, Menu, X, Mail,
   PanelLeftClose, PanelLeftOpen, DollarSign, Wifi,
 } from 'lucide-react';
 
@@ -20,12 +20,14 @@ interface NavItem {
   roles: string[];
   group: string;
   badgeKey?: keyof AdminBadges;
+  badgeColor?: string;
 }
 
 interface AdminBadges {
   pending_wave_payments: number;
   pending_upgrades: number;
   expired_accounts: number;
+  nfc_waitlist: number;
 }
 
 export interface AdminNavProps {
@@ -58,6 +60,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Factures',     to: '/admin/invoices',       icon: Receipt,         roles: ['super_admin', 'admin_technique'], group: 'Opérations' },
   { label: 'Formules',     to: '/admin/plans',          icon: CreditCard,      roles: ['super_admin', 'admin_technique'], group: 'Opérations' },
   { label: 'Cartes NFC',  to: '/admin/cartes',         icon: Wifi,            roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations' },
+  { label: 'NFC Waitlist', to: '/admin/nfc-waitlist',  icon: Mail,            roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations', badgeKey: 'nfc_waitlist', badgeColor: '#F59E0B' },
   { label: 'Upgrades',     to: '/admin/upgrades',       icon: TrendingUp,      roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations', badgeKey: 'pending_upgrades' },
   { label: 'Finance',      to: '/admin/finance',        icon: DollarSign,      roles: ['super_admin', 'admin_technique'], group: 'Analytique' },
   { label: 'Stats',        to: '/admin/stats',          icon: BarChart3,       roles: ['super_admin', 'admin_technique'], group: 'Analytique' },
@@ -80,7 +83,7 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; dot: string; b
 // ─── Real-time badges hook ────────────────────────────────────────────────────
 
 function useAdminBadges(): AdminBadges {
-  const [badges, setBadges] = useState<AdminBadges>({ pending_wave_payments: 0, pending_upgrades: 0, expired_accounts: 0 });
+  const [badges, setBadges] = useState<AdminBadges>({ pending_wave_payments: 0, pending_upgrades: 0, expired_accounts: 0, nfc_waitlist: 0 });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -88,14 +91,22 @@ function useAdminBadges(): AdminBadges {
       const token = localStorage.getItem('token');
       if (!token) return;
       try {
-        const res = await fetch(`${API_BASE}/api/admin/badges`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) return;
-        const d = await res.json();
-        setBadges({ pending_wave_payments: d.pending_wave_payments ?? 0, pending_upgrades: d.pending_upgrades ?? 0, expired_accounts: d.expired_accounts ?? 0 });
+        const [badgesRes, nfcRes] = await Promise.all([
+          fetch(`${API_BASE}/api/admin/badges`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE}/api/admin/nfc-waitlist`, { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
+        const d   = badgesRes.ok ? await badgesRes.json() : {};
+        const nfc = nfcRes.ok   ? await nfcRes.json()    : {};
+        setBadges({
+          pending_wave_payments: d.pending_wave_payments ?? 0,
+          pending_upgrades:      d.pending_upgrades ?? 0,
+          expired_accounts:      d.expired_accounts ?? 0,
+          nfc_waitlist:          nfc.total ?? 0,
+        });
       } catch { /* non-bloquant */ }
     };
     fetch_();
-    intervalRef.current = setInterval(fetch_, 30_000);
+    intervalRef.current = setInterval(fetch_, 60_000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, []);
 
@@ -104,19 +115,19 @@ function useAdminBadges(): AdminBadges {
 
 // ─── Badge pill ───────────────────────────────────────────────────────────────
 
-function BadgePill({ count }: { count: number }) {
+function BadgePill({ count, color = '#C62828' }: { count: number; color?: string }) {
   if (count <= 0) return null;
   return (
-    <span className="ml-auto min-w-[16px] h-[16px] bg-[#C62828] text-white text-[10px] font-black px-1 rounded-full leading-none flex items-center justify-center shrink-0">
+    <span className="ml-auto min-w-[16px] h-[16px] text-white text-[10px] font-black px-1 rounded-full leading-none flex items-center justify-center shrink-0" style={{ background: color }}>
       {count > 99 ? '99+' : count}
     </span>
   );
 }
 
-function BadgeDot({ count }: { count: number }) {
+function BadgeDot({ count, color = '#C62828' }: { count: number; color?: string }) {
   if (count <= 0) return null;
   return (
-    <span className="absolute -top-[5px] -right-[5px] min-w-[16px] h-[16px] bg-[#C62828] text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none px-0.5">
+    <span className="absolute -top-[5px] -right-[5px] min-w-[16px] h-[16px] text-white text-[9px] font-black rounded-full flex items-center justify-center leading-none px-0.5" style={{ background: color }}>
       {count > 9 ? '9+' : count}
     </span>
   );
@@ -163,6 +174,7 @@ const AdminNav = ({ collapsed, onToggle, profile, onSignOut }: AdminNavProps) =>
           }
           {groupItems.map((item) => {
             const count = item.badgeKey ? badges[item.badgeKey] : 0;
+            const bColor = item.badgeColor;
             return (
               <NavLink
                 key={item.to}
@@ -174,7 +186,7 @@ const AdminNav = ({ collapsed, onToggle, profile, onSignOut }: AdminNavProps) =>
               >
                 <item.icon className="h-[17px] w-[17px] shrink-0" />
                 {!isCollapsed && <span className="text-[13px] font-semibold whitespace-nowrap flex-1">{item.label}</span>}
-                {isCollapsed ? <BadgeDot count={count} /> : <BadgePill count={count} />}
+                {isCollapsed ? <BadgeDot count={count} color={bColor} /> : <BadgePill count={count} color={bColor} />}
               </NavLink>
             );
           })}

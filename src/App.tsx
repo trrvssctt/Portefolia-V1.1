@@ -42,6 +42,7 @@ import AdminUsers from "./pages/admin/Users";
 import AdminPortfolios from "./pages/admin/Portfolios";
 import AdminCommandes from "./pages/admin/Commandes";
 import AdminCartes from "./pages/admin/Cartes";
+import NfcWaitlistPage from "./pages/admin/NfcWaitlistPage";
 import AdminPaiements from "./pages/admin/Paiements";
 import AdminInvoices from "./pages/admin/Invoices";
 import AdminPlans from "./pages/admin/Plans";
@@ -155,6 +156,7 @@ function App() {
                       <Route path="/admin/commandes" element={<AdminCommandes />} />
                       <Route path="/admin/plans" element={<AdminPlans />} />
                       <Route path="/admin/cartes" element={<AdminCartes />} />
+                      <Route path="/admin/nfc-waitlist" element={<NfcWaitlistPage />} />
                       <Route path="/admin/paiements" element={<AdminPaiements />} />
                       <Route path="/admin/wave-payments" element={<WavePayments />} />
                       <Route path="/admin/wave-validation" element={<WaveValidation />} />

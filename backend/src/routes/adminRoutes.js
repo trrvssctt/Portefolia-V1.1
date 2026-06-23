@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { pool } = require('../db');
 const adminController = require('../controllers/adminController');
 const userController = require('../controllers/userController');
 const paiementController = require('../controllers/paiementController');
@@ -194,5 +195,102 @@ router.post('/clients/:id/envoyer-email',      auth, adminAuth, logAdminAction('
 router.put('/clients/:id/plan',                auth, adminAuth, logAdminAction('changer_plan_client', 'clients'),       clientsAdminCtrl.changerPlanClient);
 router.put('/clients/:id/infos',               auth, adminAuth, logAdminAction('update_client_infos', 'clients'),       clientsAdminCtrl.mettreAJourInfosClient);
 router.post('/clients/:id/forcer-renouvellement', auth, adminAuth, logAdminAction('forcer_renouvellement', 'clients'), clientsAdminCtrl.forcerRenouvellement);
+
+// ── NFC Waitlist ──────────────────────────────────────────────────────────────
+const sendEmail  = require('../utils/sendEmail');
+const FRONTEND_NFC = process.env.FRONTEND_BASE || 'https://portefolia.tech';
+
+router.get('/nfc-waitlist/export', auth, adminAuth, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT email, created_at FROM nfc_waitlist ORDER BY created_at DESC'
+    );
+    const date = new Date().toISOString().slice(0, 10);
+    const csv  = ['email,date_inscription',
+      ...rows.map(r => `${r.email},${new Date(r.created_at).toISOString().replace('T', ' ').slice(0, 19)}`)
+    ].join('\n');
+    res.set({
+      'Content-Type':        'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="nfc-waitlist-${date}.csv"`,
+    });
+    return res.send(csv);
+  } catch (err) {
+    console.error('nfc-waitlist export error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/nfc-waitlist', auth, adminAuth, async (req, res) => {
+  try {
+    const [[{ total }]] = await pool.query('SELECT COUNT(*) AS total FROM nfc_waitlist');
+    const [liste] = await pool.query(
+      'SELECT id, email, created_at FROM nfc_waitlist ORDER BY created_at DESC'
+    );
+    return res.json({ total: Number(total), liste });
+  } catch (err) {
+    console.error('nfc-waitlist list error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.delete('/nfc-waitlist/:id', auth, adminAuth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM nfc_waitlist WHERE id = ?', [req.params.id]);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error('nfc-waitlist delete error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/nfc-waitlist/notify-all', auth, adminAuth, async (req, res) => {
+  try {
+    const { sujet, message } = req.body || {};
+    if (!sujet || !message) return res.status(400).json({ error: 'sujet et message requis' });
+
+    const [rows] = await pool.query('SELECT email FROM nfc_waitlist ORDER BY created_at DESC');
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;font-family:'Helvetica Neue',Arial,sans-serif;background:#f4f4f4">
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td>
+<table width="600" align="center" cellpadding="0" cellspacing="0" style="margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)">
+  <tr><td style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:32px 40px;text-align:center">
+    <img src="${FRONTEND_NFC}/lovable-uploads/logo_portefolia_remove_bg.png" alt="Portefolia" height="40" style="filter:brightness(0) invert(1)">
+    <h1 style="color:#fff;font-size:22px;font-weight:700;margin:16px 0 0">Carte NFC Portefolia</h1>
+  </td></tr>
+  <tr><td style="padding:36px 40px">
+    <div style="font-size:15px;color:#374151;line-height:1.8;white-space:pre-wrap">${message}</div>
+    <div style="text-align:center;margin-top:32px">
+      <a href="${FRONTEND_NFC}/nfc-types" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#2E7D32,#1BC29A);color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:10px">Découvrir la carte NFC</a>
+    </div>
+  </td></tr>
+  <tr><td style="background:#f9fafb;padding:20px 40px;text-align:center;border-top:1px solid #e5e7eb">
+    <p style="font-size:11px;color:#9ca3af;margin:0">Portefolia · contact@portefolia.tech · ${FRONTEND_NFC}</p>
+    <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">Vous recevez cet email car vous êtes inscrit sur la liste d'attente NFC.</p>
+  </td></tr>
+</table></td></tr></table></body></html>`;
+
+    let envoyes = 0, echecs = 0;
+    for (const row of rows) {
+      try {
+        await sendEmail(row.email, sujet, html);
+        envoyes++;
+      } catch { echecs++; }
+    }
+
+    try {
+      await pool.query(
+        `INSERT INTO admin_action_logs (admin_id, action, resource, details, ip_address, user_agent)
+         VALUES (?, 'NFC_WAITLIST_NOTIFY', 'nfc_waitlist', ?, ?, ?)`,
+        [req.userId, JSON.stringify({ envoyes, echecs, sujet }),
+         req.headers['x-forwarded-for'] || req.ip || '',
+         (req.headers['user-agent'] || '').slice(0, 250)]
+      );
+    } catch {}
+
+    return res.json({ success: true, envoyes, echecs });
+  } catch (err) {
+    console.error('nfc-waitlist notify error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
 
 module.exports = router;
