@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ import {
   User, MapPin, Phone, Link2, Github, Linkedin, Globe, Facebook, Instagram,
   Palette, AlertCircle, Sparkles, Plus, Trash2, Calendar as CalendarIcon, Lock, X,
   Briefcase, Code2, Star, Crown, Zap, CheckCircle2, ArrowRight,
-  Building2, Type, Layout, Check, ChevronRight, ChevronLeft, Eye,
+  Building2, Type, Layout, Check, ChevronRight, ChevronLeft, Eye, Loader2,
 } from 'lucide-react';
 import {
   PORTFOLIO_TEMPLATES, TIER_META, isTemplateUnlocked,
@@ -103,6 +103,8 @@ const PLAN_CONFIG: Record<PlanType, {
 
 const PLAN_ORDER: PlanType[] = ['free', 'starter', 'pro', 'business'];
 const displayLimit = (n: number) => (n >= 9999 ? '∞' : String(n));
+
+const FIXED_DOMAINS = ['Tech', 'Agro', 'Médecine', 'Design', 'Marketing', 'Finance', 'Éducation', 'Art', 'Juridique'];
 
 const mapDomainToEnum = (domain: string | null | undefined): string | null => {
   if (!domain) return null;
@@ -783,6 +785,60 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
 
   const [hintTpl, setHintTpl] = React.useState<PortfolioTemplate | null>(null);
 
+  // ── Domaine custom (quand "Autres" est sélectionné) ──────────────────────────
+  const [isOtherDomain, setIsOtherDomain] = useState(false);
+
+  // ── Localisation autocomplete ─────────────────────────────────────────────────
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+  const [locationLoading, setLocationLoading]         = useState(false);
+  const [showLocationDrop, setShowLocationDrop]       = useState(false);
+  const locationWrapRef  = useRef<HTMLDivElement>(null);
+  const locationDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fermer le dropdown si clic en dehors
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (locationWrapRef.current && !locationWrapRef.current.contains(e.target as Node)) {
+        setShowLocationDrop(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const searchLocation = useCallback((query: string) => {
+    if (locationDebounce.current) clearTimeout(locationDebounce.current);
+    if (!query || query.length < 2) {
+      setLocationSuggestions([]);
+      setShowLocationDrop(false);
+      return;
+    }
+    locationDebounce.current = setTimeout(async () => {
+      setLocationLoading(true);
+      try {
+        const res  = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=6&addressdetails=1&accept-language=fr`,
+          { headers: { Accept: 'application/json' } }
+        );
+        const data = await res.json() as any[];
+        const seen = new Set<string>();
+        const results: string[] = [];
+        for (const item of data) {
+          const addr    = item.address || {};
+          const city    = addr.city || addr.town || addr.village || addr.municipality || addr.county || item.name || '';
+          const country = addr.country || '';
+          const label   = [city, country].filter(Boolean).join(', ')
+                          || item.display_name.split(',').slice(0, 2).join(',').trim();
+          if (label && !seen.has(label)) { seen.add(label); results.push(label); }
+        }
+        setLocationSuggestions(results);
+        setShowLocationDrop(results.length > 0);
+      } catch { /* ignore */ } finally {
+        setLocationLoading(false);
+      }
+    }, 350);
+  }, []);
+
   useEffect(() => {
     if (isBusiness) { setPlanType('business'); return; }
     const fetchPlan = async () => {
@@ -805,6 +861,8 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
 
   useEffect(() => {
     if (!portfolio) return;
+    const existingDomain = portfolio.domain || portfolio.domaine || '';
+    if (existingDomain && !FIXED_DOMAINS.includes(existingDomain)) setIsOtherDomain(true);
     const relations = portfolio.liens_sociaux || portfolio.socials || portfolio.links || portfolio.relations || [];
     const socialMap: Record<string, string> = {};
     for (const r of relations) {
@@ -861,7 +919,8 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
   const filledSocialCount = visibleSocials.filter(f => formData[f.key as keyof typeof formData]).length;
 
   // Validation étape 1
-  const canGoToStep2 = formData.title.trim() !== '' && (!!portfolio || formData.domain !== '');
+  // "Autres" sélectionné sans texte custom = domaine valide (champ optionnel)
+  const canGoToStep2 = formData.title.trim() !== '' && (!!portfolio || formData.domain !== '' || isOtherDomain);
 
   const goNext = () => {
     if (step === 1) {
@@ -877,7 +936,12 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
 
   const handleSubmit = async () => {
     if (!user) return;
-    const mappedDomain = mapDomainToEnum(formData.domain);
+    // Si "Autres" sélectionné sans texte custom → conserver "Autres" comme valeur affichée
+    if (isOtherDomain && !formData.domain) {
+      setFormData(prev => ({ ...prev, domain: 'Autres' }));
+    }
+    const finalDomain   = isOtherDomain && !formData.domain ? 'Autres' : formData.domain;
+    const mappedDomain  = mapDomainToEnum(finalDomain);
     if (!portfolio && !mappedDomain) {
       toast({ title: 'Erreur', description: 'Le champ Domaine est requis', variant: 'destructive' });
       return;
@@ -910,7 +974,8 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
       for (const k of allSocialKeys) { if (payload[k]) payload[k] = ensureUrl(payload[k]); }
       if (payload.profile_image_url && String(payload.profile_image_url).startsWith('data:')) delete payload.profile_image_url;
       if (payload.cv_url && String(payload.cv_url).startsWith('data:')) delete payload.cv_url;
-      const domainesEnum = mapDomainToEnum(payload.domain || formData.domain);
+      if (isOtherDomain && !payload.domain) payload.domain = 'Autres';
+      const domainesEnum = mapDomainToEnum(payload.domain || finalDomain);
       if (domainesEnum) payload.domaines = domainesEnum;
       if (Array.isArray(payload.experiences)) {
         payload.experiences = payload.experiences.map((exp: any) => ({
@@ -1082,7 +1147,18 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
                 </div>
                 <div>
                   <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Domaine d'activité *</Label>
-                  <select value={formData.domain} onChange={e => setFormData({ ...formData, domain: e.target.value })} required={!portfolio}
+                  <select
+                    value={isOtherDomain ? 'Autres' : formData.domain}
+                    onChange={e => {
+                      if (e.target.value === 'Autres') {
+                        setIsOtherDomain(true);
+                        setFormData({ ...formData, domain: '' });
+                      } else {
+                        setIsOtherDomain(false);
+                        setFormData({ ...formData, domain: e.target.value });
+                      }
+                    }}
+                    required={!portfolio && !isOtherDomain}
                     className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
                     <option value="">Sélectionner un domaine</option>
                     <option value="Tech">Tech</option>
@@ -1096,12 +1172,59 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
                     <option value="Juridique">Juridique</option>
                     <option value="Autres">Autres</option>
                   </select>
+                  {isOtherDomain && (
+                    <div className="mt-2">
+                      <Input
+                        value={formData.domain}
+                        onChange={e => setFormData({ ...formData, domain: e.target.value })}
+                        placeholder="Ex : Architecture, Communication, BTP..."
+                        className="h-10 text-sm"
+                        autoFocus
+                      />
+                      <p className="text-[11px] text-gray-400 mt-1">Optionnel — sera affiché tel quel sur votre portfolio</p>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Localisation</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                    <Input value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} className="pl-9 h-10 text-sm" placeholder="Dakar, Sénégal" />
+                  <div className="relative" ref={locationWrapRef}>
+                    <MapPin className="absolute left-3 top-5 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
+                    {locationLoading && (
+                      <Loader2 className="absolute right-3 top-5 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin pointer-events-none z-10" />
+                    )}
+                    <Input
+                      value={formData.location}
+                      onChange={e => {
+                        setFormData({ ...formData, location: e.target.value });
+                        searchLocation(e.target.value);
+                      }}
+                      onFocus={() => { if (locationSuggestions.length > 0) setShowLocationDrop(true); }}
+                      onKeyDown={e => { if (e.key === 'Escape') setShowLocationDrop(false); }}
+                      className="pl-9 h-10 text-sm"
+                      placeholder="Dakar, Sénégal"
+                      autoComplete="off"
+                    />
+                    {showLocationDrop && locationSuggestions.length > 0 && (
+                      <ul className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+                        {locationSuggestions.map((suggestion, i) => (
+                          <li key={i}>
+                            <button
+                              type="button"
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-green-50 transition-colors"
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => {
+                                setFormData({ ...formData, location: suggestion });
+                                setShowLocationDrop(false);
+                                setLocationSuggestions([]);
+                              }}
+                            >
+                              <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                              <span className="text-gray-800">{suggestion}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
                 <div>
