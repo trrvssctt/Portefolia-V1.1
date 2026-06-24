@@ -40,6 +40,7 @@ router.put('/users/:id/confirm-payment', auth, adminAuth, requirePermission('pay
 
 // Portfolios admin
 router.get('/portfolios', auth, adminAuth, adminController.listPortfolios);
+router.get('/portfolios/stats', auth, adminAuth, adminController.portfoliosStats); // DOIT être avant /:id
 router.get('/portfolios/:id', auth, adminAuth, adminController.getPortfolio);
 router.put('/portfolios/:id', auth, adminAuth, adminController.updatePortfolioAdmin);
 router.delete('/portfolios/:id', auth, adminAuth, adminController.deletePortfolio);

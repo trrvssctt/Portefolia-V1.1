@@ -284,7 +284,7 @@ async function approveUpgrade(req, res) {
       if (!user?.email) throw new Error('no user email');
 
       const ASSET_BASE = process.env.EMAIL_ASSET_BASE || 'https://portefolia.tech';
-      const FRONTEND   = process.env.FRONTEND_BASE || 'http://localhost:8080';
+      const FRONTEND   = process.env.FRONTEND_BASE || 'https://portefolia.tech';
       const prenom     = user?.prenom || user?.nom || 'Cher client';
       const montantPaye = Number(paiement?.montant || 0);
       const refPaiement = paiement?.reference_transaction || reference || '—';
@@ -384,7 +384,7 @@ async function rejectUpgrade(req, res) {
       if (user?.email) {
         const sendEmail = require('../utils/sendEmail');
         const ASSET_BASE = process.env.EMAIL_ASSET_BASE || 'https://portefolia.tech';
-        const FRONTEND   = process.env.FRONTEND_BASE || 'http://localhost:8080';
+        const FRONTEND   = process.env.FRONTEND_BASE || 'https://portefolia.tech';
         const prenom = user.prenom || user.nom || 'Cher client';
         const [[plan]] = await pool.query('SELECT name FROM plans WHERE id = ? LIMIT 1', [upgrade.plan_cible_id]);
 
@@ -819,7 +819,7 @@ async function confirmPaymentAndValidate(req, res) {
 
     // send invoice email to user
     const user = await userModel.findById(id);
-    const loginUrl = `${process.env.APP_URL || 'http://localhost:3000'}/auth`;
+    const loginUrl = `${process.env.APP_URL || 'https://portefolia.tech'}/auth`;
     // build rich email body with all references
     const prevPlanHtml = previousPlan ? `
       <li>Plan précédent: ${previousPlan.name || previousPlan.nom || '—'}</li>
@@ -1677,7 +1677,7 @@ async function getCommandeInvoicePdf(req, res) {
     const orderNumber = `CMD-${new Date(cmd.date_commande || Date.now()).toISOString().slice(0, 10).replace(/-/g, '')}-${cmd.id}`;
     const amount = Number(cmd.montant_total || 0);
     const currency = 'F CFA';
-    const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const baseUrl = process.env.APP_URL || 'https://portefolia.tech';
     // prefer public upload path if available
     const logoUrl = `${baseUrl}/lovable-uploads/logo_portefolia_remove_bg.png`;
 
@@ -2003,6 +2003,7 @@ module.exports.statsPlatform = statsPlatform;
 module.exports.statsPlansDistribution = statsPlansDistribution;
 module.exports.statsUsers = statsUsers;
 module.exports.statsPortfolios = statsPortfolios;
+module.exports.portfoliosStats  = portfoliosStats;
 module.exports.statsCommandes = statsCommandes;
 module.exports.dashboardStats = dashboardStats;
 
@@ -2047,6 +2048,53 @@ async function statsUsers(req, res) {
     return res.json({ total: Number(totalRow.total || 0), active: Number(activeRow.active || 0), pending: Number(pendingRow.pending || 0) });
   } catch (err) {
     console.error('admin.statsUsers error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
+// GET /api/admin/portfolios/stats?period=30d — stats enrichies pour la page admin Portfolios
+async function portfoliosStats(req, res) {
+  try {
+    const days = parseInt((req.query.period || '30').toString()) || 30;
+
+    const [[totalRow]]   = await pool.query('SELECT COUNT(*) AS total FROM portfolios WHERE deleted_at IS NULL');
+    const [[publicRow]]  = await pool.query('SELECT COUNT(*) AS pub FROM portfolios WHERE est_public = 1 AND deleted_at IS NULL');
+    const [[privateRow]] = await pool.query('SELECT COUNT(*) AS priv FROM portfolios WHERE (est_public = 0 OR est_public IS NULL) AND deleted_at IS NULL');
+    const [[deletedRow]] = await pool.query('SELECT COUNT(*) AS del FROM portfolios WHERE deleted_at IS NOT NULL');
+    const [[viewsRow]]   = await pool.query('SELECT COALESCE(COUNT(*),0) AS total_views FROM visites');
+    const [[growthRow]]  = await pool.query(
+      'SELECT COUNT(*) AS cnt FROM portfolios WHERE date_creation >= DATE_SUB(NOW(), INTERVAL ? DAY) AND deleted_at IS NULL',
+      [days]
+    );
+    const [topRows] = await pool.query(
+      `SELECT p.id, p.titre AS title, COUNT(v.id) AS views
+       FROM portfolios p
+       LEFT JOIN visites v ON v.portfolio_id = p.id
+       WHERE p.deleted_at IS NULL
+       GROUP BY p.id, p.titre ORDER BY views DESC LIMIT 5`
+    );
+    const [domainRows] = await pool.query(
+      `SELECT COALESCE(domaines, 'Non défini') AS domain, COUNT(*) AS cnt
+       FROM portfolios WHERE deleted_at IS NULL GROUP BY domaines ORDER BY cnt DESC`
+    );
+    const byDomain = {};
+    for (const r of domainRows) byDomain[r.domain] = Number(r.cnt);
+
+    return res.json({
+      total:      Number(totalRow.total    || 0),
+      public:     Number(publicRow.pub     || 0),
+      private:    Number(privateRow.priv   || 0),
+      deleted:    Number(deletedRow.del    || 0),
+      totalViews: Number(viewsRow.total_views || 0),
+      avgViews:   0,
+      growth30d:  Number(growthRow.cnt     || 0),
+      byPlan:     {},
+      byDomain,
+      byUser:     {},
+      topPerforming: topRows.map(p => ({ id: p.id, title: p.title, views: Number(p.views || 0) })),
+    });
+  } catch (err) {
+    console.error('admin.portfoliosStats error:', err);
     return res.status(500).json({ error: 'Server error' });
   }
 }
