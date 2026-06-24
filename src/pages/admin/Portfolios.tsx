@@ -159,24 +159,24 @@ export default function AdminPortfolios() {
     setRefreshing(true);
     const token = localStorage.getItem("token");
     try {
-      const [portfoliosRes, statsRes, usersRes] = await Promise.all([
+      const [portfoliosRes, usersRes] = await Promise.all([
         fetch(`${API_BASE}/api/admin/portfolios?limit=1000&include=owner,stats`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE}/api/admin/portfolios/stats?period=${statsPeriod}`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API_BASE}/api/admin/users?limit=1000&role=user`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
 
       if (portfoliosRes.ok) {
         const json = await portfoliosRes.json();
         setPortfolios(json.portfolios || []);
-      }
-      if (statsRes.ok) {
-        const s = await statsRes.json();
-        setStats({
-          total: s.total || 0, public: s.public || 0, private: s.private || 0,
-          deleted: s.deleted || 0, totalViews: s.totalViews || 0, avgViews: s.avgViews || 0,
-          byPlan: s.byPlan || {}, byDomain: s.byDomain || {}, byUser: s.byUser || {},
-          growth30d: s.growth30d || 0, topPerforming: s.topPerforming || [],
-        });
+        // Le endpoint include=owner,stats retourne déjà json.stats avec byPlan, public, private…
+        if (json.stats) {
+          const s = json.stats;
+          setStats({
+            total: s.total || 0, public: s.public || 0, private: s.private || 0,
+            deleted: s.deleted || 0, totalViews: s.totalViews || 0, avgViews: s.avgViews || 0,
+            byPlan: s.byPlan || {}, byDomain: s.byDomain || {}, byUser: s.byUser || {},
+            growth30d: s.growth30d || 0, topPerforming: s.topPerforming || [],
+          });
+        }
       }
       if (usersRes.ok) {
         const usersData = await usersRes.json();
