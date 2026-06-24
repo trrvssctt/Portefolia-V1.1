@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import {
   PORTFOLIO_TEMPLATES, TIER_META, isTemplateUnlocked,
-  templateById, type PortfolioTemplate,
+  templateById, type PortfolioTemplate, type TemplateFamily,
 } from '@/components/portfolio/portfolioTemplates';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -246,34 +246,20 @@ function TemplateThumb({ tpl, selected, locked, onClick }: {
   tpl: PortfolioTemplate; selected: boolean; locked: boolean; onClick: () => void;
 }) {
   const a = tpl.primary;
+  const v = tpl.variant;
 
-  // ── EDITORIAL: fond blanc · barre accent top · avatar+titre en ligne · 2 colonnes (sidebar | main) ──
-  const EditorialInner = () => (
+  // ── Editorial ─────────────────────────────────────────────────────────────
+  const EditorialClassicInner = () => (
     <div style={{ background: '#fff', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Barre fine accent tout en haut */}
       <div style={{ height: 2.5, background: a, flexShrink: 0 }} />
-      {/* Header horizontal : avatar carré gauche + grand titre à droite */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, padding: '7px 8px 6px', flexShrink: 0 }}>
         <div style={{ width: 24, height: 24, borderRadius: 4, background: `${a}25`, flexShrink: 0 }} />
-        <div>
-          <div style={{ width: 56, height: 9, borderRadius: 1, background: '#18181B', marginBottom: 3 }} />
-          <div style={{ width: 32, height: 3, borderRadius: 1, background: a }} />
-        </div>
+        <div><div style={{ width: 56, height: 9, borderRadius: 1, background: '#18181B', marginBottom: 3 }} /><div style={{ width: 32, height: 3, borderRadius: 1, background: a }} /></div>
       </div>
-      {/* Corps 2 colonnes : sidebar compétences | contenu principal */}
       <div style={{ display: 'flex', gap: 5, padding: '0 8px 6px', flex: 1, overflow: 'hidden' }}>
-        {/* Sidebar étroite avec barres compétences */}
         <div style={{ width: 28, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {[75, 50, 85, 60].map((w, i) => (
-            <div key={i}>
-              <div style={{ width: `${w}%`, height: 2, borderRadius: 1, background: '#D4D4D8' }} />
-              {i < 3 && <div style={{ width: '100%', height: 2.5, borderRadius: 1, marginTop: 1, background: '#F4F4F5' }}>
-                <div style={{ width: `${w}%`, height: '100%', borderRadius: 1, background: `${a}70` }} />
-              </div>}
-            </div>
-          ))}
+          {[75, 50, 85, 60].map((w, i) => (<div key={i}><div style={{ width: `${w}%`, height: 2, borderRadius: 1, background: '#D4D4D8' }} />{i < 3 && <div style={{ width: '100%', height: 2.5, borderRadius: 1, marginTop: 1, background: '#F4F4F5' }}><div style={{ width: `${w}%`, height: '100%', borderRadius: 1, background: `${a}70` }} /></div>}</div>))}
         </div>
-        {/* Colonne principale : cartes projets/exps */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
           <div style={{ flex: 2, borderRadius: 5, border: '1px solid #E4E4E7', background: '#FAFAFA' }} />
           <div style={{ flex: 1, borderRadius: 5, border: '1px solid #E4E4E7', background: '#FAFAFA' }} />
@@ -282,97 +268,140 @@ function TemplateThumb({ tpl, selected, locked, onClick }: {
     </div>
   );
 
-  // ── CLASSIQUE: fond blanc · avatar centré · cartes empilées pleine largeur ──
-  const ClassiqueInner = () => (
-    <div style={{ background: '#fff', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '7px 7px 5px' }}>
-      {/* Avatar cercle centré */}
-      <div style={{ width: 24, height: 24, borderRadius: '50%', background: `${a}20`, border: `2px solid ${a}`, marginBottom: 4, flexShrink: 0 }} />
-      {/* Nom centré */}
-      <div style={{ width: 48, height: 6, borderRadius: 1, background: '#18181B', marginBottom: 2 }} />
-      <div style={{ width: 28, height: 3, borderRadius: 1, background: a, marginBottom: 8 }} />
-      {/* Cartes empilées pleine largeur */}
-      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 3, flex: 1, overflow: 'hidden' }}>
-        {/* Carte compétences */}
-        <div style={{ borderRadius: 5, border: '1px solid #E4E4E7', padding: '3px 5px', background: '#fff' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2 }}>
-            <div style={{ width: 7, height: 7, borderRadius: 2, background: `${a}20` }} />
-            <div style={{ width: 30, height: 3, borderRadius: 1, background: '#18181B' }} />
-          </div>
-          <div style={{ display: 'flex', gap: 2 }}>
-            {[60, 80].map((w, i) => <div key={i} style={{ flex: 1, height: 2.5, borderRadius: 1, background: '#F4F4F5' }}>
-              <div style={{ width: `${w}%`, height: '100%', borderRadius: 1, background: `${a}60` }} />
-            </div>)}
-          </div>
-        </div>
-        {/* Carte expériences */}
-        <div style={{ borderRadius: 5, border: '1px solid #E4E4E7', padding: '3px 5px', background: '#fff', flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2 }}>
-            <div style={{ width: 7, height: 7, borderRadius: 2, background: `${a}20` }} />
-            <div style={{ width: 24, height: 3, borderRadius: 1, background: '#18181B' }} />
-          </div>
-          <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: a, opacity: 0.7 }} />
-            <div>
-              <div style={{ width: 36, height: 2.5, borderRadius: 1, background: '#D4D4D8', marginBottom: 1.5 }} />
-              <div style={{ width: 22, height: 2, borderRadius: 1, background: a, opacity: 0.6 }} />
-            </div>
-          </div>
+  const EditorialCoverInner = () => (
+    <div style={{ background: '#fff', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: `linear-gradient(135deg, ${a}, ${a}88)`, padding: '14px 8px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', border: '2px solid #fff', marginBottom: 4 }} />
+        <div style={{ width: 50, height: 5, borderRadius: 1, background: 'rgba(255,255,255,0.9)', marginBottom: 2 }} />
+        <div style={{ width: 32, height: 3, borderRadius: 1, background: 'rgba(255,255,255,0.6)' }} />
+      </div>
+      <div style={{ flex: 1, padding: '7px 10px', display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+        <div style={{ width: '80%', height: 3, borderRadius: 1, background: '#D4D4D8' }} />
+        <div style={{ width: '60%', height: 3, borderRadius: 1, background: '#E4E4E7' }} />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, width: '100%', marginTop: 2 }}>
+          <div style={{ borderRadius: 4, border: '1px solid #E4E4E7', height: 24, background: '#FAFAFA' }} />
+          <div style={{ borderRadius: 4, border: '1px solid #E4E4E7', height: 24, background: '#FAFAFA' }} />
         </div>
       </div>
     </div>
   );
 
-  // ── MINIMAL: fond blanc pur · PAS d'avatar · typographie large · séparateurs horizontaux · pills skills ──
-  const MinimalInner = () => (
-    <div style={{ background: '#fff', width: '100%', height: '100%', padding: '9px 9px 7px' }}>
-      {/* Grand titre bold sans avatar */}
-      <div style={{ width: '62%', height: 10, borderRadius: 1, background: '#18181B', marginBottom: 3 }} />
-      {/* Sous-titre domaine · location */}
-      <div style={{ width: '42%', height: 3, borderRadius: 1, background: '#A1A1AA', marginBottom: 8 }} />
-      {/* Séparateur horizontal */}
-      <div style={{ width: '100%', height: 0.75, background: '#E4E4E7', marginBottom: 7 }} />
-      {/* Section : label tout-caps + lignes */}
-      <div style={{ width: 28, height: 2.5, borderRadius: 1, background: '#D4D4D8', marginBottom: 5 }} />
-      {[1, 2].map(i => (
-        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 4, marginBottom: 3, borderBottom: '1px solid #F4F4F5' }}>
-          <div style={{ width: `${i === 1 ? 52 : 36}%`, height: 3, borderRadius: 1, background: '#D4D4D8' }} />
-          <div style={{ width: 18, height: 3, borderRadius: 1, background: '#E4E4E7' }} />
+  const EditorialSplitInner = () => (
+    <div style={{ background: '#fff', width: '100%', height: '100%', display: 'flex', flexDirection: 'row' }}>
+      <div style={{ width: '40%', padding: '10px 6px', display: 'flex', flexDirection: 'column', gap: 4, borderRight: '1px solid #F4F4F5' }}>
+        <div style={{ width: 22, height: 22, borderRadius: 4, background: `${a}20`, marginBottom: 3 }} />
+        <div style={{ width: '80%', height: 7, borderRadius: 1, background: '#18181B' }} />
+        <div style={{ width: '60%', height: 4, borderRadius: 1, background: a }} />
+        {[1, 2, 3].map(i => <div key={i} style={{ width: `${70 - i * 10}%`, height: 2, borderRadius: 1, background: '#E4E4E7' }} />)}
+      </div>
+      <div style={{ flex: 1, padding: '10px 7px', display: 'flex', flexDirection: 'column', gap: 6, position: 'relative' }}>
+        <div style={{ position: 'absolute', left: 13, top: 15, bottom: 12, width: 1, background: '#E4E4E7' }} />
+        {[1, 2].map(i => (
+          <div key={i} style={{ paddingLeft: 14, position: 'relative' }}>
+            <div style={{ position: 'absolute', left: 8, top: 3, width: 7, height: 7, borderRadius: '50%', background: i === 1 ? a : '#D4D4D8', border: '1.5px solid #fff' }} />
+            <div style={{ width: '75%', height: 4, borderRadius: 1, background: '#18181B', marginBottom: 2 }} />
+            <div style={{ width: '50%', height: 3, borderRadius: 1, background: a, opacity: 0.7 }} />
+          </div>
+        ))}
+        <div style={{ borderRadius: 4, border: '1px solid #E4E4E7', height: 22, background: '#FAFAFA', marginLeft: 2 }} />
+      </div>
+    </div>
+  );
+
+  // ── Classique ─────────────────────────────────────────────────────────────
+  const ClassiqueCenteredInner = () => (
+    <div style={{ background: '#F7F8F8', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '7px 7px 5px' }}>
+      <div style={{ width: 24, height: 24, borderRadius: '50%', background: `${a}20`, border: `2px solid ${a}`, marginBottom: 4, flexShrink: 0 }} />
+      <div style={{ width: 48, height: 6, borderRadius: 1, background: '#18181B', marginBottom: 2 }} />
+      <div style={{ width: 28, height: 3, borderRadius: 1, background: a, marginBottom: 8 }} />
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 3, flex: 1, overflow: 'hidden' }}>
+        <div style={{ borderRadius: 5, border: '1px solid #E4E4E7', padding: '3px 5px', background: '#fff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2 }}><div style={{ width: 7, height: 7, borderRadius: 2, background: `${a}20` }} /><div style={{ width: 30, height: 3, borderRadius: 1, background: '#18181B' }} /></div>
+          <div style={{ display: 'flex', gap: 2 }}>{[60, 80].map((w, i) => <div key={i} style={{ flex: 1, height: 2.5, borderRadius: 1, background: '#F4F4F5' }}><div style={{ width: `${w}%`, height: '100%', borderRadius: 1, background: `${a}60` }} /></div>)}</div>
         </div>
-      ))}
-      {/* Pills compétences */}
-      <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
-        {[24, 32, 20].map((w, i) => (
-          <div key={i} style={{ width: w, height: 9, borderRadius: 10, border: '1px solid #D4D4D8', background: '#fff' }} />
+        <div style={{ borderRadius: 5, border: '1px solid #E4E4E7', padding: '3px 5px', background: '#fff', flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2 }}><div style={{ width: 7, height: 7, borderRadius: 2, background: `${a}20` }} /><div style={{ width: 24, height: 3, borderRadius: 1, background: '#18181B' }} /></div>
+          <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}><div style={{ width: 8, height: 8, borderRadius: 2, background: a, opacity: 0.7 }} /><div><div style={{ width: 36, height: 2.5, borderRadius: 1, background: '#D4D4D8', marginBottom: 1.5 }} /><div style={{ width: 22, height: 2, borderRadius: 1, background: a, opacity: 0.6 }} /></div></div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const ClassiqueSidebarInner = () => (
+    <div style={{ background: '#F7F8F8', width: '100%', height: '100%', display: 'flex', flexDirection: 'row', gap: 4, padding: '7px' }}>
+      <div style={{ width: '35%', borderRadius: 5, border: '1px solid #E4E4E7', background: '#fff', padding: '6px 5px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+        <div style={{ width: 20, height: 20, borderRadius: '50%', background: `${a}20`, border: `1.5px solid ${a}` }} />
+        <div style={{ width: '70%', height: 4, borderRadius: 1, background: '#18181B' }} />
+        <div style={{ width: '50%', height: 3, borderRadius: 1, background: a }} />
+        <div style={{ width: '80%', height: 2, borderRadius: 1, background: '#E4E4E7' }} />
+      </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {[1, 2, 3].map(i => (
+          <div key={i} style={{ borderRadius: 5, border: '1px solid #E4E4E7', background: '#fff', padding: '4px 5px', flex: i === 3 ? 1 : undefined }}>
+            <div style={{ width: `${65 - i * 8}%`, height: 3, borderRadius: 1, background: '#18181B', marginBottom: 2 }} />
+            <div style={{ width: `${45 - i * 5}%`, height: 2, borderRadius: 1, background: `${a}50` }} />
+          </div>
         ))}
       </div>
     </div>
   );
 
-  // ── SOMBRE: fond #0E0F13 · avatar+titre en ligne (comme editorial mais dark) · sidebar + cartes sombres ──
-  const SombreInner = () => (
+  const ClassiqueBandInner = () => (
+    <div style={{ background: '#F7F8F8', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ background: `linear-gradient(135deg, ${a}22, ${a}10)`, borderBottom: '1px solid #E4E4E7', padding: '10px 10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#fff', border: `2px solid ${a}`, marginBottom: 4 }} />
+        <div style={{ width: 44, height: 5, borderRadius: 1, background: '#18181B', marginBottom: 2 }} />
+        <div style={{ width: 28, height: 3, borderRadius: 1, background: a }} />
+      </div>
+      <div style={{ flex: 1, padding: '5px 6px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
+        {[1, 2, 3, 4].map(i => (<div key={i} style={{ borderRadius: 4, border: '1px solid #E4E4E7', background: '#fff', padding: '4px 5px' }}><div style={{ width: `${60 - i * 5}%`, height: 3, borderRadius: 1, background: '#18181B', marginBottom: 2 }} /><div style={{ width: `${40 - i * 3}%`, height: 2, borderRadius: 1, background: `${a}60` }} /></div>))}
+      </div>
+    </div>
+  );
+
+  // ── Minimal ───────────────────────────────────────────────────────────────
+  const MinimalListInner = () => (
+    <div style={{ background: '#fff', width: '100%', height: '100%', padding: '9px 9px 7px' }}>
+      <div style={{ width: '62%', height: 10, borderRadius: 1, background: '#18181B', marginBottom: 3 }} />
+      <div style={{ width: '42%', height: 3, borderRadius: 1, background: '#A1A1AA', marginBottom: 8 }} />
+      <div style={{ width: '100%', height: 0.75, background: '#E4E4E7', marginBottom: 7 }} />
+      <div style={{ width: 28, height: 2.5, borderRadius: 1, background: '#D4D4D8', marginBottom: 5 }} />
+      {[1, 2].map(i => (<div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 4, marginBottom: 3, borderBottom: '1px solid #F4F4F5' }}><div style={{ width: `${i === 1 ? 52 : 36}%`, height: 3, borderRadius: 1, background: '#D4D4D8' }} /><div style={{ width: 18, height: 3, borderRadius: 1, background: '#E4E4E7' }} /></div>))}
+      <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>{[24, 32, 20].map((w, i) => (<div key={i} style={{ width: w, height: 9, borderRadius: 10, border: '1px solid #D4D4D8', background: '#fff' }} />))}</div>
+    </div>
+  );
+
+  const MinimalCenterInner = () => (
+    <div style={{ background: '#fff', width: '100%', height: '100%', padding: '9px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div style={{ width: 26, height: 26, borderRadius: '50%', background: `${a}18`, border: `2px solid ${a}30`, marginBottom: 5 }} />
+      <div style={{ width: '55%', height: 8, borderRadius: 1, background: '#18181B', marginBottom: 3 }} />
+      <div style={{ width: '38%', height: 3, borderRadius: 1, background: '#A1A1AA', marginBottom: 8 }} />
+      <div style={{ width: '100%', height: 0.75, background: '#E4E4E7', marginBottom: 6 }} />
+      {[1, 2].map(i => (<div key={i} style={{ display: 'flex', justifyContent: 'center', paddingBottom: 4, marginBottom: 3, borderBottom: '1px solid #F4F4F5', width: '100%' }}><div style={{ width: `${i === 1 ? 48 : 36}%`, height: 3, borderRadius: 1, background: '#D4D4D8' }} /></div>))}
+      <div style={{ display: 'flex', gap: 3, marginTop: 2 }}>{[24, 32, 20].map((w, i) => (<div key={i} style={{ width: w, height: 8, borderRadius: 10, border: '1px solid #D4D4D8' }} />))}</div>
+    </div>
+  );
+
+  const MinimalIndexInner = () => (
+    <div style={{ background: '#fff', width: '100%', height: '100%', padding: '9px 9px 7px' }}>
+      <div style={{ width: '62%', height: 10, borderRadius: 1, background: '#18181B', marginBottom: 3 }} />
+      <div style={{ width: '42%', height: 3, borderRadius: 1, background: '#A1A1AA', marginBottom: 8 }} />
+      <div style={{ width: '100%', height: 0.75, background: '#E4E4E7', marginBottom: 6 }} />
+      {[1, 2, 3].map(i => (<div key={i} style={{ display: 'grid', gridTemplateColumns: '20px 1fr', gap: 6, paddingBottom: 5, borderBottom: i < 3 ? '1px solid #F4F4F5' : 'none', alignItems: 'center' }}><span style={{ fontSize: 7, fontWeight: 700, color: a, fontFamily: 'ui-monospace, monospace' }}>0{i}</span><div style={{ width: `${60 - i * 8}%`, height: 3, borderRadius: 1, background: '#D4D4D8' }} /></div>))}
+    </div>
+  );
+
+  // ── Sombre ────────────────────────────────────────────────────────────────
+  const SombrePanelInner = () => (
     <div style={{ background: '#0E0F13', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: '7px 7px 5px' }}>
-      {/* Header horizontal : avatar rect gauche + titre blanc droite */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 6, flexShrink: 0 }}>
         <div style={{ width: 22, height: 22, borderRadius: 4, background: `${a}35`, flexShrink: 0 }} />
-        <div>
-          <div style={{ width: 52, height: 7, borderRadius: 1, background: 'rgba(255,255,255,0.85)', marginBottom: 3 }} />
-          <div style={{ width: 28, height: 3, borderRadius: 1, background: a }} />
-        </div>
+        <div><div style={{ width: 52, height: 7, borderRadius: 1, background: 'rgba(255,255,255,0.85)', marginBottom: 3 }} /><div style={{ width: 28, height: 3, borderRadius: 1, background: a }} /></div>
       </div>
-      {/* Corps 2 colonnes dark : sidebar compétences | cartes expériences/projets */}
       <div style={{ display: 'flex', gap: 5, flex: 1, overflow: 'hidden' }}>
-        {/* Sidebar : barres compétences white */}
         <div style={{ width: 28, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {[65, 80, 50, 70].map((w, i) => (
-            <div key={i}>
-              <div style={{ width: `${w}%`, height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.2)' }} />
-              <div style={{ width: '100%', height: 2, borderRadius: 1, marginTop: 1, background: 'rgba(255,255,255,0.06)' }}>
-                <div style={{ width: `${w}%`, height: '100%', borderRadius: 1, background: `${a}80` }} />
-              </div>
-            </div>
-          ))}
+          {[65, 80, 50, 70].map((w, i) => (<div key={i}><div style={{ width: `${w}%`, height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.2)' }} /><div style={{ width: '100%', height: 2, borderRadius: 1, marginTop: 1, background: 'rgba(255,255,255,0.06)' }}><div style={{ width: `${w}%`, height: '100%', borderRadius: 1, background: `${a}80` }} /></div></div>))}
         </div>
-        {/* Colonne principale : cartes dark à bord blanc/10 */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 3 }}>
           <div style={{ flex: 2, borderRadius: 5, border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.04)' }} />
           <div style={{ flex: 1, borderRadius: 5, border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.04)' }} />
@@ -381,10 +410,58 @@ function TemplateThumb({ tpl, selected, locked, onClick }: {
     </div>
   );
 
-  const Inner = tpl.family === 'editorial' ? EditorialInner
-    : tpl.family === 'classique' ? ClassiqueInner
-    : tpl.family === 'minimal' ? MinimalInner
-    : SombreInner;
+  const SombreHeroInner = () => (
+    <div style={{ background: '#0E0F13', width: '100%', height: '100%', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'absolute', top: -20, left: '50%', transform: 'translateX(-50%)', width: 100, height: 100, borderRadius: '50%', background: `radial-gradient(circle, ${a}40, transparent 65%)`, filter: 'blur(8px)' }} />
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '14px 10px 8px', flexShrink: 0 }}>
+        <div style={{ width: 24, height: 24, borderRadius: '50%', background: `${a}30`, border: `1.5px solid ${a}50`, marginBottom: 5 }} />
+        <div style={{ width: 52, height: 7, borderRadius: 1, background: 'rgba(255,255,255,0.85)', marginBottom: 3 }} />
+        <div style={{ width: 32, height: 3, borderRadius: 1, background: a }} />
+      </div>
+      <div style={{ flex: 1, padding: '4px 10px 8px', display: 'flex', flexDirection: 'column', gap: 4, position: 'relative' }}>
+        <div style={{ display: 'flex', gap: 3, justifyContent: 'center' }}>{[24, 32, 24].map((w, i) => <div key={i} style={{ width: w, height: 7, borderRadius: 999, background: `${a}22`, border: `1px solid ${a}30` }} />)}</div>
+        <div style={{ borderRadius: 4, border: '1px solid rgba(255,255,255,0.09)', height: 24, background: 'rgba(255,255,255,0.03)' }} />
+      </div>
+    </div>
+  );
+
+  const SombreMonoInner = () => (
+    <div style={{ background: '#0E0F13', width: '100%', height: '100%', padding: '8px 9px 6px' }}>
+      <div style={{ fontSize: 6, color: a, letterSpacing: '0.08em', marginBottom: 4, textTransform: 'uppercase' as const, fontFamily: 'ui-monospace, monospace' }}>// portfolio</div>
+      <div style={{ width: '70%', height: 9, borderRadius: 1, background: 'rgba(255,255,255,0.85)', marginBottom: 4 }} />
+      <div style={{ width: '45%', height: 3, borderRadius: 1, background: a, marginBottom: 8 }} />
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 6, display: 'grid', gap: 5 }}>
+        {['# skills', '# exp', '# projets'].map((tag, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '40px 1fr', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: 6, color: a, fontFamily: 'ui-monospace, monospace' }}>{tag}</span>
+            <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.1)' }}><div style={{ width: `${60 - i * 15}%`, height: '100%', borderRadius: 1, background: 'rgba(255,255,255,0.2)' }} /></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Select inner by family + variant
+  const Inner = (() => {
+    if (tpl.family === 'editorial') {
+      if (v === 'cover') return EditorialCoverInner;
+      if (v === 'split') return EditorialSplitInner;
+      return EditorialClassicInner;
+    }
+    if (tpl.family === 'classique') {
+      if (v === 'sidebar') return ClassiqueSidebarInner;
+      if (v === 'band')    return ClassiqueBandInner;
+      return ClassiqueCenteredInner;
+    }
+    if (tpl.family === 'minimal') {
+      if (v === 'center') return MinimalCenterInner;
+      if (v === 'index')  return MinimalIndexInner;
+      return MinimalListInner;
+    }
+    if (v === 'hero') return SombreHeroInner;
+    if (v === 'mono') return SombreMonoInner;
+    return SombrePanelInner;
+  })();
 
   return (
     <button type="button" onClick={onClick} className="group relative text-left w-full">
@@ -407,8 +484,11 @@ function TemplateThumb({ tpl, selected, locked, onClick }: {
           </span>
         )}
       </div>
-      <div className="flex items-center justify-between mt-1.5 px-0.5">
-        <span className="text-xs font-medium text-gray-800 truncate">{tpl.name}</span>
+      <div className="flex items-center justify-between mt-1.5 px-0.5 gap-1">
+        <div className="min-w-0 flex-1">
+          <span className="text-xs font-medium text-gray-800 truncate block">{tpl.name}</span>
+          <span className="text-[10px] text-gray-400 capitalize">{tpl.variant}</span>
+        </div>
         {locked
           ? <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded text-gray-500 bg-zinc-100 shrink-0">{TIER_META[tpl.tier].label}</span>
           : <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: tpl.primary }} />}
@@ -454,7 +534,7 @@ function StepIndicator({ current, isEdit }: { current: Step; isEdit: boolean }) 
 
 // ─── Preview téléphone portrait (fidèle à chaque famille) ────────────────────
 function PhonePreview({ formData }: { formData: any }) {
-  const tpl = templateById(formData.template_id || 't1');
+  const tpl = templateById(formData.template_id || 'tpl-1');
   const accent = formData.theme_color || tpl.primary;
   const name = formData.title || 'Votre Nom';
   const domain = formData.domain || 'Domaine';
@@ -780,7 +860,7 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
     experiences: [] as any[],
     font_family: '',
     layout_style: 'modern' as 'classic' | 'modern' | 'minimal' | 'bold',
-    template_id: 't1',
+    template_id: 'tpl-1',
   });
 
   const [hintTpl, setHintTpl] = React.useState<PortfolioTemplate | null>(null);
@@ -895,7 +975,7 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
       is_public: portfolio.is_public ?? true,
       font_family: portfolio.font_family || '',
       layout_style: portfolio.layout_style || 'modern',
-      template_id: portfolio.template_id || portfolio.template || 't1',
+      template_id: portfolio.template_id || portfolio.template || 'tpl-1',
       projects: (portfolio.projects || portfolio.projets || []).map((p: any) => ({
         titre: p.titre || p.title || '', description: p.description || '',
         lien_demo: p.lien_demo || p.demo_url || '', lien_code: p.lien_code || p.code_url || '', image: p.image || p.image_url || null,
@@ -962,8 +1042,9 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
         return;
       }
       const payload: any = { ...formData };
-      const selectedTpl = templateById(payload.template_id || 't1');
-      payload.template_family = selectedTpl.family;
+      const selectedTpl = templateById(payload.template_id || 'tpl-1');
+      payload.template_family   = selectedTpl.family;
+      payload.template_variant  = selectedTpl.variant;
       const allSocialKeys = ['website', 'linkedin_url', 'github_url', 'twitter_url', 'facebook_url', 'instagram_url'];
       const allowedSocialKeys = visibleSocials.map(s => s.key);
       for (const k of allSocialKeys) {
@@ -1017,7 +1098,7 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
   };
 
   const handleUpgrade = () => navigate('/upgrade');
-  const selectedTpl = templateById(formData.template_id || 't1');
+  const selectedTpl = templateById(formData.template_id || 'tpl-1');
 
   // ─── Récapitulatif (étape 3) ──────────────────────────────────────────────
   const RecapStep = () => {
@@ -1371,24 +1452,6 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
               )}
             </div>
 
-            {/* Personnalisation */}
-            <div className="px-6 py-6">
-              <SectionHeader icon={<Palette className="w-4 h-4 text-pink-600" />} title="Personnalisation visuelle" />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Couleur du thème</Label>
-                  <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                    <Input type="color" value={formData.theme_color} onChange={e => setFormData({ ...formData, theme_color: e.target.value })} className="h-10 w-16 cursor-pointer rounded-lg p-0.5 border-0" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-800" style={{ color: formData.theme_color }}>{formData.theme_color.toUpperCase()}</p>
-                      <p className="text-xs text-gray-400">Couleur principale du portfolio</p>
-                    </div>
-                  </div>
-                </div>
-                <BannerCustomizer bannerType={formData.banner_type} bannerColor={formData.banner_color} bannerImageUrl={formData.banner_image_url} onBannerTypeChange={type => setFormData({ ...formData, banner_type: type })} onBannerColorChange={color => setFormData({ ...formData, banner_color: color })} onBannerImageChange={url => setFormData({ ...formData, banner_image_url: url })} />
-              </div>
-            </div>
-
             {/* Business avancé */}
             {isBusiness && (
               <div className="px-6 py-6 bg-gradient-to-br from-amber-50/50 via-yellow-50/30 to-amber-50/50">
@@ -1490,22 +1553,46 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
               </div>
             )}
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-6">
-              {PORTFOLIO_TEMPLATES.map(tpl => {
-                const locked = !isTemplateUnlocked(tpl, planType);
-                return (
-                  <TemplateThumb key={tpl.id} tpl={tpl} selected={formData.template_id === tpl.id} locked={locked} onClick={() => {
-                    if (!locked) {
-                      const bannerColor = tpl.family === 'sombre' ? '#0E0F13'
-                        : tpl.family === 'minimal' ? '#F1F5F9'
-                        : '#1e293b';
-                      setFormData(prev => ({ ...prev, template_id: tpl.id, theme_color: tpl.primary, banner_color: bannerColor }));
-                      setHintTpl(null);
-                    } else { setHintTpl(tpl); }
-                  }} />
-                );
-              })}
-            </div>
+            {(() => {
+              const FAMILIES: { key: TemplateFamily; label: string; color: string }[] = [
+                { key: 'editorial', label: 'Éditorial',  color: '#1A1A2E' },
+                { key: 'classique', label: 'Classique',  color: '#1565C0' },
+                { key: 'minimal',   label: 'Minimal',    color: '#374151' },
+                { key: 'sombre',    label: 'Sombre',     color: '#6366F1' },
+              ];
+              return (
+                <div className="space-y-7">
+                  {FAMILIES.map(fam => {
+                    const famTpls = PORTFOLIO_TEMPLATES.filter(t => t.family === fam.key);
+                    return (
+                      <div key={fam.key}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-1 h-4 rounded-full" style={{ background: fam.color }} />
+                          <span className="text-xs font-semibold text-gray-700">{fam.label}</span>
+                          <span className="text-[10px] text-gray-400 ml-auto">{famTpls.length} layouts</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-x-3 gap-y-5">
+                          {famTpls.map(tpl => {
+                            const locked = !isTemplateUnlocked(tpl, planType);
+                            return (
+                              <TemplateThumb key={tpl.id} tpl={tpl} selected={formData.template_id === tpl.id} locked={locked} onClick={() => {
+                                if (!locked) {
+                                  const bannerColor = tpl.family === 'sombre' ? '#0E0F13'
+                                    : tpl.family === 'minimal' ? '#F1F5F9'
+                                    : '#1e293b';
+                                  setFormData(prev => ({ ...prev, template_id: tpl.id, theme_color: tpl.primary, banner_color: bannerColor }));
+                                  setHintTpl(null);
+                                } else { setHintTpl(tpl); }
+                              }} />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* Template sélectionné badge */}
             <div className="mt-6 p-3 rounded-xl flex items-center gap-3" style={{ background: `${selectedTpl.primary}12`, border: `1px solid ${selectedTpl.primary}30` }}>
@@ -1514,7 +1601,7 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
               </div>
               <div>
                 <p className="text-sm font-semibold" style={{ color: selectedTpl.primary }}>Template sélectionné : {selectedTpl.name}</p>
-                <p className="text-xs text-gray-500">Famille {selectedTpl.family} · Couleur appliquée : {formData.theme_color}</p>
+                <p className="text-xs text-gray-500 capitalize">{selectedTpl.family} · {selectedTpl.variant} · {formData.theme_color}</p>
               </div>
               <div className="ml-auto w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0" style={{ background: selectedTpl.primary }}>
                 <Check size={12} strokeWidth={3} />

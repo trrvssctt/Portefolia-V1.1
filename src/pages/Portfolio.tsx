@@ -101,7 +101,7 @@ const Portfolio = () => {
         theme_color: (() => {
           if (p.theme_color && p.theme_color !== '#28A745') return p.theme_color;
           const tid = (p.template_id || p.template || '').toString();
-          if (/^t\d+$/.test(tid)) return templateById(tid).primary;
+          if (/^tpl?-?\d+$/.test(tid)) return templateById(tid).primary;
           return p.theme_color || p.theme || '#28A745';
         })(),
         cv_url: p.cv_url || p.resume_url || p.cv || '',
@@ -111,9 +111,9 @@ const Portfolio = () => {
         template_family: (() => {
           // If backend returns template_family directly, use it
           if (p.template_family) return p.template_family;
-          // If template_id matches catalog format (t1, t2, …), resolve via catalog
+          // Résoudre via le catalogue (formats 't1'→'t25' et 'tpl-1'→'tpl-46')
           const tid = (p.template_id || p.template || '').toString();
-          if (/^t\d+$/.test(tid)) return templateById(tid).family;
+          if (/^tpl?-?\d+$/.test(tid)) return templateById(tid).family;
           // Fallback: infer from slug/name
           const slug = tid.toLowerCase();
           if (slug.includes('classique') || slug.includes('classic')) return 'classique';

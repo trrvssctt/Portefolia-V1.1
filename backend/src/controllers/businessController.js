@@ -9,7 +9,7 @@ const crypto = require('crypto');
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 const ACCESS_TOKEN_EXPIRES = process.env.ACCESS_TOKEN_EXPIRES || '15m';
 const REFRESH_TOKEN_EXPIRES_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS || 30);
-const FRONTEND_BASE = process.env.FRONTEND_BASE || 'http://localhost:5173';
+const FRONTEND_BASE = process.env.FRONTEND_BASE || 'https://portefolia.tech';
 
 // Retourne le compte Business existant, ou le crée automatiquement (pour les
 // utilisateurs ayant payé avant que le webhook n'initialise le record).

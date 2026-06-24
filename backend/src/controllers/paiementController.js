@@ -253,8 +253,8 @@ async function updateStatus(req, res) {
                         }
 
                         if (user && user.email && !isCommandeNFC) {
-              const loginUrl = `${process.env.APP_URL || 'http://localhost:3000'}/auth`;
-                                        const invoiceUrl = `${process.env.APP_URL || 'http://localhost:3000'}/admin/invoices/${invoice.id}`;
+              const loginUrl = `${process.env.APP_URL || 'https://portefolia.tech'}/auth`;
+                                        const invoiceUrl = `${process.env.APP_URL || 'https://portefolia.tech'}/admin/invoices/${invoice.id}`;
 
                                         // Ensure planName / planDescription exist to avoid ReferenceError in template
                                         let planName = 'Premium';
@@ -402,8 +402,8 @@ async function updateStatus(req, res) {
                     try {
                         const user = await userModel.findById(userId);
                         if (user && user.email) {
-                            const loginUrl = `${process.env.APP_URL || 'http://localhost:3000'}/auth`;
-                            const invoiceUrl = `${process.env.APP_URL || 'http://localhost:3000'}/admin/invoices/${invoice.id}`;
+                            const loginUrl = `${process.env.APP_URL || 'https://portefolia.tech'}/auth`;
+                            const invoiceUrl = `${process.env.APP_URL || 'https://portefolia.tech'}/admin/invoices/${invoice.id}`;
                             const refundHtml = `
                                <!DOCTYPE html>
 <html lang="fr">

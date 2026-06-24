@@ -41,7 +41,17 @@ import {
   RefreshCw,
   Copy,
   ExternalLink,
+  ShieldCheck,
+  ShieldX,
+  AlertCircle,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3000";
 
@@ -60,7 +70,19 @@ interface Commande {
   ordered_at: string;
   card_uid?: string;
   portfolio_title?: string;
+  paiement_statut: 'non_payé' | 'en_attente_validation' | 'payé' | 'refusé';
+  paiement_mode?: string;
+  paiement_reference?: string;
+  paiement_date?: string;
+  paiement_note?: string;
 }
+
+const PAIEMENT_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
+  non_payé:              { label: 'Non payé',           color: 'bg-gray-100 text-gray-700',    icon: AlertCircle },
+  en_attente_validation: { label: 'En attente valid.',  color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+  payé:                  { label: 'Payé ✓',             color: 'bg-green-100 text-green-800',  icon: ShieldCheck },
+  refusé:                { label: 'Refusé',             color: 'bg-red-100 text-red-800',      icon: ShieldX },
+};
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   En_attente: { label: "En attente", color: "bg-orange-100 text-orange-800", icon: Clock },
@@ -76,6 +98,9 @@ export default function AdminCommandes() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [paiementFilter, setPaiementFilter] = useState<string>("all");
+  const [selectedCommande, setSelectedCommande] = useState<Commande | null>(null);
+  const [adminNote, setAdminNote] = useState("");
 
   const load = async () => {
     const token = localStorage.getItem("token");
@@ -131,6 +156,30 @@ export default function AdminCommandes() {
     }
   };
 
+  const validerPaiement = async (id: string, note = "") => {
+    const token = localStorage.getItem("token");
+    await fetch(`${API_BASE}/api/admin/commandes/${id}/valider-paiement`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ note }),
+    });
+    setSelectedCommande(null);
+    setAdminNote("");
+    await load();
+  };
+
+  const refuserPaiement = async (id: string, note = "") => {
+    const token = localStorage.getItem("token");
+    await fetch(`${API_BASE}/api/admin/commandes/${id}/refuser-paiement`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ note }),
+    });
+    setSelectedCommande(null);
+    setAdminNote("");
+    await load();
+  };
+
   const filteredCommandes = useMemo(() => {
     return commandes.filter((c) => {
       const matchesSearch =
@@ -139,22 +188,19 @@ export default function AdminCommandes() {
         (c.card_uid ?? "").toString().includes(searchTerm) ||
         (c.portfolio_title ?? "").toLowerCase().includes(searchTerm.toLowerCase());
       let matchesStatus = statusFilter === "all" || c.statut === statusFilter;
-      // custom processed filter: anything that is not 'En_attente' nor 'Annulée'
-      if (statusFilter === 'processed') {
-        matchesStatus = c.statut !== 'En_attente' && c.statut !== 'Annulée';
-      }
-
-      return matchesSearch && matchesStatus;
+      if (statusFilter === 'processed') matchesStatus = c.statut !== 'En_attente' && c.statut !== 'Annulée';
+      const matchesPaiement = paiementFilter === "all" || c.paiement_statut === paiementFilter;
+      return matchesSearch && matchesStatus && matchesPaiement;
     });
-  }, [commandes, searchTerm, statusFilter]);
+  }, [commandes, searchTerm, statusFilter, paiementFilter]);
 
   const stats = useMemo(() => {
     const total = commandes.length;
     const enAttente = commandes.filter(c => c.statut === "En_attente").length;
     const livrees = commandes.filter(c => c.statut === "Livrée").length;
-    const revenuTotal = commandes.reduce((acc, c) => acc + Number(c.montant_total || 0), 0);
-
-    return { total, enAttente, livrees, revenuTotal };
+    const aValider = commandes.filter(c => c.paiement_statut === "en_attente_validation").length;
+    const revenuTotal = commandes.filter(c => c.paiement_statut === 'payé').reduce((acc, c) => acc + Number(c.montant_total || 0), 0);
+    return { total, enAttente, livrees, aValider, revenuTotal };
   }, [commandes]);
 
   if (loading) {
@@ -191,6 +237,12 @@ export default function AdminCommandes() {
               </h1>
               <p className="text-lg text-gray-600 mt-2">
                 {stats.total} commandes • {stats.enAttente} en attente • {stats.livrees} livrées
+                {stats.aValider > 0 && (
+                  <span className="ml-2 inline-flex items-center gap-1 bg-yellow-100 text-yellow-800 text-sm font-semibold px-2 py-0.5 rounded-full">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    {stats.aValider} paiement{stats.aValider > 1 ? 's' : ''} à valider
+                  </span>
+                )}
               </p>
             </div>
             <div className="text-right">
@@ -216,7 +268,7 @@ export default function AdminCommandes() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-64">
+                <SelectTrigger className="w-56">
                   <SelectValue placeholder="Filtrer par statut" />
                 </SelectTrigger>
                 <SelectContent>
@@ -225,6 +277,17 @@ export default function AdminCommandes() {
                     <SelectItem key={status} value={status}>
                       {STATUS_CONFIG[status].label}
                     </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={paiementFilter} onValueChange={setPaiementFilter}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="Filtrer par paiement" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les paiements</SelectItem>
+                  {Object.entries(PAIEMENT_CONFIG).map(([key, cfg]) => (
+                    <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -271,6 +334,7 @@ export default function AdminCommandes() {
                     <TableHead>Date</TableHead>
                     <TableHead>Montant</TableHead>
                     <TableHead>Statut</TableHead>
+                    <TableHead>Paiement</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -322,9 +386,32 @@ export default function AdminCommandes() {
                             {STATUS_CONFIG[c.statut]?.label || c.statut}
                           </Badge>
                         </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const pcfg = PAIEMENT_CONFIG[c.paiement_statut] || PAIEMENT_CONFIG['non_payé'];
+                            const PIcon = pcfg.icon;
+                            return (
+                              <Badge className={pcfg.color}>
+                                <PIcon className="h-3 w-3 mr-1" />
+                                {pcfg.label}
+                              </Badge>
+                            );
+                          })()}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {c.statut !== "Livrée" && c.statut !== "Annulée" && (
+                            {c.paiement_statut === 'en_attente_validation' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-yellow-400 text-yellow-700 hover:bg-yellow-50"
+                                onClick={() => { setSelectedCommande(c); setAdminNote(""); }}
+                              >
+                                <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+                                Valider paiement
+                              </Button>
+                            )}
+                            {c.statut !== "Livrée" && c.statut !== "Annulée" && c.paiement_statut === 'payé' && (
                               <>
                                 {c.statut === "En_attente" && (
                                   <Button
@@ -375,6 +462,72 @@ export default function AdminCommandes() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog validation paiement */}
+      <Dialog open={!!selectedCommande} onOpenChange={(open) => { if (!open) { setSelectedCommande(null); setAdminNote(""); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-yellow-600" />
+              Validation du paiement — #{selectedCommande?.numero_commande}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedCommande && (
+            <div className="space-y-4 pt-2">
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Client</span>
+                  <span className="font-medium">{selectedCommande.utilisateur_email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Montant</span>
+                  <span className="font-bold text-[#28A745]">{Number(selectedCommande.montant_total).toLocaleString()} F CFA</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Mode de paiement</span>
+                  <span className="font-medium capitalize">{selectedCommande.paiement_mode?.replace('_', ' ') || '—'}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500">Référence</span>
+                  <span className="font-mono font-semibold text-blue-700">{selectedCommande.paiement_reference || '—'}</span>
+                </div>
+                {selectedCommande.paiement_date && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Date soumission</span>
+                    <span>{safeFormatDate(selectedCommande.paiement_date)}</span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Note admin (optionnel)</label>
+                <Textarea
+                  placeholder="Raison du refus ou commentaire..."
+                  value={adminNote}
+                  onChange={(e) => setAdminNote(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  onClick={() => validerPaiement(selectedCommande.id, adminNote)}
+                >
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  Valider le paiement
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 border-red-400 text-red-700 hover:bg-red-50"
+                  onClick={() => refuserPaiement(selectedCommande.id, adminNote)}
+                >
+                  <ShieldX className="h-4 w-4 mr-2" />
+                  Refuser
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

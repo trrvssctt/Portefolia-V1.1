@@ -93,7 +93,7 @@ async function createCheckout(req, res) {
 
     return res.status(201).json({
       checkout: { id: checkout.id, token: checkout.token },
-      checkout_url: `${process.env.FRONTEND_BASE || 'http://localhost:8080'}/checkout?token=${checkout.token}`,
+      checkout_url: `${process.env.FRONTEND_BASE || 'https://portefolia.tech'}/checkout?token=${checkout.token}`,
       duration_months,
       discount_percent: discountPercent,
       montant,
@@ -214,7 +214,7 @@ async function confirmCheckout(req, res) {
     try {
       const sendEmail = require('../utils/sendEmail');
       const ASSET_BASE = process.env.EMAIL_ASSET_BASE || 'https://portefolia.tech';
-      const FRONTEND  = process.env.FRONTEND_BASE || 'http://localhost:8080';
+      const FRONTEND  = process.env.FRONTEND_BASE || 'https://portefolia.tech';
       const user = await userModel.findById(checkout.utilisateur_id);
       const cMeta = typeof checkout.metadata === 'string' ? JSON.parse(checkout.metadata || '{}') : (checkout.metadata || {});
       const cDuration = Number(cMeta.duration_months) || 1;
@@ -418,7 +418,7 @@ async function approveWavePayment(req, res) {
       const paiement = await paiementModel.findById(checkout.paiement_id);
       const planForEmail = meta.plan || await planModel.getPlanById(checkout.plan_id) || {};
       if (user?.email) {
-        const loginUrl = `${process.env.FRONTEND_BASE || 'http://localhost:5173'}/auth`;
+        const loginUrl = `${process.env.FRONTEND_BASE || 'https://portefolia.tech'}/auth`;
         const prenom = user.prenom || user.nom || 'Client';
         const dureeLabel = durationMonths === 12 ? '1 an' : `${durationMonths} mois`;
         const montantPaye = Number(paiement?.montant || meta.montant || 0);

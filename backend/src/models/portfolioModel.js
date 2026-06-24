@@ -51,6 +51,8 @@ async function init() {
     // template relation fields
     await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS selected_template_id INT NULL");
     await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS template_settings JSON NULL");
+    await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS template_id VARCHAR(20) NULL");
+    await pool.query("ALTER TABLE portfolios ADD COLUMN IF NOT EXISTS template_variant VARCHAR(20) NULL");
   } catch (err) {
     // Ignore if ALTER NOT SUPPORTED on older MySQL; table created above will contain columns for new DBs
     console.warn('portfolioModel.init: ALTER TABLE optional columns may not be supported on this MySQL version:', err.message);
@@ -73,6 +75,8 @@ async function createPortfolio(data) {
     profile_image_url: data.profile_image_url !== undefined ? data.profile_image_url : (data.profile_image || null),
     domain: data.domain !== undefined ? data.domain : (data.domaine || null),
     cv_url: data.cv_url !== undefined ? data.cv_url : (data.resume_url || null),
+    template_id: data.template_id || null,
+    template_variant: data.template_variant || null,
     location: data.location || null,
     phone: data.phone || null,
     website: data.website || null,
@@ -110,6 +114,8 @@ async function updatePortfolio(id, data) {
   if (data.banner_color !== undefined) payload.banner_color = data.banner_color;
   if (data.profile_image_url !== undefined || data.profile_image !== undefined) payload.profile_image_url = data.profile_image_url || data.profile_image;
   if (data.cv_url !== undefined || data.resume_url !== undefined) payload.cv_url = data.cv_url || data.resume_url;
+  if (data.template_id !== undefined) payload.template_id = data.template_id;
+  if (data.template_variant !== undefined) payload.template_variant = data.template_variant;
   if (Object.keys(payload).length === 0) return await findById(id);
   const sets = Object.keys(payload).map(k => `${k} = ?`).join(', ');
   const values = [...Object.values(payload), id];
@@ -131,6 +137,8 @@ async function findById(id) {
   p.bio = p.description;
   p.theme_color = p.theme;
   p.is_public = p.est_public;
+  p.template_id = p.template_id || null;
+  p.template_variant = p.template_variant || null;
   p.banner_type = p.banner_type;
   p.banner_color = p.banner_color;
   p.banner_image_url = p.banner_image_url;

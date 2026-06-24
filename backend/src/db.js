@@ -8,7 +8,8 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'gestionapp_carrer_card',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  charset: 'utf8mb4'
 });
 
 module.exports = {

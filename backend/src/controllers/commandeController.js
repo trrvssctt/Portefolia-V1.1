@@ -138,7 +138,7 @@ async function createPublicOrder(req, res) {
       }
 
       // vcf url (served from backend static path)
-      const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
+      const baseUrl = process.env.APP_URL || 'https://portefolia.tech';
       const vcfUrl = `${baseUrl}/uploads/visites_carte/${filename}`;
 
       const card = await carteModel.createCarte({ commande_id: order.id, uid_nfc: uid, lien_portfolio: null, design: JSON.stringify({ design, vcf_url: vcfUrl }) });

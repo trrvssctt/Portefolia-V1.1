@@ -156,6 +156,8 @@ async function create(req, res) {
       domain: incoming.domain || incoming.domaine || null,
       domaines: domainesEnum,
       cv_url: incoming.cv_url || incoming.resume_url || incoming.cv || null,
+      template_id: incoming.template_id || null,
+      template_variant: incoming.template_variant || null,
       // contact fields
       location: incoming.location || null,
       phone: incoming.phone || null,
@@ -341,6 +343,8 @@ async function update(req, res) {
   if (incoming.github_url !== undefined) mappedUpdate.github_url = incoming.github_url;
   if (incoming.twitter_url !== undefined) mappedUpdate.twitter_url = incoming.twitter_url;
   if (incoming.domain !== undefined || incoming.domaine !== undefined) mappedUpdate.domain = incoming.domain || incoming.domaine;
+  if (incoming.template_id !== undefined) mappedUpdate.template_id = incoming.template_id;
+  if (incoming.template_variant !== undefined) mappedUpdate.template_variant = incoming.template_variant;
   // handle enum column `domaines` if provided
   if (incoming.domaines !== undefined || incoming.domain !== undefined || incoming.domaine !== undefined || incoming.domain_enum !== undefined) {
     const val = incoming.domaines || incoming.domain || incoming.domaine || incoming.domain_enum;
