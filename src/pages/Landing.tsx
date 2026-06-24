@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { fetchJson } from '@/lib/api';
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import {
@@ -337,6 +337,15 @@ const FEATURES = [
 
 // ── Landing Page ──────────────────────────────────────────────────────────────
 const Landing: React.FC = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash === '#formules') {
+      const el = document.getElementById('formules');
+      if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth' }), 100);
+    }
+  }, [location.hash]);
+
   return (
     <div className="min-h-screen bg-white">
       <Header />
@@ -449,7 +458,7 @@ const Landing: React.FC = () => {
       </section>
 
       {/* ── Pricing ── */}
-      <section className="bg-zinc-50/60 border-y border-[#E7E7EA]">
+      <section id="formules" className="bg-zinc-50/60 border-y border-[#E7E7EA]">
         <div className="max-w-6xl mx-auto px-5 sm:px-8 py-20 sm:py-24">
           <div className="text-center max-w-2xl mx-auto mb-4">
             <h2

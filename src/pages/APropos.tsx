@@ -18,10 +18,9 @@ const STATS: [string, string][] = [
 ];
 
 const TEAM = [
-  { name: 'Mamadou Diallo', role: 'CEO & Co-fondateur',  initial: 'M' },
-  { name: 'Awa Diané',      role: 'CTO & Co-fondatrice', initial: 'A' },
-  { name: 'Sokhna Mbaye',   role: 'Head of Design',      initial: 'S' },
-  { name: 'Babacar Sy',     role: 'Head of Growth',      initial: 'B' },
+  { name: 'Seydou DIANKA',        role: 'Co-fondateur · Développeur',              initial: 'SD' },
+  { name: 'Rudaldy Rudy NGOMA',   role: 'Co-fondateur · Chef de projet Marketing digital', initial: 'RN' },
+  { name: 'Mariama NDIAYE',       role: 'Co-fondatrice · Directrice Générale',     initial: 'MN' },
 ];
 
 export default function APropos() {
@@ -95,7 +94,7 @@ export default function APropos() {
             <h2 className="font-serif text-[#18181B] leading-tight tracking-tight"
               style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.6rem)' }}>Les visages derrière Portefolia</h2>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl mx-auto">
             {TEAM.map(m => (
               <div key={m.name} className="rounded-2xl border border-[#E7E7EA] bg-white p-6 text-center">
                 <span className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-white text-2xl font-bold"

@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 const NAV_LINKS = [
   { label: 'Fonctionnalités', to: '/' },
-  { label: 'Tarifs',          to: '/upgrade' },
+  { label: 'Tarifs',          to: '/#formules' },
   { label: 'Documentation',   to: '/docs' },
   { label: 'À propos',        to: '/apropos' },
   { label: 'Contact',         to: '/contact' },
@@ -18,8 +18,20 @@ const Header = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const isActive = (to: string) =>
-    to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
+  const scrollToHash = (to: string) => {
+    if (!to.includes('#')) return false;
+    const id = to.split('#')[1];
+    if (location.pathname === '/') {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+      return true;
+    }
+    return false;
+  };
+
+  const isActive = (to: string) => {
+    const path = to.split('#')[0] || '/';
+    return path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm">
@@ -40,6 +52,7 @@ const Header = () => {
             <Link
               key={l.to}
               to={l.to}
+              onClick={e => { if (scrollToHash(l.to)) e.preventDefault(); }}
               className={`h-9 px-3.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive(l.to)
                   ? 'text-[#2E7D32] bg-[#E8F5E9]'
@@ -95,7 +108,10 @@ const Header = () => {
               <Link
                 key={l.to}
                 to={l.to}
-                onClick={() => setMobileOpen(false)}
+                onClick={e => {
+                  if (scrollToHash(l.to)) e.preventDefault();
+                  setMobileOpen(false);
+                }}
                 className={`flex items-center h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
                   isActive(l.to)
                     ? 'text-[#2E7D32] bg-[#E8F5E9]'

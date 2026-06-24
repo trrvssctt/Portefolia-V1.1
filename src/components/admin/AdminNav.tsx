@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, UserCheck, Briefcase, CreditCard,
   TrendingUp, Banknote, BarChart3, FileText, BookOpen,
-  UserCog, LogOut, Waves, Receipt, Menu, X, Mail,
+  UserCog, LogOut, Waves, Receipt, Menu, X, Mail, MessageSquare,
   PanelLeftClose, PanelLeftOpen, DollarSign, Wifi,
 } from 'lucide-react';
 
@@ -28,6 +28,7 @@ interface AdminBadges {
   pending_upgrades: number;
   expired_accounts: number;
   nfc_waitlist: number;
+  unread_contact: number;
 }
 
 export interface AdminNavProps {
@@ -66,6 +67,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Stats',        to: '/admin/stats',          icon: BarChart3,       roles: ['super_admin', 'admin_technique'], group: 'Analytique' },
   { label: 'Blog',         to: '/admin/blog',           icon: BookOpen,        roles: ['super_admin', 'admin_contenu'], group: 'Contenu' },
   { label: 'Pages',        to: '/admin/pages',          icon: FileText,        roles: ['super_admin', 'admin_contenu'], group: 'Contenu' },
+  { label: 'Messages',     to: '/admin/contact-messages', icon: MessageSquare, roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations', badgeKey: 'unread_contact', badgeColor: '#10B981' },
   { label: 'Admins',       to: '/admin/users-admin',    icon: UserCog,         roles: ['super_admin'], group: 'Administration' },
 ];
 
@@ -83,7 +85,7 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; dot: string; b
 // ─── Real-time badges hook ────────────────────────────────────────────────────
 
 function useAdminBadges(): AdminBadges {
-  const [badges, setBadges] = useState<AdminBadges>({ pending_wave_payments: 0, pending_upgrades: 0, expired_accounts: 0, nfc_waitlist: 0 });
+  const [badges, setBadges] = useState<AdminBadges>({ pending_wave_payments: 0, pending_upgrades: 0, expired_accounts: 0, nfc_waitlist: 0, unread_contact: 0 });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -91,17 +93,20 @@ function useAdminBadges(): AdminBadges {
       const token = localStorage.getItem('token');
       if (!token) return;
       try {
-        const [badgesRes, nfcRes] = await Promise.all([
+        const [badgesRes, nfcRes, contactRes] = await Promise.all([
           fetch(`${API_BASE}/api/admin/badges`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${API_BASE}/api/admin/nfc-waitlist`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE}/api/contact/admin`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
-        const d   = badgesRes.ok ? await badgesRes.json() : {};
-        const nfc = nfcRes.ok   ? await nfcRes.json()    : {};
+        const d       = badgesRes.ok  ? await badgesRes.json()  : {};
+        const nfc     = nfcRes.ok     ? await nfcRes.json()     : {};
+        const contact = contactRes.ok ? await contactRes.json() : {};
         setBadges({
           pending_wave_payments: d.pending_wave_payments ?? 0,
           pending_upgrades:      d.pending_upgrades ?? 0,
           expired_accounts:      d.expired_accounts ?? 0,
           nfc_waitlist:          nfc.total ?? 0,
+          unread_contact:        contact.unread ?? 0,
         });
       } catch { /* non-bloquant */ }
     };

@@ -2,20 +2,53 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { Mail, Phone, MessageCircle, MapPin, Send, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Mail, Phone, MessageCircle, MapPin, Send, CheckCircle, ArrowLeft, Loader2 } from 'lucide-react';
+
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
 
 const CHANNELS = [
-  { Icon: Mail,          label: 'Email',      value: 'support@portefolia.tech', sub: 'Réponse sous 24 h' },
-  { Icon: Phone,         label: 'Téléphone',  value: '+221 33 800 12 34',       sub: 'Lun–Ven, 9h–18h' },
-  { Icon: MessageCircle, label: 'WhatsApp',   value: '+221 77 000 12 34',       sub: 'Réponse rapide' },
-  { Icon: MapPin,        label: 'Bureau',     value: 'Sacré-Cœur 3, Dakar',    sub: 'Sur rendez-vous' },
+  { Icon: Mail,          label: 'Email',      value: 'contact@portefolia.tech', sub: 'Réponse sous 24 h' },
+  { Icon: Phone,         label: 'Téléphone',  value: '+221 78 131 13 71',       sub: 'Lun–Ven, 9h–18h' },
+  { Icon: MessageCircle, label: 'WhatsApp',   value: '+221 78 131 13 71',       sub: 'Réponse rapide' },
+  { Icon: MapPin,        label: 'Bureau',     value: 'Dakar, Sénégal',          sub: 'Sur rendez-vous' },
 ];
 
 const SUBJECTS = ['Question générale', 'Paiement & facturation', 'Carte NFC', 'Partenariat', 'Support technique'];
 
 export default function Contact() {
   const [sent, setSent]       = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
   const [subject, setSubject] = useState('Question générale');
+  const [form, setForm]       = useState({ nom: '', email: '', message: '' });
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const handleSubmit = async () => {
+    setError('');
+    if (!form.nom.trim() || !form.email.trim() || !form.message.trim()) {
+      setError('Veuillez remplir tous les champs.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom: form.nom, email: form.email, sujet: subject, message: form.message }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || 'Erreur serveur');
+      }
+      setSent(true);
+    } catch (e: any) {
+      setError(e.message || 'Une erreur est survenue. Réessayez.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -67,9 +100,10 @@ export default function Contact() {
                 style={{ background: '#E8F5E9', color: '#2E7D32' }}>
                 <CheckCircle size={28} />
               </span>
-              <h3 className="text-lg font-bold text-[#18181B]">Message envoyé</h3>
-              <p className="text-sm text-[#71717A] mt-1.5">Merci ! Nous revenons vers vous sous 24 h ouvrées.</p>
-              <button onClick={() => setSent(false)}
+              <h3 className="text-lg font-bold text-[#18181B]">Message envoyé !</h3>
+              <p className="text-sm text-[#71717A] mt-1.5">Merci {form.nom} ! Nous revenons vers vous sous 24 h ouvrées.</p>
+              <button
+                onClick={() => { setSent(false); setForm({ nom: '', email: '', message: '' }); }}
                 className="mt-5 text-sm font-semibold hover:underline"
                 style={{ color: '#1B5E20' }}>
                 Envoyer un autre message
@@ -82,12 +116,19 @@ export default function Contact() {
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide">Nom complet</label>
-                    <input className="mt-1.5 w-full h-11 px-3.5 rounded-xl border border-[#E7E7EA] outline-none text-sm focus:border-[#18181B]/30"
+                    <input
+                      value={form.nom}
+                      onChange={set('nom')}
+                      className="mt-1.5 w-full h-11 px-3.5 rounded-xl border border-[#E7E7EA] outline-none text-sm focus:border-[#2E7D32]/40"
                       placeholder="Awa Ndiaye" />
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide">Email</label>
-                    <input className="mt-1.5 w-full h-11 px-3.5 rounded-xl border border-[#E7E7EA] outline-none text-sm focus:border-[#18181B]/30"
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={set('email')}
+                      className="mt-1.5 w-full h-11 px-3.5 rounded-xl border border-[#E7E7EA] outline-none text-sm focus:border-[#2E7D32]/40"
                       placeholder="vous@email.com" />
                   </div>
                 </div>
@@ -105,14 +146,25 @@ export default function Contact() {
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-[#71717A] uppercase tracking-wide">Message</label>
-                  <textarea rows={4}
-                    className="mt-1.5 w-full px-3.5 py-3 rounded-xl border border-[#E7E7EA] outline-none text-sm focus:border-[#18181B]/30 resize-none"
+                  <textarea
+                    rows={4}
+                    value={form.message}
+                    onChange={set('message')}
+                    className="mt-1.5 w-full px-3.5 py-3 rounded-xl border border-[#E7E7EA] outline-none text-sm focus:border-[#2E7D32]/40 resize-none"
                     placeholder="Décrivez votre demande…" />
                 </div>
-                <button onClick={() => setSent(true)}
-                  className="w-full h-12 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2"
+                {error && (
+                  <p className="text-sm text-red-600 font-medium">{error}</p>
+                )}
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="w-full h-12 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-60"
                   style={{ background: '#2E7D32' }}>
-                  <Send size={15} /> Envoyer le message
+                  {loading
+                    ? <><Loader2 size={16} className="animate-spin" /> Envoi en cours…</>
+                    : <><Send size={15} /> Envoyer le message</>
+                  }
                 </button>
               </div>
             </>

@@ -280,19 +280,6 @@ export default function CheckoutPage() {
                   </p>
                 )}
 
-                {/* Reference */}
-                <div className="mt-4 bg-gray-50 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs text-gray-500">Référence</p>
-                    <code className="text-sm font-bold text-gray-800">{reference}</code>
-                  </div>
-                  <button
-                    onClick={() => copyRef(reference)}
-                    className="p-2 rounded-lg hover:bg-gray-200 transition-colors text-gray-500"
-                  >
-                    {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -340,6 +327,19 @@ export default function CheckoutPage() {
                         <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#1BC29A] text-white text-xs font-bold px-4 py-1.5 rounded-full shadow">
                           Wave
                         </div>
+                      </div>
+
+                      {/* Numéro marchand avec bouton copier */}
+                      <div className="mt-6 inline-flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2.5 border border-gray-200">
+                        <span className="text-xs text-gray-500">Ou envoyez au</span>
+                        <span className="text-sm font-bold text-gray-900 tracking-wide">+221 78 131 13 71</span>
+                        <button
+                          onClick={() => copyRef('+221 78 131 13 71')}
+                          className="p-1.5 rounded-lg hover:bg-gray-200 transition-colors text-gray-400"
+                          title="Copier le numéro"
+                        >
+                          {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
                       </div>
                     </div>
 

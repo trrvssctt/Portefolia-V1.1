@@ -196,6 +196,7 @@ export function WavePaymentForm({ planId, onSuccess }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [confirmData, setConfirmData] = useState<ConfirmData | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedPhone, setCopiedPhone] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const userEmail = profile?.email || user?.email || '';
@@ -377,6 +378,22 @@ export function WavePaymentForm({ planId, onSuccess }: Props) {
                 />
               </div>
               <span className="text-xs text-gray-400 font-medium">Scanner avec Wave</span>
+              <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 border border-gray-200 mt-1">
+                <span className="text-xs text-gray-500">Ou envoyez au</span>
+                <span className="text-xs font-bold text-gray-900 tracking-wide">{WAVE_NUMBER}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(WAVE_NUMBER);
+                    setCopiedPhone(true);
+                    setTimeout(() => setCopiedPhone(false), 2000);
+                  }}
+                  className="p-1 rounded-lg hover:bg-gray-200 transition-colors text-gray-400"
+                  title="Copier le numéro"
+                >
+                  {copiedPhone ? <Check className="w-3 h-3 text-[#2E7D32]" /> : <Copy className="w-3 h-3" />}
+                </button>
+              </div>
             </div>
 
             {/* Montant */}

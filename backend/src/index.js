@@ -127,6 +127,8 @@ app.use('/api/roles', rolesRoutes);
 app.use('/api/business', businessRoutes);
 // NFC waitlist (public)
 app.use('/api/nfc', require('./routes/nfcRoutes'));
+// Contact form (public POST + admin GET/PATCH/DELETE)
+app.use('/api/contact', require('./routes/contactRoutes'));
 
 // Webhooks (public endpoint) - keep minimal and verify signatures in production
 app.post('/webhooks/payment', (req, res) => adminController.paymentWebhook(req, res));

@@ -55,6 +55,7 @@ import UpgradePlan from "./pages/UpgradePlan";
 import Reabonnement from "./pages/Reabonnement";
 import CheckoutPage from "./pages/Checkout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import ContactMessages from "./pages/admin/ContactMessages";
 import DetailsUsers from "./pages/admin/DetailsUsers";
 import UserAdmin from "./pages/admin/UserAdmin";
 import ProfilsUserPage from "./pages/Profils_user";
@@ -170,6 +171,7 @@ function App() {
                       <Route path="/admin/upgrades" element={<AdminUpgrades />} />
                       <Route path="/admin/finance" element={<FinancialDashboard />} />
                       <Route path="/admin/clients" element={<ClientsPage />} />
+                      <Route path="/admin/contact-messages" element={<ContactMessages />} />
                     </Route>
                     <Route path="/dashboard/profile" element={<RequirePayment><RequireSubscription><ProfilsUserPage /></RequireSubscription></RequirePayment>} />
                     <Route path="/dashboard/settings" element={<AccountSettings />} />
