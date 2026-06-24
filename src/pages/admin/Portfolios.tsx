@@ -814,7 +814,7 @@ export default function AdminPortfolios() {
                                 <div className="grid grid-cols-2 gap-2">
                                   <div className="bg-white border border-[#E7E7EA] rounded-xl p-3">
                                     <p className="text-[9px] font-bold uppercase text-zinc-400 mb-0.5">ID</p>
-                                    <p className="font-mono text-[11px] font-bold text-zinc-600">{p.id.substring(0, 10)}…</p>
+                                    <p className="font-mono text-[11px] font-bold text-zinc-600">{String(p.id)}</p>
                                   </div>
                                   <div className="bg-white border border-[#E7E7EA] rounded-xl p-3">
                                     <p className="text-[9px] font-bold uppercase text-zinc-400 mb-0.5">Vues tot.</p>
