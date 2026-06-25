@@ -1168,7 +1168,46 @@ async function deactivateMe(req, res) {
       await businessAccountModel.deactivateByAdminId(userId);
     }
 
+    const [infoRows] = await pool.query('SELECT prenom, nom, email FROM utilisateurs WHERE id = ? LIMIT 1', [userId]);
+    const u = infoRows[0] || {};
     await userModel.deactivateUser(userId, null);
+
+    const FRONTEND = process.env.FRONTEND_URL || 'https://portefolia.tech';
+    sendEmail({
+      to: u.email,
+      subject: 'Votre compte Portefolia a été désactivé',
+      html: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:'Helvetica Neue',Arial,sans-serif;background:#f4f4f4">
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td>
+<table width="600" align="center" cellpadding="0" cellspacing="0"
+  style="margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)">
+  <tr><td style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:28px 40px;text-align:center">
+    <img src="${FRONTEND}/lovable-uploads/logo_portefolia_remove_bg.png" alt="Portefolia" height="36" style="filter:brightness(0) invert(1)">
+    <h1 style="color:#fff;font-size:20px;font-weight:700;margin:12px 0 0">Compte désactivé</h1>
+  </td></tr>
+  <tr><td style="padding:32px 40px">
+    <p style="font-size:15px;color:#374151">Bonjour <strong>${u.prenom || u.nom || 'cher(e) membre'}</strong>,</p>
+    <p style="font-size:15px;color:#374151;line-height:1.7">
+      Votre compte Portefolia a bien été <strong>désactivé</strong> suite à votre demande.
+      Vos données et portfolios sont <strong>conservés</strong> pendant 90 jours.
+    </p>
+    <div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;padding:16px 20px;margin:20px 0">
+      <p style="margin:0;font-size:14px;color:#92400E">
+        ⚠️ Si vous souhaitez <strong>réactiver votre compte</strong>, contactez notre support à
+        <a href="mailto:contact@portefolia.tech" style="color:#92400E">contact@portefolia.tech</a>
+        avant l'expiration du délai de 90 jours.
+      </p>
+    </div>
+    <p style="font-size:14px;color:#6B7280;line-height:1.7">
+      Si vous n'êtes pas à l'origine de cette action, contactez-nous immédiatement.
+    </p>
+  </td></tr>
+  <tr><td style="background:#f9fafb;padding:16px 40px;text-align:center;border-top:1px solid #e5e7eb">
+    <p style="font-size:11px;color:#9ca3af;margin:0">Portefolia · contact@portefolia.tech · ${FRONTEND}</p>
+  </td></tr>
+</table></td></tr></table></body></html>`,
+    }).catch(e => console.warn('deactivateMe email error:', e.message));
+
     return res.json({ message: 'Compte désactivé' });
   } catch (err) {
     console.error('deactivateMe error:', err);
@@ -1197,7 +1236,47 @@ async function deleteMe(req, res) {
       await businessAccountModel.softDeleteByAdminId(userId);
     }
 
+    const [infoRows] = await pool.query('SELECT prenom, nom, email FROM utilisateurs WHERE id = ? LIMIT 1', [userId]);
+    const u = infoRows[0] || {};
     await userModel.softDeleteUser(userId, null);
+
+    const FRONTEND = process.env.FRONTEND_URL || 'https://portefolia.tech';
+    sendEmail({
+      to: u.email,
+      subject: 'Votre compte Portefolia a été supprimé',
+      html: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:'Helvetica Neue',Arial,sans-serif;background:#f4f4f4">
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td>
+<table width="600" align="center" cellpadding="0" cellspacing="0"
+  style="margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)">
+  <tr><td style="background:linear-gradient(135deg,#7F1D1D,#B91C1C);padding:28px 40px;text-align:center">
+    <img src="${FRONTEND}/lovable-uploads/logo_portefolia_remove_bg.png" alt="Portefolia" height="36" style="filter:brightness(0) invert(1)">
+    <h1 style="color:#fff;font-size:20px;font-weight:700;margin:12px 0 0">Compte supprimé</h1>
+  </td></tr>
+  <tr><td style="padding:32px 40px">
+    <p style="font-size:15px;color:#374151">Bonjour <strong>${u.prenom || u.nom || 'cher(e) membre'}</strong>,</p>
+    <p style="font-size:15px;color:#374151;line-height:1.7">
+      La suppression de votre compte Portefolia a bien été effectuée suite à votre demande.
+    </p>
+    <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:16px 20px;margin:20px 0">
+      <p style="margin:0;font-size:14px;color:#991B1B;line-height:1.6">
+        🗑️ <strong>Ce qui a été supprimé :</strong><br>
+        Vos portfolios, projets, compétences, expériences et toutes les données associées
+        à votre compte seront définitivement effacés sous 30 jours.
+      </p>
+    </div>
+    <p style="font-size:14px;color:#6B7280;line-height:1.7">
+      Si vous n'êtes pas à l'origine de cette action, contactez-nous immédiatement à
+      <a href="mailto:contact@portefolia.tech" style="color:#2E7D32">contact@portefolia.tech</a>.
+    </p>
+    <p style="font-size:14px;color:#6B7280">Merci d'avoir fait confiance à Portefolia. À bientôt peut-être !</p>
+  </td></tr>
+  <tr><td style="background:#f9fafb;padding:16px 40px;text-align:center;border-top:1px solid #e5e7eb">
+    <p style="font-size:11px;color:#9ca3af;margin:0">Portefolia · contact@portefolia.tech · ${FRONTEND}</p>
+  </td></tr>
+</table></td></tr></table></body></html>`,
+    }).catch(e => console.warn('deleteMe email error:', e.message));
+
     return res.json({ message: 'Compte supprimé' });
   } catch (err) {
     console.error('deleteMe error:', err);

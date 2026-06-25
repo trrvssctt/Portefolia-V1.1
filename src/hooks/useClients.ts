@@ -215,6 +215,15 @@ export function useClientActions(clientId: number) {
     onSuccess: invalidateClient,
   });
 
+  const reactiver = useMutation<ActionResponse, Error, void>({
+    mutationFn: () =>
+      apiMutate<ActionResponse>(
+        `${API_BASE}/api/admin/clients/${clientId}/reactiver`,
+        'POST'
+      ),
+    onSuccess: invalidateClient,
+  });
+
   const envoyerEmail = useMutation<ActionResponse, Error, { sujet: string; message: string }>({
     mutationFn: (data) =>
       apiMutate<ActionResponse>(
@@ -262,7 +271,7 @@ export function useClientActions(clientId: number) {
     onSuccess: invalidateClient,
   });
 
-  return { bloquer, debloquer, envoyerEmail, changerPlan, modifierInfos, forcerRenouvellement };
+  return { bloquer, debloquer, reactiver, envoyerEmail, changerPlan, modifierInfos, forcerRenouvellement };
 }
 
 // ── Utilitaire : télécharger l'export CSV ─────────────────────────────────────

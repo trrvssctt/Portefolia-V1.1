@@ -71,6 +71,7 @@ function StatutBadge({ statut }: { statut?: string }) {
     EXPIRED:         { label: 'Expiré',      color: RED    },
     SUSPENDED:       { label: 'Suspendu',    color: RED    },
     BLOQUÉ:          { label: 'Bloqué',      color: RED    },
+    inactif:         { label: 'Inactif',     color: '#9CA3AF' },
   };
   const cfg = map[statut] ?? { label: statut, color: '#757575' };
   return (
@@ -919,13 +920,21 @@ export default function ClientProfil360({ clientId, onClose }: Props) {
   }
 
   const { infos, abonnement, paiements, portfolios, timeline, stats } = profil;
-  const bloque  = infos.statut_compte === 'BLOQUÉ';
-  const expired = infos.subscription_status === 'EXPIRED';
-  const active  = infos.subscription_status === 'ACTIVE';
+  const bloque    = infos.statut_compte === 'BLOQUÉ';
+  const inactif   = infos.statut_compte === 'inactif';
+  const expired   = infos.subscription_status === 'EXPIRED';
+  const active    = infos.subscription_status === 'ACTIVE';
 
   const handleDebloquer = () => {
     actions.debloquer.mutate(undefined, {
       onSuccess: () => toast.success('Compte débloqué avec succès'),
+      onError: (err) => toast.error(err.message || 'Erreur'),
+    });
+  };
+
+  const handleReactiver = () => {
+    actions.reactiver.mutate(undefined, {
+      onSuccess: () => toast.success('Compte réactivé — email envoyé au client'),
       onError: (err) => toast.error(err.message || 'Erreur'),
     });
   };
@@ -943,7 +952,7 @@ export default function ClientProfil360({ clientId, onClose }: Props) {
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
           <div
             className="flex items-center justify-center h-11 w-11 rounded-full shrink-0 text-white text-sm font-bold"
-            style={{ backgroundColor: bloque ? '#9E9E9E' : GREEN }}
+            style={{ backgroundColor: (bloque || inactif) ? '#9E9E9E' : GREEN }}
           >
             {initiales(infos.prenom, infos.nom)}
           </div>
@@ -951,7 +960,7 @@ export default function ClientProfil360({ clientId, onClose }: Props) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-sm font-bold text-gray-900">{infos.nom_complet}</p>
-              <StatutBadge statut={bloque ? 'BLOQUÉ' : infos.subscription_status} />
+              <StatutBadge statut={bloque ? 'BLOQUÉ' : inactif ? 'inactif' : infos.subscription_status} />
             </div>
             <p className="text-xs text-gray-500">
               {infos.email} &nbsp;·&nbsp;
@@ -1021,6 +1030,10 @@ export default function ClientProfil360({ clientId, onClose }: Props) {
                 ...(bloque ? [{
                   icon: <Unlock size={13} />, label: 'Débloquer',
                   onClick: handleDebloquer, color: GREEN,
+                }] : []),
+                ...(inactif ? [{
+                  icon: <Unlock size={13} />, label: 'Réactiver le compte',
+                  onClick: handleReactiver, color: GREEN,
                 }] : []),
                 ...(expired ? [{
                   icon: <Send size={13} />, label: 'Email de relance',

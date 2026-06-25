@@ -192,6 +192,7 @@ router.get('/clients',                         auth, adminAuth, clientsAdminCtrl
 router.get('/clients/:id/profil360',           auth, adminAuth, clientsAdminCtrl.getProfil360);
 router.post('/clients/:id/bloquer',            auth, adminAuth, logAdminAction('bloquer_client', 'clients'),            clientsAdminCtrl.bloquerClient);
 router.post('/clients/:id/debloquer',          auth, adminAuth, logAdminAction('debloquer_client', 'clients'),          clientsAdminCtrl.debloquerClient);
+router.post('/clients/:id/reactiver',          auth, adminAuth, logAdminAction('reactiver_client', 'clients'),          clientsAdminCtrl.reactiverClient);
 router.post('/clients/:id/envoyer-email',      auth, adminAuth, logAdminAction('envoyer_email_client', 'clients'),      clientsAdminCtrl.envoyerEmailClient);
 router.put('/clients/:id/plan',                auth, adminAuth, logAdminAction('changer_plan_client', 'clients'),       clientsAdminCtrl.changerPlanClient);
 router.put('/clients/:id/infos',               auth, adminAuth, logAdminAction('update_client_infos', 'clients'),       clientsAdminCtrl.mettreAJourInfosClient);

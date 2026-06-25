@@ -392,6 +392,68 @@ async function debloquerClient(req, res) {
   }
 }
 
+// ─── ENDPOINT 4b : POST /api/admin/clients/:id/reactiver ────────────────────
+async function reactiverClient(req, res) {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID invalide' });
+
+    const [users] = await pool.query(
+      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role = 'USER'",
+      [id]
+    );
+    const user = users[0];
+    if (!user) return res.status(404).json({ error: 'Client introuvable' });
+
+    await pool.query(
+      "UPDATE utilisateurs SET is_active = 1, statut = 'actif' WHERE id = ?",
+      [id]
+    );
+
+    const FRONTEND = process.env.FRONTEND_URL || 'https://portefolia.tech';
+    await sendEmail({
+      to: user.email,
+      subject: 'Votre compte Portefolia a été réactivé',
+      html: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:'Helvetica Neue',Arial,sans-serif;background:#f4f4f4">
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td>
+<table width="600" align="center" cellpadding="0" cellspacing="0"
+  style="margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)">
+  <tr><td style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:28px 40px;text-align:center">
+    <img src="${FRONTEND}/lovable-uploads/logo_portefolia_remove_bg.png" alt="Portefolia" height="36" style="filter:brightness(0) invert(1)">
+    <h1 style="color:#fff;font-size:20px;font-weight:700;margin:12px 0 0">Compte réactivé ✓</h1>
+  </td></tr>
+  <tr><td style="padding:32px 40px">
+    <p style="font-size:15px;color:#374151">Bonjour <strong>${user.prenom || user.nom || 'cher(e) membre'}</strong>,</p>
+    <p style="font-size:15px;color:#374151;line-height:1.7">
+      Bonne nouvelle ! Votre compte Portefolia a été <strong>réactivé</strong> par notre équipe.
+      Vous pouvez vous connecter dès maintenant et retrouver tous vos portfolios.
+    </p>
+    <div style="text-align:center;margin:28px 0">
+      <a href="${FRONTEND}/auth"
+        style="display:inline-block;padding:14px 32px;background:#2E7D32;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:10px">
+        Se connecter →
+      </a>
+    </div>
+    <p style="font-size:13px;color:#9CA3AF;text-align:center">
+      Une question ? <a href="mailto:contact@portefolia.tech" style="color:#2E7D32">contact@portefolia.tech</a>
+    </p>
+  </td></tr>
+  <tr><td style="background:#f9fafb;padding:16px 40px;text-align:center;border-top:1px solid #e5e7eb">
+    <p style="font-size:11px;color:#9ca3af;margin:0">Portefolia · contact@portefolia.tech · ${FRONTEND}</p>
+  </td></tr>
+</table></td></tr></table></body></html>`,
+    }).catch(err => console.error('reactiverClient:email', err.message));
+
+    await logAction(req, 'reactiver_client', 'clients', { client_id: id });
+
+    return res.json({ success: true, message: 'Compte réactivé avec succès' });
+  } catch (err) {
+    console.error('reactiverClient error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
 // ─── ENDPOINT 5 : POST /api/admin/clients/:id/envoyer-email ─────────────────
 async function envoyerEmailClient(req, res) {
   try {
@@ -677,6 +739,7 @@ module.exports = {
   getProfil360,
   bloquerClient,
   debloquerClient,
+  reactiverClient,
   envoyerEmailClient,
   changerPlanClient,
   mettreAJourInfosClient,
