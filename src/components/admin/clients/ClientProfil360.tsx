@@ -84,9 +84,82 @@ function StatutBadge({ statut }: { statut?: string }) {
   );
 }
 
+// ── DIALOG 6 — ResetPasswordDialog ───────────────────────────────────────────
+
+function ResetPasswordDialog({
+  open, onClose, clientName, clientEmail, mutation,
+}: {
+  open: boolean;
+  onClose: () => void;
+  clientName: string;
+  clientEmail: string;
+  mutation: ReturnType<typeof useClientActions>['reinitialiserMotDePasse'];
+}) {
+  const [confirmed, setConfirmed] = useState(false);
+
+  const handleClose = () => { setConfirmed(false); onClose(); };
+
+  const handleSubmit = () => {
+    if (!confirmed) { toast.error('Veuillez cocher la case de confirmation'); return; }
+    mutation.mutate(undefined, {
+      onSuccess: () => {
+        toast.success(`Mot de passe réinitialisé — email envoyé à ${clientEmail}`);
+        handleClose();
+      },
+      onError: (err) => toast.error(err.message || 'Erreur lors de la réinitialisation'),
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-gray-800">
+            <KeyRound size={16} />
+            Réinitialiser le mot de passe
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4 py-2">
+          <p className="text-sm text-gray-600">
+            Un nouveau mot de passe temporaire sera généré et envoyé par email à{' '}
+            <span className="font-semibold text-gray-900">{clientName}</span>{' '}
+            (<span className="text-gray-500">{clientEmail}</span>).
+          </p>
+
+          <div className="rounded-lg p-3 flex gap-2.5 text-xs" style={{ backgroundColor: '#FEF9C3', color: '#854D0E' }}>
+            <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+            <div className="flex flex-col gap-0.5">
+              <span className="font-semibold">Le client sera invité à changer son mot de passe</span>
+              <span>Son mot de passe actuel sera invalidé immédiatement.</span>
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-700 select-none">
+            <Checkbox checked={confirmed} onCheckedChange={(v) => setConfirmed(!!v)} />
+            Je confirme vouloir réinitialiser le mot de passe de ce compte
+          </label>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={handleClose}>Annuler</Button>
+          <Button
+            size="sm"
+            className="text-white"
+            style={{ backgroundColor: confirmed ? '#374151' : undefined }}
+            onClick={handleSubmit}
+            disabled={mutation.isPending || !confirmed}
+          >
+            {mutation.isPending ? 'Envoi en cours…' : 'Réinitialiser et envoyer'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Dialog type union ─────────────────────────────────────────────────────────
 
-type DialogType = 'email' | 'renew' | 'plan' | 'edit' | 'block' | null;
+type DialogType = 'email' | 'renew' | 'plan' | 'edit' | 'block' | 'reset-password' | null;
 
 // ── DIALOG 1 — EmailDialog ────────────────────────────────────────────────────
 
@@ -1037,13 +1110,7 @@ export default function ClientProfil360({ clientId, onClose }: Props) {
                 }] : []),
                 {
                   icon: <KeyRound size={13} />, label: 'Réinitialiser le mot de passe',
-                  onClick: () => {
-                    if (!confirm(`Réinitialiser le mot de passe de ${infos.nom_complet} ? Un email avec le nouveau mot de passe lui sera envoyé.`)) return;
-                    actions.reinitialiserMotDePasse.mutate(undefined, {
-                      onSuccess: () => toast.success('Mot de passe réinitialisé — email envoyé au client'),
-                      onError: (err) => toast.error(err.message || 'Erreur'),
-                    });
-                  },
+                  onClick: () => setDialog('reset-password'),
                   color: '#374151',
                 },
                 ...(expired ? [{
@@ -1141,6 +1208,13 @@ export default function ClientProfil360({ clientId, onClose }: Props) {
         onClose={() => setDialog(null)}
         clientEmail={infos.email}
         mutation={actions.bloquer}
+      />
+      <ResetPasswordDialog
+        open={dialog === 'reset-password'}
+        onClose={() => setDialog(null)}
+        clientName={infos.nom_complet}
+        clientEmail={infos.email}
+        mutation={actions.reinitialiserMotDePasse}
       />
     </>
   );
