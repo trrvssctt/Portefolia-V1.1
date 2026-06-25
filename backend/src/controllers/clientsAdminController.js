@@ -339,7 +339,7 @@ async function bloquerClient(req, res) {
     const user = users[0];
     if (!user) return res.status(404).json({ error: 'Client introuvable' });
 
-    await pool.query("UPDATE utilisateurs SET statut = 'BLOQUÉ' WHERE id = ?", [id]);
+    await pool.query("UPDATE utilisateurs SET statut = 'BLOQUÉ', is_active = 0 WHERE id = ?", [id]);
 
     await pool.query('DELETE FROM refresh_tokens WHERE utilisateur_id = ?', [id]).catch(() => {});
 

@@ -251,6 +251,14 @@ async function login(req, res) {
     });
   }
 
+  // Compte bloqué par un administrateur
+  if (user.statut === 'BLOQUÉ') {
+    return res.status(403).json({
+      error: 'Votre compte a été suspendu. Contactez le support à contact@portefolia.tech pour plus d\'informations.',
+      code: 'ACCOUNT_BLOCKED',
+    });
+  }
+
   // Si le compte est inactif, détecter la raison précise
   if (typeof user.is_active !== 'undefined' && user.is_active === 0) {
     try {
