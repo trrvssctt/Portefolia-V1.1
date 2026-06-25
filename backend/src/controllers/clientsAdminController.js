@@ -41,7 +41,7 @@ async function getClientInfos(id) {
       u.phone AS telephone,
       NULL AS ville,
       u.date_inscription,
-      u.statut, u.subscription_status,
+      u.statut, u.statut AS statut_compte, u.subscription_status,
       u.last_payment_at, u.next_billing_date,
       pl.name AS plan_nom, pl.id AS plan_id, pl.price_cents AS plan_prix,
       (SELECT COUNT(*) FROM portfolios p WHERE p.utilisateur_id = u.id) AS nb_portfolios,
