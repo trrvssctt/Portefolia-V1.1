@@ -5,7 +5,7 @@ import {
   Mail, Phone, MapPin, Calendar, CreditCard, Clock,
   RefreshCw, TrendingUp, Edit2, Lock, Unlock, Send,
   Copy, X, Check, ExternalLink, Briefcase, AlertTriangle,
-  FileText, LayoutTemplate,
+  FileText, LayoutTemplate, KeyRound,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -1035,6 +1035,17 @@ export default function ClientProfil360({ clientId, onClose }: Props) {
                   icon: <Unlock size={13} />, label: 'Réactiver le compte',
                   onClick: handleReactiver, color: GREEN,
                 }] : []),
+                {
+                  icon: <KeyRound size={13} />, label: 'Réinitialiser le mot de passe',
+                  onClick: () => {
+                    if (!confirm(`Réinitialiser le mot de passe de ${infos.nom_complet} ? Un email avec le nouveau mot de passe lui sera envoyé.`)) return;
+                    actions.reinitialiserMotDePasse.mutate(undefined, {
+                      onSuccess: () => toast.success('Mot de passe réinitialisé — email envoyé au client'),
+                      onError: (err) => toast.error(err.message || 'Erreur'),
+                    });
+                  },
+                  color: '#374151',
+                },
                 ...(expired ? [{
                   icon: <Send size={13} />, label: 'Email de relance',
                   onClick: () => setDialog('email'), color: ORANGE,

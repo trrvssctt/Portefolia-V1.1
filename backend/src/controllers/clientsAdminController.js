@@ -2,6 +2,7 @@
 
 const { pool } = require('../db');
 const sendEmail = require('../utils/sendEmail');
+const bcrypt = require('bcrypt');
 
 // ─── helper : log admin action ───────────────────────────────────────────────
 async function logAction(req, action, resource, extra = {}) {
@@ -454,6 +455,79 @@ async function reactiverClient(req, res) {
   }
 }
 
+// ─── ENDPOINT 4c : POST /api/admin/clients/:id/reset-password ───────────────
+async function reinitialiserMotDePasseClient(req, res) {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID invalide' });
+
+    const [users] = await pool.query(
+      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role = 'USER'",
+      [id]
+    );
+    const user = users[0];
+    if (!user) return res.status(404).json({ error: 'Client introuvable' });
+
+    // Générer un mot de passe temporaire sécurisé
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#!';
+    const tempPassword = Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const hash = await bcrypt.hash(tempPassword, 12);
+
+    await pool.query('UPDATE utilisateurs SET mot_de_passe = ? WHERE id = ?', [hash, id]);
+
+    const FRONTEND = process.env.FRONTEND_URL || 'https://portefolia.tech';
+    await sendEmail({
+      to: user.email,
+      subject: 'Votre nouveau mot de passe Portefolia',
+      html: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:'Helvetica Neue',Arial,sans-serif;background:#f4f4f4">
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td>
+<table width="600" align="center" cellpadding="0" cellspacing="0"
+  style="margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)">
+  <tr><td style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:28px 40px;text-align:center">
+    <img src="${FRONTEND}/lovable-uploads/logo_portefolia_remove_bg.png" alt="Portefolia" height="36" style="filter:brightness(0) invert(1)">
+    <h1 style="color:#fff;font-size:20px;font-weight:700;margin:12px 0 0">Réinitialisation de mot de passe</h1>
+  </td></tr>
+  <tr><td style="padding:32px 40px">
+    <p style="font-size:15px;color:#374151">Bonjour <strong>${user.prenom || user.nom || 'cher(e) membre'}</strong>,</p>
+    <p style="font-size:15px;color:#374151;line-height:1.7">
+      Votre mot de passe Portefolia a été réinitialisé par notre équipe. Voici vos nouvelles informations de connexion :
+    </p>
+    <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:20px 24px;margin:20px 0;text-align:center">
+      <p style="margin:0 0 8px;font-size:12px;font-weight:600;color:#166534;text-transform:uppercase;letter-spacing:.05em">Mot de passe temporaire</p>
+      <p style="margin:0;font-size:24px;font-weight:900;color:#166534;font-family:monospace;letter-spacing:.1em">${tempPassword}</p>
+    </div>
+    <div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;padding:14px 18px;margin:16px 0">
+      <p style="margin:0;font-size:13px;color:#92400E">
+        ⚠️ <strong>Changez ce mot de passe dès votre première connexion</strong> depuis les paramètres de votre compte.
+      </p>
+    </div>
+    <div style="text-align:center;margin:28px 0">
+      <a href="${FRONTEND}/auth"
+        style="display:inline-block;padding:14px 32px;background:#2E7D32;color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:10px">
+        Se connecter →
+      </a>
+    </div>
+    <p style="font-size:13px;color:#9CA3AF;text-align:center">
+      Si vous n'avez pas demandé cette réinitialisation, contactez-nous immédiatement à
+      <a href="mailto:contact@portefolia.tech" style="color:#2E7D32">contact@portefolia.tech</a>
+    </p>
+  </td></tr>
+  <tr><td style="background:#f9fafb;padding:16px 40px;text-align:center;border-top:1px solid #e5e7eb">
+    <p style="font-size:11px;color:#9ca3af;margin:0">Portefolia · contact@portefolia.tech · ${FRONTEND}</p>
+  </td></tr>
+</table></td></tr></table></body></html>`,
+    });
+
+    await logAction(req, 'reset_password_client', 'clients', { client_id: id });
+
+    return res.json({ success: true, message: 'Mot de passe réinitialisé et envoyé par email' });
+  } catch (err) {
+    console.error('reinitialiserMotDePasseClient error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+}
+
 // ─── ENDPOINT 5 : POST /api/admin/clients/:id/envoyer-email ─────────────────
 async function envoyerEmailClient(req, res) {
   try {
@@ -740,6 +814,7 @@ module.exports = {
   bloquerClient,
   debloquerClient,
   reactiverClient,
+  reinitialiserMotDePasseClient,
   envoyerEmailClient,
   changerPlanClient,
   mettreAJourInfosClient,

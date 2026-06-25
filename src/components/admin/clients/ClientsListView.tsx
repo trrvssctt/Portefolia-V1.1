@@ -38,7 +38,7 @@ function initiales(prenom: string, nom: string): string {
 }
 
 function rowBg(status: ClientListItem['subscription_status'], statut_compte: string, index: number): string {
-  if (statut_compte === 'BLOQUÉ') return '#F5F5F5';
+  if (statut_compte === 'BLOQUÉ' || statut_compte === 'inactif') return '#F5F5F5';
   if (status === 'PENDING_PAYMENT') return '#FFFDE7';
   if (status === 'EXPIRED') return '#FFF5F5';
   return index % 2 === 1 ? '#E8F5E9' : '#FFFFFF';
@@ -145,11 +145,13 @@ function StatutBadge({ statut, jours }: { statut?: string; jours?: number }) {
   if (!statut) return null;
 
   const map: Record<string, { label: string; color: string }> = {
-    ACTIVE:          { label: 'Actif',       color: GREEN  },
-    PENDING_PAYMENT: { label: 'En attente',  color: ORANGE },
-    GRACE_PERIOD:    { label: 'Délai grâce', color: ORANGE },
-    EXPIRED:         { label: 'Expiré',      color: RED    },
-    SUSPENDED:       { label: 'Suspendu',    color: RED    },
+    ACTIVE:          { label: 'Actif',       color: GREEN     },
+    PENDING_PAYMENT: { label: 'En attente',  color: ORANGE    },
+    GRACE_PERIOD:    { label: 'Délai grâce', color: ORANGE    },
+    EXPIRED:         { label: 'Expiré',      color: RED       },
+    SUSPENDED:       { label: 'Suspendu',    color: RED       },
+    inactif:         { label: 'Inactif',     color: '#9CA3AF' },
+    BLOQUÉ:          { label: 'Bloqué',      color: RED       },
   };
 
   const cfg = map[statut] ?? { label: statut, color: '#757575' };
@@ -610,6 +612,7 @@ export default function ClientsListView({ onSelectClient, selectedClientId }: Pr
           clients.map((client, index) => {
             const isSelected  = client.id === selectedClientId;
             const isBloque    = client.statut_compte === 'BLOQUÉ';
+            const isInactif   = client.statut_compte === 'inactif';
             const bg          = rowBg(client.subscription_status, client.statut_compte, index);
 
             return (
@@ -621,14 +624,14 @@ export default function ClientsListView({ onSelectClient, selectedClientId }: Pr
                   backgroundColor: bg,
                   gridTemplateColumns: '22% 18% 10% 13% 8% 10% 14% auto',
                   borderLeft: isSelected ? `3px solid ${GREEN}` : '3px solid transparent',
-                  opacity: isBloque ? 0.65 : 1,
+                  opacity: (isBloque || isInactif) ? 0.65 : 1,
                 }}
               >
                 {/* Client */}
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div
                     className="flex items-center justify-center w-9 h-9 rounded-full shrink-0 text-white text-xs font-bold"
-                    style={{ backgroundColor: isBloque ? '#9E9E9E' : GREEN }}
+                    style={{ backgroundColor: (isBloque || isInactif) ? '#9E9E9E' : GREEN }}
                   >
                     {initiales(client.prenom, client.nom)}
                   </div>
@@ -654,7 +657,7 @@ export default function ClientsListView({ onSelectClient, selectedClientId }: Pr
                 {/* Abonnement */}
                 <div>
                   <StatutBadge
-                    statut={client.abonnement_statut ?? client.subscription_status}
+                    statut={isInactif ? 'inactif' : isBloque ? 'BLOQUÉ' : (client.abonnement_statut ?? client.subscription_status)}
                     jours={client.jours_restants ?? undefined}
                   />
                 </div>
