@@ -251,7 +251,7 @@ export default function AdminPortfolios() {
 
   const userChartData = useMemo(() =>
     Object.values(stats.byUser || {}).sort((a, b) => b.count - a.count).slice(0, 6).map((u, i) => ({
-      name: u.name.split(' ')[0] || u.name.substring(0, 12),
+      name: (u.name ? String(u.name).split(' ')[0] : u.email || `#${i + 1}`),
       portfolios: u.count, fill: CHART_COLORS[i % CHART_COLORS.length],
     })),
     [stats.byUser]);
