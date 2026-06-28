@@ -241,7 +241,7 @@ async function listClients(req, res) {
       FROM utilisateurs u
       LEFT JOIN ${LAST_ABO} a ON a.utilisateur_id = u.id
       LEFT JOIN plans pl ON a.plan_id = pl.id
-      WHERE u.role = 'USER'
+      WHERE u.role IN ('USER', 'BUSINESS_MEMBER')
         AND (? IS NULL OR (u.nom LIKE ? OR u.prenom LIKE ? OR u.email LIKE ? OR u.phone LIKE ?))
         AND (? IS NULL OR u.subscription_status = ?)
         AND (? IS NULL OR pl.id = ?)
@@ -264,7 +264,7 @@ async function listClients(req, res) {
       FROM utilisateurs u
       LEFT JOIN ${LAST_ABO} a ON a.utilisateur_id = u.id
       LEFT JOIN plans pl ON a.plan_id = pl.id
-      WHERE u.role = 'USER'
+      WHERE u.role IN ('USER', 'BUSINESS_MEMBER')
         AND (? IS NULL OR (u.nom LIKE ? OR u.prenom LIKE ? OR u.email LIKE ? OR u.phone LIKE ?))
         AND (? IS NULL OR u.subscription_status = ?)
         AND (? IS NULL OR pl.id = ?)
@@ -277,7 +277,7 @@ async function listClients(req, res) {
         COALESCE(SUM(CASE WHEN subscription_status = 'PENDING_PAYMENT' THEN 1 ELSE 0 END), 0) AS en_attente,
         COALESCE(SUM(CASE WHEN subscription_status = 'EXPIRED'         THEN 1 ELSE 0 END), 0) AS expires,
         COALESCE(SUM(CASE WHEN statut = 'BLOQUÉ'                       THEN 1 ELSE 0 END), 0) AS bloques
-      FROM utilisateurs WHERE role = 'USER'
+      FROM utilisateurs WHERE role IN ('USER', 'BUSINESS_MEMBER')
     `;
 
     const [clientsResult, countResult, tabResult] = await Promise.all([
@@ -333,7 +333,7 @@ async function bloquerClient(req, res) {
     if (!motif) return res.status(400).json({ error: 'Motif requis' });
 
     const [users] = await pool.query(
-      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role = 'USER'",
+      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role IN ('USER', 'BUSINESS_MEMBER')",
       [id]
     );
     const user = users[0];
@@ -368,7 +368,7 @@ async function debloquerClient(req, res) {
     if (!id) return res.status(400).json({ error: 'ID invalide' });
 
     const [users] = await pool.query(
-      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role = 'USER'",
+      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role IN ('USER', 'BUSINESS_MEMBER')",
       [id]
     );
     const user = users[0];
@@ -400,7 +400,7 @@ async function reactiverClient(req, res) {
     if (!id) return res.status(400).json({ error: 'ID invalide' });
 
     const [users] = await pool.query(
-      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role = 'USER'",
+      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role IN ('USER', 'BUSINESS_MEMBER')",
       [id]
     );
     const user = users[0];
@@ -462,7 +462,7 @@ async function reinitialiserMotDePasseClient(req, res) {
     if (!id) return res.status(400).json({ error: 'ID invalide' });
 
     const [users] = await pool.query(
-      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role = 'USER'",
+      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role IN ('USER', 'BUSINESS_MEMBER')",
       [id]
     );
     const user = users[0];
@@ -537,7 +537,7 @@ async function envoyerEmailClient(req, res) {
     if (!sujet || !message) return res.status(400).json({ error: 'Sujet et message requis' });
 
     const [users] = await pool.query(
-      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role = 'USER'",
+      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role IN ('USER', 'BUSINESS_MEMBER')",
       [id]
     );
     const user = users[0];
@@ -566,7 +566,7 @@ async function changerPlanClient(req, res) {
     if (!id || !nouveau_plan_id) return res.status(400).json({ error: 'ID et nouveau_plan_id requis' });
 
     const [users] = await pool.query(
-      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role = 'USER'",
+      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role IN ('USER', 'BUSINESS_MEMBER')",
       [id]
     );
     const user = users[0];
@@ -653,7 +653,7 @@ async function mettreAJourInfosClient(req, res) {
         prenom = COALESCE(?, prenom),
         email  = COALESCE(?, email),
         phone  = COALESCE(?, phone)
-       WHERE id = ? AND role = 'USER'`,
+       WHERE id = ? AND role IN ('USER', 'BUSINESS_MEMBER')`,
       [nom || null, prenom || null, email || null, telephone || null, id]
     );
 
@@ -680,7 +680,7 @@ async function forcerRenouvellement(req, res) {
     if (!commentaire)                     return res.status(400).json({ error: 'Commentaire requis' });
 
     const [users] = await pool.query(
-      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role = 'USER'",
+      "SELECT id, email, prenom, nom FROM utilisateurs WHERE id = ? AND role IN ('USER', 'BUSINESS_MEMBER')",
       [id]
     );
     const user = users[0];
@@ -768,7 +768,7 @@ async function exportClientsCSV(req, res) {
       FROM utilisateurs u
       LEFT JOIN ${LAST_ABO_EXP} a ON a.utilisateur_id = u.id
       LEFT JOIN plans pl ON a.plan_id = pl.id
-      WHERE u.role = 'USER'
+      WHERE u.role IN ('USER', 'BUSINESS_MEMBER')
         AND (? IS NULL OR (u.nom LIKE ? OR u.prenom LIKE ? OR u.email LIKE ? OR u.phone LIKE ?))
         AND (? IS NULL OR u.subscription_status = ?)
         AND (? IS NULL OR pl.id = ?)
