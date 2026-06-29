@@ -220,11 +220,21 @@ async function getNouveauxInscrits(limit = 8) {
   const [rows] = await pool.query(
     `SELECT u.id, CONCAT(u.prenom, ' ', u.nom) AS nom,
        u.email, u.created_at, u.subscription_status,
-       p.name AS plan_nom
+       u.role AS user_role,
+       p.name AS plan_nom,
+       ba.id AS business_account_id,
+       ba.company_name AS business_company,
+       bpl.name AS business_plan_nom,
+       CONCAT(admin_u.prenom, ' ', admin_u.nom) AS business_admin_nom,
+       admin_u.id AS business_admin_id
      FROM utilisateurs u
      LEFT JOIN abonnements a ON a.utilisateur_id = u.id
        AND a.statut IN ('ACTIVE', 'PENDING_PAYMENT')
      LEFT JOIN plans p ON a.plan_id = p.id
+     LEFT JOIN business_accounts ba ON ba.id = u.business_account_id AND ba.deleted_at IS NULL
+     LEFT JOIN utilisateurs admin_u ON admin_u.id = ba.admin_user_id
+     LEFT JOIN plans bpl ON bpl.id = ba.plan_id
+     WHERE u.role IN ('USER', 'BUSINESS_MEMBER')
      ORDER BY u.created_at DESC
      LIMIT ?`,
     [limit]

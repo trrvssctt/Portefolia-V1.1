@@ -73,6 +73,12 @@ export interface NouvelInscrit {
   subscription_status: string;
   plan_nom: string;
   created_at: string;
+  user_role?: string;
+  business_account_id?: number;
+  business_company?: string;
+  business_plan_nom?: string;
+  business_admin_nom?: string;
+  business_admin_id?: number;
 }
 
 export interface SanteService {

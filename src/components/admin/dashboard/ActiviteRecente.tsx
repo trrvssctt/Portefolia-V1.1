@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { Building2, Crown } from 'lucide-react';
 import type { Transaction, NouvelInscrit } from '@/hooks/useAdminDashboard';
 import { formatFCFA } from '@/utils/formatFinancial';
 import { formatTimeAgo } from '@/utils/formatTimeAgo';
@@ -195,19 +196,55 @@ function ColonneTransactions({ transactions }: { transactions: Transaction[] }) 
 
 function LigneInscrit({ inscrit, isLast }: { inscrit: NouvelInscrit; isLast: boolean }) {
   const nom = safeName(inscrit.nom, inscrit.id);
+  const isBusinessMember = inscrit.user_role === 'BUSINESS_MEMBER';
 
   return (
     <div>
       <div className="flex items-center gap-3 py-2.5">
-        <Avatar nom={nom} bg="#F3F4F6" color="#6B7280" />
+        <Avatar
+          nom={nom}
+          bg={isBusinessMember ? '#EDE9FE' : '#F3F4F6'}
+          color={isBusinessMember ? '#6D28D9' : '#6B7280'}
+        />
 
         <div className="flex-1 min-w-0">
-          <p className="text-[12px] font-bold text-gray-800 leading-tight truncate">{nom}</p>
-          <p className="text-[10px] text-gray-400 leading-tight truncate">{inscrit.email}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-[12px] font-bold text-gray-800 leading-tight truncate">{nom}</p>
+            {isBusinessMember && (
+              <span
+                className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                style={{ backgroundColor: '#EDE9FE', color: '#6D28D9' }}
+              >
+                <Building2 size={8} />Invité
+              </span>
+            )}
+          </div>
+          {isBusinessMember && inscrit.business_company ? (
+            <p className="text-[10px] leading-tight truncate" style={{ color: '#7C3AED' }}>
+              {inscrit.business_company}
+            </p>
+          ) : (
+            <p className="text-[10px] text-gray-400 leading-tight truncate">{inscrit.email}</p>
+          )}
+          {isBusinessMember && inscrit.business_admin_nom && (
+            <p className="text-[9px] text-gray-400 leading-tight flex items-center gap-0.5">
+              <Crown size={8} style={{ color: '#7C3AED' }} />
+              Admin : {inscrit.business_admin_nom}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col items-end gap-1 shrink-0">
-          <BadgeStatutAbonne status={inscrit.subscription_status} plan={inscrit.plan_nom} />
+          {isBusinessMember ? (
+            <span
+              className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded"
+              style={{ backgroundColor: '#EDE9FE', color: '#6D28D9' }}
+            >
+              <Crown size={8} />{inscrit.business_plan_nom || 'Business'}
+            </span>
+          ) : (
+            <BadgeStatutAbonne status={inscrit.subscription_status} plan={inscrit.plan_nom} />
+          )}
           <p className="text-[9px] text-gray-400">{formatTimeAgo(inscrit.created_at)}</p>
         </div>
       </div>
