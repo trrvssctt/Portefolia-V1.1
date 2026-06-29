@@ -3,7 +3,7 @@ import {
   Users, Clock, AlertCircle, XCircle,
   MoreVertical, Mail, Edit2, RefreshCw,
   Lock, Unlock, Eye, ChevronLeft, ChevronRight,
-  Briefcase, Download,
+  Briefcase, Download, Building2, Crown,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -610,10 +610,11 @@ export default function ClientsListView({ onSelectClient, selectedClientId }: Pr
           <EmptyState onReset={resetFiltres} />
         ) : (
           clients.map((client, index) => {
-            const isSelected  = client.id === selectedClientId;
-            const isBloque    = client.statut_compte === 'BLOQUÉ';
-            const isInactif   = client.statut_compte === 'inactif';
-            const bg          = rowBg(client.subscription_status, client.statut_compte, index);
+            const isSelected    = client.id === selectedClientId;
+            const isBloque      = client.statut_compte === 'BLOQUÉ';
+            const isInactif     = client.statut_compte === 'inactif';
+            const isBusinessMember = client.user_role === 'BUSINESS_MEMBER';
+            const bg            = rowBg(client.subscription_status, client.statut_compte, index);
 
             return (
               <div
@@ -636,8 +637,22 @@ export default function ClientsListView({ onSelectClient, selectedClientId }: Pr
                     {initiales(client.prenom, client.nom)}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-gray-800 truncate">{client.nom_complet}</p>
-                    <p className="text-[10px] text-gray-400">{formatDateCourte(client.date_inscription)}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-xs font-semibold text-gray-800 truncate">{client.nom_complet}</p>
+                      {isBusinessMember && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+                          style={{ backgroundColor: '#EDE9FE', color: '#6D28D9' }}>
+                          <Building2 size={9} />Invité
+                        </span>
+                      )}
+                    </div>
+                    {isBusinessMember && client.business_company ? (
+                      <p className="text-[10px] truncate" style={{ color: '#7C3AED' }}>
+                        {client.business_company}
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-gray-400">{formatDateCourte(client.date_inscription)}</p>
+                    )}
                   </div>
                 </div>
 
@@ -651,7 +666,21 @@ export default function ClientsListView({ onSelectClient, selectedClientId }: Pr
 
                 {/* Plan */}
                 <div>
-                  <PlanBadge name={client.plan_nom} />
+                  {isBusinessMember ? (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded"
+                        style={{ backgroundColor: '#EDE9FE', color: '#6D28D9' }}>
+                        <Crown size={8} />{client.business_plan_nom || 'Business'}
+                      </span>
+                      {client.business_admin_nom && (
+                        <p className="text-[9px] text-gray-400 truncate" title={`Admin: ${client.business_admin_nom}`}>
+                          Admin: {client.business_admin_nom.split(' ')[0]}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <PlanBadge name={client.plan_nom} />
+                  )}
                 </div>
 
                 {/* Abonnement */}

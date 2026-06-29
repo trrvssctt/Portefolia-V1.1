@@ -5,7 +5,7 @@ import {
   Mail, Phone, MapPin, Calendar, CreditCard, Clock,
   RefreshCw, TrendingUp, Edit2, Lock, Unlock, Send,
   Copy, X, Check, ExternalLink, Briefcase, AlertTriangle,
-  FileText, LayoutTemplate, KeyRound,
+  FileText, LayoutTemplate, KeyRound, Building2, Crown,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -1019,7 +1019,27 @@ export default function ClientProfil360({ clientId, onClose }: Props) {
         style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}
       >
         {/* Bande verte de connexion */}
-        <div className="h-0.5 w-full" style={{ backgroundColor: GREEN }} />
+        <div className="h-0.5 w-full" style={{ backgroundColor: infos.user_role === 'BUSINESS_MEMBER' ? '#7C3AED' : GREEN }} />
+
+        {/* ── Bannière membre business ───────────────────────────────────────── */}
+        {infos.user_role === 'BUSINESS_MEMBER' && (
+          <div className="flex items-center gap-2 px-4 py-2 text-xs" style={{ backgroundColor: '#F5F3FF', borderBottom: '1px solid #DDD6FE' }}>
+            <Building2 size={13} style={{ color: '#7C3AED' }} className="shrink-0" />
+            <span style={{ color: '#5B21B6' }}>
+              Compte invité du plan{' '}
+              <strong>{infos.business_plan_nom || 'Business'}</strong>
+              {infos.business_company ? (
+                <> — entreprise <strong>{infos.business_company}</strong></>
+              ) : null}
+            </span>
+            {infos.business_admin_nom && (
+              <span className="ml-auto flex items-center gap-1 font-medium" style={{ color: '#6D28D9' }}>
+                <Crown size={11} />
+                Admin : {infos.business_admin_nom}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* ── Header ────────────────────────────────────────────────────────── */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">

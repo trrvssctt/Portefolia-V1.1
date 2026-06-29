@@ -64,6 +64,13 @@ export interface ClientListItem {
   jours_restants?: number;
   nb_portfolios: number;
   ca_total: number;
+  user_role?: string;
+  business_account_id?: number;
+  business_company?: string;
+  business_plan_nom?: string;
+  business_admin_nom?: string;
+  business_admin_email?: string;
+  business_admin_id?: number;
 }
 
 export interface ClientProfil360 {

@@ -41,11 +41,18 @@ async function getClientInfos(id) {
       u.phone AS telephone,
       NULL AS ville,
       u.date_inscription,
+      u.role AS user_role,
       u.statut, u.statut AS statut_compte, u.subscription_status,
       u.last_payment_at, u.next_billing_date,
       pl.name AS plan_nom, pl.id AS plan_id, pl.price_cents AS plan_prix,
       (SELECT COUNT(*) FROM portfolios p WHERE p.utilisateur_id = u.id) AS nb_portfolios,
-      ${CA_SUBQUERY}
+      ${CA_SUBQUERY},
+      ba.id AS business_account_id,
+      ba.company_name AS business_company,
+      bpl.name AS business_plan_nom,
+      CONCAT(admin_u.prenom, ' ', admin_u.nom) AS business_admin_nom,
+      admin_u.email AS business_admin_email,
+      admin_u.id AS business_admin_id
     FROM utilisateurs u
     LEFT JOIN (
       SELECT a.* FROM abonnements a
@@ -57,6 +64,9 @@ async function getClientInfos(id) {
       ) latest ON a.id = latest.max_id
     ) a ON a.utilisateur_id = u.id
     LEFT JOIN plans pl ON a.plan_id = pl.id
+    LEFT JOIN business_accounts ba ON ba.id = u.business_account_id AND ba.deleted_at IS NULL
+    LEFT JOIN utilisateurs admin_u ON admin_u.id = ba.admin_user_id
+    LEFT JOIN plans bpl ON bpl.id = ba.plan_id
     WHERE u.id = ?
     LIMIT 1
   `, [id]);
@@ -230,6 +240,7 @@ async function listClients(req, res) {
         u.phone AS telephone,
         NULL AS ville,
         u.date_inscription,
+        u.role AS user_role,
         u.statut AS statut_compte,
         u.subscription_status,
         u.last_payment_at, u.next_billing_date,
@@ -237,10 +248,19 @@ async function listClients(req, res) {
         a.statut_v2 AS abonnement_statut, a.date_echeance,
         DATEDIFF(a.date_echeance, NOW()) AS jours_restants,
         (SELECT COUNT(*) FROM portfolios p WHERE p.utilisateur_id = u.id) AS nb_portfolios,
-        ${CA_SUBQUERY}
+        ${CA_SUBQUERY},
+        ba.id AS business_account_id,
+        ba.company_name AS business_company,
+        bpl.name AS business_plan_nom,
+        CONCAT(admin_u.prenom, ' ', admin_u.nom) AS business_admin_nom,
+        admin_u.email AS business_admin_email,
+        admin_u.id AS business_admin_id
       FROM utilisateurs u
       LEFT JOIN ${LAST_ABO} a ON a.utilisateur_id = u.id
       LEFT JOIN plans pl ON a.plan_id = pl.id
+      LEFT JOIN business_accounts ba ON ba.id = u.business_account_id AND ba.deleted_at IS NULL
+      LEFT JOIN utilisateurs admin_u ON admin_u.id = ba.admin_user_id
+      LEFT JOIN plans bpl ON bpl.id = ba.plan_id
       WHERE u.role IN ('USER', 'BUSINESS_MEMBER')
         AND (? IS NULL OR (u.nom LIKE ? OR u.prenom LIKE ? OR u.email LIKE ? OR u.phone LIKE ?))
         AND (? IS NULL OR u.subscription_status = ?)
