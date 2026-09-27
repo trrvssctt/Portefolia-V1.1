@@ -61,10 +61,20 @@ async function uploadToCloudinary(req, res) {
       if (!detectedMime.startsWith('image/')) resourceType = 'raw';
     }
 
+    // Fichiers "raw" (PDF, DOCX…) : garder l'extension dans le public_id, sinon
+    // Cloudinary les sert sans extension en application/octet-stream (illisibles sur mobile)
+    const RAW_EXT = {
+      'application/pdf': 'pdf',
+      'application/msword': 'doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    };
+    const rawExt = resourceType === 'raw' ? RAW_EXT[detectedMime] : null;
+
     const result = await cloudinary.uploader.upload(payload, {
       folder: req.body?.folder || process.env.CLOUDINARY_UPLOAD_FOLDER || 'portfolios',
       resource_type: resourceType,
       overwrite: false,
+      ...(rawExt ? { public_id: `${require('crypto').randomBytes(10).toString('hex')}.${rawExt}` } : {}),
     });
 
     return res.json({ url: result.secure_url, raw: result });

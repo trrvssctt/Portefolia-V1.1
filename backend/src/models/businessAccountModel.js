@@ -108,6 +108,10 @@ async function init() {
     if (!existing.has('business_account_id')) {
       await pool.query('ALTER TABLE portfolios ADD COLUMN business_account_id INT NULL');
     }
+    // Choix du membre : afficher ou non le logo de l'entreprise sur son portfolio
+    if (!existing.has('show_company_logo')) {
+      await pool.query('ALTER TABLE portfolios ADD COLUMN show_company_logo TINYINT(1) NOT NULL DEFAULT 0');
+    }
   } catch (err) {
     console.warn('businessAccountModel.init: could not add portfolio columns:', err.message);
   }
@@ -222,7 +226,9 @@ async function listMembers(business_account_id) {
   const [rows] = await pool.query(`
     SELECT bm.*,
            u.nom, u.prenom, u.email AS user_email, u.photo_profil,
-           (SELECT COUNT(*) FROM portfolios p WHERE p.utilisateur_id = bm.user_id AND p.portfolio_type = 'business') AS portfolio_count
+           (SELECT COUNT(*) FROM portfolios p
+             WHERE p.utilisateur_id = bm.user_id
+               AND (p.deleted_at IS NULL OR p.deleted_at = '0000-00-00 00:00:00')) AS portfolio_count
     FROM business_members bm
     LEFT JOIN utilisateurs u ON u.id = bm.user_id
     WHERE bm.business_account_id = ?
@@ -276,6 +282,7 @@ async function getMemberProfile(member_id, business_account_id) {
     ORDER BY created_at DESC
   `, [member.user_id]);
 
+  member.portfolio_count = portfolios.length;
   return { member, portfolios };
 }
 

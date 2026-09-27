@@ -140,6 +140,18 @@ async function create(req, res) {
       console.warn(`[portfolioController.create] social links limit exceeded user=${userId} provided=${providedSocials} limit=${socialLimit}`);
       return res.status(400).json({ error: `Plan ${planLabel} : vous ne pouvez ajouter que ${socialLimit} lien(s) de réseaux sociaux.` });
     }
+    // Portfolio créé depuis un espace Business : rattacher au compte entreprise
+    let businessAccountId = null;
+    if (isBusinessRole) {
+      const [baRows] = await pool.query(`
+        SELECT ba.id FROM business_accounts ba
+        LEFT JOIN business_members bm ON bm.business_account_id = ba.id AND bm.user_id = ? AND bm.status = 'active'
+        WHERE ba.deleted_at IS NULL AND (ba.admin_user_id = ? OR bm.id IS NOT NULL)
+        LIMIT 1
+      `, [userId, userId]);
+      businessAccountId = baRows[0]?.id ?? null;
+    }
+
     // Map frontend fields to French DB columns (SEULEMENT les champs du schéma)
     const mapped = {
       utilisateur_id: userId,
@@ -168,6 +180,10 @@ async function create(req, res) {
       twitter_url: incoming.twitter_url || null,
       facebook_url: incoming.facebook_url || null,
       instagram_url: incoming.instagram_url || null,
+      // business fields
+      portfolio_type: businessAccountId ? 'business' : null,
+      business_account_id: businessAccountId,
+      show_company_logo: businessAccountId ? (incoming.show_company_logo ? 1 : 0) : null,
     };
     const keys = Object.keys(mapped).filter(k => mapped[k] !== undefined && mapped[k] !== null).join(', ');
     const placeholders = Object.keys(mapped).filter(k => mapped[k] !== undefined && mapped[k] !== null).map(() => '?').join(', ');
@@ -345,6 +361,7 @@ async function update(req, res) {
   if (incoming.domain !== undefined || incoming.domaine !== undefined) mappedUpdate.domain = incoming.domain || incoming.domaine;
   if (incoming.template_id !== undefined) mappedUpdate.template_id = incoming.template_id;
   if (incoming.template_variant !== undefined) mappedUpdate.template_variant = incoming.template_variant;
+  if (incoming.show_company_logo !== undefined) mappedUpdate.show_company_logo = incoming.show_company_logo ? 1 : 0;
   // handle enum column `domaines` if provided
   if (incoming.domaines !== undefined || incoming.domain !== undefined || incoming.domaine !== undefined || incoming.domain_enum !== undefined) {
     const val = incoming.domaines || incoming.domain || incoming.domaine || incoming.domain_enum;
@@ -652,6 +669,7 @@ async function getPublicBySlug(req, res) {
         website_url:     biz.website_url     || null,
         role_label:      biz.poste || (biz.member_role === 'admin' ? 'Administrateur' : 'Collaborateur'),
         is_admin:        false,
+        show_logo:       !!Number(portfolio.show_company_logo),
       };
     } else {
       // Cherche en tant qu'admin
@@ -674,6 +692,7 @@ async function getPublicBySlug(req, res) {
           website_url:     biz.website_url     || null,
           role_label:      'Administrateur',
           is_admin:        true,
+          show_logo:       !!Number(portfolio.show_company_logo),
         };
       }
     }

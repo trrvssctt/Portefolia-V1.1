@@ -861,6 +861,7 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
     font_family: '',
     layout_style: 'modern' as 'classic' | 'modern' | 'minimal' | 'bold',
     template_id: 'tpl-1',
+    show_company_logo: true,
   });
 
   const [hintTpl, setHintTpl] = React.useState<PortfolioTemplate | null>(null);
@@ -976,6 +977,7 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
       font_family: portfolio.font_family || '',
       layout_style: portfolio.layout_style || 'modern',
       template_id: portfolio.template_id || portfolio.template || 'tpl-1',
+      show_company_logo: portfolio.show_company_logo !== undefined && portfolio.show_company_logo !== null ? !!Number(portfolio.show_company_logo) : true,
       projects: (portfolio.projects || portfolio.projets || []).map((p: any) => ({
         titre: p.titre || p.title || '', description: p.description || '',
         lien_demo: p.lien_demo || p.demo_url || '', lien_code: p.lien_code || p.code_url || '', image: p.image || p.image_url || null,
@@ -1042,6 +1044,7 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
         return;
       }
       const payload: any = { ...formData };
+      if (!isBusiness) delete payload.show_company_logo;
       const selectedTpl = templateById(payload.template_id || 'tpl-1');
       payload.template_family   = selectedTpl.family;
       payload.template_variant  = selectedTpl.variant;
@@ -1480,6 +1483,16 @@ export const PortfolioForm: React.FC<PortfolioFormProps> = ({ portfolio, onClose
                       <CheckCircle2 className="w-3.5 h-3.5" />Appliquer
                     </Button>
                   </div>
+                )}
+                {businessAccount?.company_logo_url && (
+                  <label htmlFor="show_company_logo" className="mb-5 flex items-center gap-3 p-4 bg-white border border-amber-200 rounded-xl cursor-pointer hover:bg-amber-50/40 transition-colors">
+                    <Checkbox id="show_company_logo" checked={formData.show_company_logo} onCheckedChange={v => setFormData(prev => ({ ...prev, show_company_logo: !!v }))} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">Afficher le logo de l'entreprise</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Le logo de {businessAccount.company_name || 'votre entreprise'} apparaîtra en haut de votre portfolio</p>
+                    </div>
+                    <img src={businessAccount.company_logo_url} alt={businessAccount.company_name} className={`ml-auto h-8 w-auto max-w-[80px] object-contain rounded shrink-0 ${formData.show_company_logo ? '' : 'opacity-30 grayscale'}`} />
+                  </label>
                 )}
                 <div className="mb-5">
                   <Label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 mb-1.5"><Type className="w-3.5 h-3.5" />Police du portfolio</Label>

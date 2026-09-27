@@ -224,14 +224,14 @@ function TplSocialRow({ d, t, accent, center = false }: { d: D; t: Theme; accent
 function CvBtn({ d, accent }: { d: D; accent: string }) {
   if (!d.cv) return null;
   return (
-    <a href={d.cv} target="_blank" rel="noopener noreferrer" style={{
+    <button type="button" onClick={() => downloadCV(d.cv, d.titre || 'Profil')} style={{
       display: 'inline-flex', alignItems: 'center', gap: 8,
-      height: 44, padding: '0 20px', borderRadius: 8,
+      height: 44, padding: '0 20px', borderRadius: 8, border: 'none', cursor: 'pointer',
       background: accent, color: onAccent(accent),
       fontWeight: 600, fontSize: 15, marginTop: 18, textDecoration: 'none',
     }}>
       <Download size={16} /> Télécharger le CV
-    </a>
+    </button>
   );
 }
 
@@ -760,33 +760,49 @@ const FAMILY_LABELS: Record<string, string> = {
   editorial: 'Éditorial', classique: 'Classique', minimal: 'Minimal', sombre: 'Sombre',
 };
 
+const PF_LOGO = '/lovable-uploads/logo_portefolia_remove_bg.png';
+const PF_LOGO_DARK: CSSProperties = { filter: 'brightness(0) invert(1)' };
+
 function TopBar({ portfolio, accent, dark, onCopy, copied }: {
   portfolio: any; accent: string; dark: boolean; onCopy: () => void; copied: boolean;
 }) {
   const isLoggedIn = !!localStorage.getItem('token');
   const family  = portfolio.template_family  || 'editorial';
   const variant = portfolio.template_variant || '';
+  const biz     = portfolio.business;
+  const bizLogo = biz?.show_logo && biz.company_logo_url && !String(biz.company_logo_url).startsWith('data:')
+    ? biz.company_logo_url : null;
   return (
     <div className={`sticky top-0 z-40 backdrop-blur-md border-b ${dark ? 'bg-black/40 border-white/10' : 'bg-white/90 border-zinc-200/80'}`}>
       <div className="max-w-5xl mx-auto px-5 sm:px-8 h-14 flex items-center justify-between">
-        {isLoggedIn ? (
-          <a href="/dashboard" className={`flex items-center gap-2 text-sm font-medium transition-colors ${dark ? 'text-white/60 hover:text-white' : 'text-zinc-500 hover:text-zinc-900'}`}>
-            <ArrowLeft size={15} /> Tableau de bord
+        <div className="flex items-center gap-3 min-w-0">
+          {isLoggedIn && (
+            <a href="/dashboard" title="Tableau de bord" className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${dark ? 'text-white/60 hover:text-white' : 'text-zinc-500 hover:text-zinc-900'}`}>
+              <ArrowLeft size={15} /> <span className="hidden md:inline">Tableau de bord</span>
+            </a>
+          )}
+          <a href="/" className="flex items-center shrink-0" aria-label="Portefolia">
+            <img src={PF_LOGO} alt="Portefolia" className="h-7 sm:h-8 w-auto object-contain" style={dark ? PF_LOGO_DARK : undefined} />
           </a>
+        </div>
+        {bizLogo ? (
+          <span className={`flex items-center gap-2 min-w-0 text-sm font-semibold ${dark ? 'text-white' : 'text-zinc-800'}`}>
+            <img src={bizLogo} alt={biz.company_name} className={`h-8 w-auto max-w-[120px] object-contain rounded ${dark ? 'bg-white p-0.5' : ''}`} />
+            <span className="hidden sm:block truncate">{biz.company_name}</span>
+          </span>
         ) : (
-          <a href="/" className="text-sm font-bold" style={{ color: accent }}>Portefolia</a>
+          <span className={`hidden sm:flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${dark ? 'bg-white/10 text-white/70' : 'bg-zinc-100 text-zinc-500'}`}>
+            {FAMILY_LABELS[family] || 'Template'}
+            {variant && <span className="opacity-60">· {variant}</span>}
+          </span>
         )}
-        <span className={`hidden sm:flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${dark ? 'bg-white/10 text-white/70' : 'bg-zinc-100 text-zinc-500'}`}>
-          {FAMILY_LABELS[family] || 'Template'}
-          {variant && <span className="opacity-60">· {variant}</span>}
-        </span>
         <div className="flex items-center gap-2">
           <button onClick={onCopy} className={`hidden sm:flex items-center gap-1.5 h-9 px-3.5 rounded-xl border text-sm font-medium transition-colors ${dark ? 'border-white/15 text-white hover:bg-white/10' : 'border-zinc-200 text-zinc-800 hover:bg-zinc-50'}`}>
             {copied ? <Check size={14} /> : <Copy size={14} />}
             {copied ? 'Copié !' : 'Copier le lien'}
           </button>
           {portfolio.cv_url && (
-            <button onClick={() => downloadCV(portfolio.cv_url, portfolio.full_name || portfolio.nom || 'Profil')}
+            <button onClick={() => downloadCV(portfolio.cv_url, portfolio.title || portfolio.full_name || portfolio.nom || 'Profil')}
               className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-sm font-semibold text-white transition-colors"
               style={{ background: accent }}>
               <Download size={14} /> CV
@@ -802,10 +818,13 @@ function TopBar({ portfolio, accent, dark, onCopy, copied }: {
 function PageFooter({ portfolio, dark, accent }: { portfolio: any; dark: boolean; accent: string }) {
   return (
     <footer className={`border-t mt-12 ${dark ? 'border-white/10' : 'border-zinc-200'}`}>
-      <div className={`max-w-5xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between text-sm ${dark ? 'text-white/40' : 'text-zinc-400'}`}>
-        <span>© {new Date().getFullYear()} {portfolio.title}</span>
-        <div className="flex items-center gap-3">
-          <span className="hidden sm:block">Créé avec <span className="font-semibold" style={{ color: accent }}>Portefolia</span></span>
+      <div className={`max-w-5xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-3 text-sm ${dark ? 'text-white/40' : 'text-zinc-400'}`}>
+        <span className="truncate min-w-0">© {new Date().getFullYear()} {portfolio.title}</span>
+        <div className="flex items-center gap-3 shrink-0">
+          <a href="/" className="flex items-center gap-2 shrink-0" aria-label="Portefolia">
+            <span className="hidden sm:inline">Créé avec</span>
+            <img src={PF_LOGO} alt="Portefolia" className="h-6 w-auto object-contain" style={dark ? PF_LOGO_DARK : undefined} />
+          </a>
           <a href="/" className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-white" style={{ background: accent }}>
             Créer le vôtre
           </a>
