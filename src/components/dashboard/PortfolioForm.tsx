@@ -69,8 +69,8 @@ const PLAN_CONFIG: Record<PlanType, {
     bgColor: 'bg-gray-100',
     borderColor: 'border-gray-300',
     icon: <Star className="w-3.5 h-3.5" />,
-    limits: { socials: 1, projects: 0, competences: 0, experiences: 0 },
-    features: ['1 portfolio', 'Photo + biographie', '1 lien social (LinkedIn)'],
+    limits: { socials: 1, projects: 2, competences: 2, experiences: 1 },
+    features: ['1 portfolio', 'Photo + biographie', '1 lien social (LinkedIn)', '2 projets', '2 compétences', '1 expérience'],
   },
   starter: {
     label: 'Starter',

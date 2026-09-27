@@ -218,14 +218,14 @@ async function create(req, res) {
     }
 
     // Persist related records if provided using the same connection (map to French columns)
-    // For free plans we disallow adding related items on creation
-    if (!effectivelyFree && Array.isArray(req.body.projects) && req.body.projects.length > 0) {
-      // Limit projects: Starter=3, Pro=10, others unlimited
-      const projectLimit = isStarterPlan ? 3 : (isProPlan ? 10 : Infinity);
+    const createPlanLabel = effectivelyFree ? 'Gratuit' : isStarterPlan ? 'Starter' : isProPlan ? 'Professionnel' : 'Avancé';
+    if (Array.isArray(req.body.projects) && req.body.projects.length > 0) {
+      // Limit projects: Free=2, Starter=3, Pro=10, others unlimited
+      const projectLimit = effectivelyFree ? 2 : isStarterPlan ? 3 : (isProPlan ? 10 : Infinity);
       if (req.body.projects.length > projectLimit) {
         await conn.rollback();
         conn.release();
-        return res.status(400).json({ error: `Plan ${isStarterPlan ? 'Starter' : (isProPlan ? 'Professionnel' : 'Avancé')} : maximum ${projectLimit} projets par portfolio.` });
+        return res.status(400).json({ error: `Plan ${createPlanLabel} : maximum ${projectLimit} projets par portfolio.` });
       }
       for (const p of req.body.projects) {
         const projMapped = {
@@ -244,13 +244,13 @@ async function create(req, res) {
         await conn.query(`INSERT INTO projets (${k}) VALUES (${ph})`, vals);
       }
     }
-    if (!effectivelyFree && Array.isArray(req.body.competences) && req.body.competences.length > 0) {
-      // Limit competences: Starter=3, Pro=10, others unlimited
-      const competenceLimit = isStarterPlan ? 3 : (isProPlan ? 10 : Infinity);
+    if (Array.isArray(req.body.competences) && req.body.competences.length > 0) {
+      // Limit competences: Free=2, Starter=3, Pro=10, others unlimited
+      const competenceLimit = effectivelyFree ? 2 : isStarterPlan ? 3 : (isProPlan ? 10 : Infinity);
       if (req.body.competences.length > competenceLimit) {
         await conn.rollback();
         conn.release();
-        return res.status(400).json({ error: `Plan ${isStarterPlan ? 'Starter' : (isProPlan ? 'Professionnel' : 'Avancé')} : maximum ${competenceLimit} compétences par portfolio.` });
+        return res.status(400).json({ error: `Plan ${createPlanLabel} : maximum ${competenceLimit} compétences par portfolio.` });
       }
       for (const c of req.body.competences) {
         const compMapped = {
@@ -265,16 +265,16 @@ async function create(req, res) {
         await conn.query(`INSERT INTO competences (${k}) VALUES (${ph})`, vals);
       }
     }
-    if (!effectivelyFree && Array.isArray(req.body.experiences) && req.body.experiences.length > 0) {
-      // Limit experiences: Starter=0 (not allowed), Pro=5, others unlimited
-      const experienceLimit = isStarterPlan ? 0 : (isProPlan ? 5 : Infinity);
+    if (Array.isArray(req.body.experiences) && req.body.experiences.length > 0) {
+      // Limit experiences: Free=1, Starter=0 (not allowed), Pro=5, others unlimited
+      const experienceLimit = effectivelyFree ? 1 : isStarterPlan ? 0 : (isProPlan ? 5 : Infinity);
       if (req.body.experiences.length > experienceLimit) {
         await conn.rollback();
         conn.release();
         if (experienceLimit === 0) {
           return res.status(400).json({ error: 'Plan Starter : ajout d\'expériences non autorisé.' });
         }
-        return res.status(400).json({ error: `Plan ${isProPlan ? 'Professionnel' : 'Avancé'} : maximum ${experienceLimit} expériences par portfolio.` });
+        return res.status(400).json({ error: `Plan ${createPlanLabel} : maximum ${experienceLimit} expérience(s) par portfolio.` });
       }
       for (const e of req.body.experiences) {
         const expMapped = {
@@ -468,31 +468,32 @@ async function update(req, res) {
       }
 
       // Enforce project/competence/experience limits for updates as well
+      const updatePlanLabel = effectivelyFreeUpdate ? 'Gratuit' : isStarter ? 'Starter' : isPro ? 'Professionnel' : 'Avancé';
       if (Array.isArray(req.body.projects)) {
-        const projectLimitUpdate = isStarter ? 3 : (isPro ? 10 : Infinity);
+        const projectLimitUpdate = effectivelyFreeUpdate ? 2 : isStarter ? 3 : (isPro ? 10 : Infinity);
         if (req.body.projects.length > projectLimitUpdate) {
           await conn.rollback();
           conn.release();
-          return res.status(400).json({ error: `Plan ${isStarter ? 'Starter' : (isPro ? 'Professionnel' : 'Avancé')} : maximum ${projectLimitUpdate} projets par portfolio.` });
+          return res.status(400).json({ error: `Plan ${updatePlanLabel} : maximum ${projectLimitUpdate} projets par portfolio.` });
         }
       }
       if (Array.isArray(req.body.competences)) {
-        const competenceLimitUpdate = isStarter ? 3 : (isPro ? 10 : Infinity);
+        const competenceLimitUpdate = effectivelyFreeUpdate ? 2 : isStarter ? 3 : (isPro ? 10 : Infinity);
         if (req.body.competences.length > competenceLimitUpdate) {
           await conn.rollback();
           conn.release();
-          return res.status(400).json({ error: `Plan ${isStarter ? 'Starter' : (isPro ? 'Professionnel' : 'Avancé')} : maximum ${competenceLimitUpdate} compétences par portfolio.` });
+          return res.status(400).json({ error: `Plan ${updatePlanLabel} : maximum ${competenceLimitUpdate} compétences par portfolio.` });
         }
       }
       if (Array.isArray(req.body.experiences)) {
-        const experienceLimitUpdate = isStarter ? 0 : (isPro ? 5 : Infinity);
+        const experienceLimitUpdate = effectivelyFreeUpdate ? 1 : isStarter ? 0 : (isPro ? 5 : Infinity);
         if (req.body.experiences.length > experienceLimitUpdate) {
           await conn.rollback();
           conn.release();
           if (experienceLimitUpdate === 0) {
             return res.status(400).json({ error: 'Plan Starter : ajout d\'expériences non autorisé.' });
           }
-          return res.status(400).json({ error: `Plan ${isPro ? 'Professionnel' : 'Avancé'} : maximum ${experienceLimitUpdate} expériences par portfolio.` });
+          return res.status(400).json({ error: `Plan ${updatePlanLabel} : maximum ${experienceLimitUpdate} expérience(s) par portfolio.` });
         }
       }
 

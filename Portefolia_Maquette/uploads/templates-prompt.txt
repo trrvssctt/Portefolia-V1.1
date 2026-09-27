@@ -1,0 +1,549 @@
+CLAUDE DESIGN — 46 TEMPLATES PORTFOLIO
+Prompt complet pour créer
+46 templates uniques
+pour Portefolia
+1 Essai · 5 Starter · 15 Pro · 25 Business — Chaque template = une identité visuelle unique
+0. Contexte & Philosophie
+Portefolia propose 46 templates de portfolio répartis sur 4 plans. Le problème actuel : les templates manquent d&apos;âme et de personnalité. Les utilisateurs du plan Essai disent que leur portfolio &apos;ne donne pas envie&apos;.
+Le vrai problème identifié — Pourquoi les templates actuels &apos;n&apos;ont pas d&apos;âme&apos;
+1. Hiérarchie typographique plate — tout a la même taille et le même poids
+2. Hero section générique — juste nom + titre sur fond blanc pur
+3. Zéro microinteraction — aucun effet au survol, aucune transition, aucune animation
+4. Pas de personnalité visuelle — template &apos;clean-modern&apos; sans couleur distinctive
+5. Sections sans identité — rien ne guide le regard du visiteur
+6. Fond blanc pur (#FFFFFF) = froid et clinique — jamais pour un portfolio
+La solution — 3 principes fondamentaux
+PRINCIPE 1 : Chaque template a une PERSONNALITÉ, pas juste une couleur différente
+  → Un nom évocateur, un registre émotionnel, un public cible précis
+PRINCIPE 2 : La hiérarchie typographique est la colonne vertébrale de chaque template
+  → Écarts de taille significatifs : 64px → 22px → 16px — jamais 2 éléments identiques
+PRINCIPE 3 : Les microinteractions sont obligatoires sur TOUS les templates
+  → Hover sur cards, transitions de sections, fade-in au scroll
+Règles communes à tous les 46 templates
+Élément
+Règle universelle
+Interdit
+Fond principal
+Jamais #FFFFFF pur — toujours une nuance légèrement teintée
+#FFFFFF pur comme bg-white
+Nom utilisateur
+Minimum 48px / font-weight 700 — pas négociable
+16-24px comme le body text
+Titre métier
+Couleur accent définie par le template, 18-22px
+Même couleur que le nom
+Labels de sections
+UPPERCASE / 11px / letter-spacing 0.08em / couleur accent
+Taille normale, pas d&apos;accent
+Cards projets
+Hover obligatoire : translateY(-4px) + shadow / transition 0.3s
+Cards sans état hover
+Hero section
+Un visuel distinctif : dégradé, couleur, texture, ou image
+Fond blanc uni sans accent
+Bio utilisateur
+16px / line-height 1.7 / couleur secondaire — jamais noire pure
+14px compact sans respiration
+Données manquantes
+Affichage conditionnel — si pas de photo, fallback élégant
+Espace vide ou placeholder moche
+1. Plan Essai — 1 Template : &apos;Clarté&apos;
+Un seul template pour le plan gratuit. Il doit être suffisamment bon pour convaincre, mais clairement moins riche que les templates payants. L&apos;objectif : donner envie d&apos;upgrader.
+PROMPT E-01  — Template &apos;Clarté&apos; — Plan Essai (Gratuit)
+TEMPLATE : "Clarté"
+PLAN : Essai (Gratuit)
+PERSONNALITÉ : Minimaliste lumineux — simple mais pas banal
+PUBLIC CIBLE : Étudiants, jeunes professionnels, débutants
+REGISTRE ÉMOTIONNEL : Confiance, clarté, professionnalisme accessible
+════════════════════════════════════════════
+IDENTITÉ VISUELLE
+════════════════════════════════════════════
+Fond principal    : #FAFAFA (légèrement gris, pas blanc pur)
+Fond sections alt : #FFFFFF (les sections alternent)
+Couleur accent    : #2E7D32 (vert Portefolia — personnalisable)
+Texte principal   : #1A1A2E
+Texte secondaire  : #5C5C5C
+Bordures          : #E8E8E8
+Typographie :
+  Nom      : Inter 700 / 48px / color: #1A1A2E / tracking: -0.02em
+  Titre    : Inter 400 / 18px / color: accent / letter-spacing: 0
+  Bio      : Inter 400 / 16px / line-height: 1.7 / color: #5C5C5C
+  Labels   : Inter 600 / 11px / UPPERCASE / letter-spacing: 0.08em / accent
+  Body     : Inter 400 / 15px / line-height: 1.6
+════════════════════════════════════════════
+STRUCTURE (sections dans l&apos;ordre)
+════════════════════════════════════════════
+1. NAVIGATION
+   Logo/Prénom à gauche (lien vers haut de page)
+   3 liens à droite : À propos · Projets · Contact
+   bg: #FAFAFA sticky, border-bottom: 1px solid #E8E8E8
+2. HERO SECTION
+   Layout : centré, padding-top 80px, padding-bottom 80px
+   Fond : dégradé subtil from #FAFAFA to #F0F7F0 (très léger vert)
+   Avatar/Photo : cercle 96px, border: 3px solid accent
+     Fallback si pas de photo : initiales sur fond accent, texte blanc
+   Nom : Inter 700 / 48px / #1A1A2E
+   Titre métier : Inter 400 / 18px / couleur accent
+   Bio courte (1-2 lignes max)
+   2 boutons côte à côte :
+     Primaire : "Voir mes projets" — bg accent, text blanc, radius 8px
+     Secondaire : "Me contacter" — outline accent, radius 8px
+   Icônes réseaux sociaux sous les boutons (LinkedIn, GitHub, email)
+3. SECTION À PROPOS
+   Label : "À PROPOS" en uppercase accent
+   Sous-titre : "Qui suis-je ?"
+   Layout 2 colonnes (texte gauche / compétences droite)
+   Bio complète (texte brut)
+   Compétences : pills colorées groupées par catégorie
+     bg: #E8F5E9, text: #2E7D32, radius: 20px, padding: 4px 12px
+4. SECTION PROJETS
+   Label : "PROJETS"
+   Grid 2 colonnes (1 colonne mobile)
+   Card projet :
+     bg: #FFFFFF
+     border: 1px solid #E8E8E8
+     border-radius: 12px
+     padding: 16px
+     Image projet en haut (ratio 16/9, object-fit: cover)
+     Titre projet : Inter 600 / 15px
+     Description courte : 2 lignes max, #5C5C5C
+     Tag catégorie : pill accent
+     HOVER OBLIGATOIRE :
+       transform: translateY(-4px)
+       box-shadow: 0 8px 24px rgba(0,0,0,0.10)
+       transition: all 0.3s ease
+       border-color: accent
+5. SECTION COMPÉTENCES (si données)
+   Label : "COMPÉTENCES"
+   Pills groupées par catégorie
+   Catégorie label : 11px uppercase #5C5C5C
+   Pills : même style qu&apos;à propos
+6. SECTION CONTACT
+   Label : "CONTACT"
+   Email cliquable : grand, accent
+   Liens réseaux sociaux : icônes + label
+   Localisation si disponible
+7. FOOTER
+   "Portfolio créé avec Portefolia · © 2026 [Nom]"
+   bg: #1A1A2E, texte blanc, 14px
+════════════════════════════════════════════
+DONNÉES MOCKÉES POUR LA MAQUETTE
+(utiliser des données sénégalaises réalistes)
+════════════════════════════════════════════
+Nom : Aminata Diallo
+Titre : Designer UX & Product · Dakar, Sénégal
+Bio : "Je crée des expériences numériques centrées sur
+      l&apos;utilisateur. Passionnée par le design inclusif
+      et les solutions adaptées au contexte africain."
+Projets : Wave App Redesign · Plateforme e-commerce Jumia ·
+          App mobile santé · Dashboard analytics
+Compétences : Figma · User Research · Prototypage ·
+              Adobe XD · Design System · Accessibilité
+LinkedIn : linkedin.com/in/aminata-diallo
+LIVRAISON : 1 fichier JSX complet + responsive mobile
+2. Plan Starter — 5 Templates
+5 templates distincts ciblant des profils différents. Chacun a sa propre personnalité visuelle tout en restant accessible. Niveau d&apos;élaboration : moyen — bon mais pas premium.
+PROMPT S-01  — Template &apos;Atlas&apos; — Professionnel Moderne
+TEMPLATE : "Atlas"
+PLAN : Starter
+PERSONNALITÉ : Professionnel moderne, ambitieux, structuré
+PUBLIC : Freelances, chefs de projet, consultants juniors
+PALETTE :
+  Fond : #F8F9FA | Accent : #1565C0 (bleu) | Texte : #1A1A2E
+HERO :
+  Fond : dégradé linéaire from #1565C0 to #0D47A1
+  Avatar avec ring blanc 3px
+  Nom : 52px / 700 / blanc
+  Titre : 20px / 400 / #90CAF9
+  3 stats sous le nom : [X] ans d&apos;expérience · [X] projets · [X] clients
+DIFFÉRENCIATEUR VISUEL :
+  Barre de navigation : bg blanc, logo + liens + CTA "Me recruter"
+  Section projets : grid 3 colonnes avec overlay coloré au hover
+  Overlay hover : bg #1565C0 opacity 80%, titre blanc visible
+  Section compétences : barres de progression animées au scroll
+  Timeline expériences : ligne verticale bleue avec points
+MICROINTERACTIONS :
+  Fade-in sections au scroll (Intersection Observer)
+  Hover cards : overlay couleur + titre
+  Compteurs stats animés au chargement
+PROMPT S-02  — Template &apos;Miel&apos; — Chaleur Créative
+TEMPLATE : "Miel"
+PLAN : Starter
+PERSONNALITÉ : Chaleureux, créatif, artisanal, humain
+PUBLIC : Artistes, illustrateurs, graphistes, créatifs
+PALETTE :
+  Fond : #FFFBF5 | Accent primaire : #E65100 | Accent secondaire : #FF8F00
+  Texte : #2C1810
+HERO :
+  Fond : dégradé from #FFF8F0 to #FFFBF5
+  Grande photo ou illustration en arrière-plan (opacité 15%)
+  Nom : Inter 800 / 56px / #2C1810 / style légèrement penché
+  Titre : 20px / script ou handwritten feel / couleur orange
+  Tagline créative : "Je transforme vos idées en visuels mémorables"
+DIFFÉRENCIATEUR VISUEL :
+  Navigation : bg transparent sticky → bg #FFFBF5 au scroll
+  Grid projets : masonry (colonnes inégales) — pas de grid uniforme
+  Cards arrondies : border-radius 16px — plus organic
+  Section à propos : photo grande + texte décalé (pas centré)
+  Accents décoratifs : petites formes géométriques orange dans les coins
+  Séparateurs de sections : vague SVG orange
+MICROINTERACTIONS :
+  Cards : hover scale(1.03) + shadow chaude rgba(230,81,0,0.15)
+  Navigation links : soulignement animé couleur orange
+PROMPT S-03  — Template &apos;Horizon&apos; — Développeur Tech
+TEMPLATE : "Horizon"
+PLAN : Starter
+PERSONNALITÉ : Tech, précis, moderne, logique
+PUBLIC : Développeurs, ingénieurs, data scientists
+PALETTE :
+  Fond : #0D1117 (dark mode) | Accent : #00B0FF | Text : #E6EDF3
+  Fond secondaire : #161B22 | Bordures : #30363D
+HERO :
+  Fond sombre avec grille de points subtile (pseudo-element CSS)
+  Texte : monospace pour le titre "const [name] = &apos;Seydou Fall&apos;;"
+  Blinking cursor animé après le nom
+  Badges technos : React · Node.js · Python · etc. sous le titre
+DIFFÉRENCIATEUR VISUEL :
+  Navigation : bg #0D1117 sticky avec bordure bottom #30363D
+  Cards projets : style "code card" — fond #161B22, border #30363D
+    Header card : petits ronds rouge/jaune/vert (style terminal)
+    Titre en font monospace
+  Section compétences : icônes de techno organisées en grille avec tooltips
+  Contribution graph (style GitHub) si données
+MICROINTERACTIONS :
+  Cards hover : border-color: #00B0FF, glow box-shadow bleu
+  Texte hero : effet de frappe au chargement (typewriter)
+  Compétences : apparition au scroll en cascade
+PROMPT S-04  — Template &apos;Nuit&apos; — Designer Élégant Dark
+TEMPLATE : "Nuit"
+PLAN : Starter
+PERSONNALITÉ : Élégant, sophistiqué, créatif haut de gamme
+PUBLIC : Designers UI/UX, motion designers, créatifs visuels
+PALETTE :
+  Fond : #1A1A2E | Accent : #BB86FC (violet) | Texte : #E8E8F0
+  Secondaire : #CF6679 | Fond cards : #242442
+HERO :
+  Fond : #1A1A2E avec subtle noise texture (filtre CSS)
+  Dégradé radial en arrière-plan : violet très sombre au centre
+  Nom : Inter 700 / 56px / blanc
+  Titre : Inter 300 / 22px / #BB86FC / uppercase / letter-spacing 0.2em
+  2 CTA : primaire violet rempli + secondaire outline blanc
+DIFFÉRENCIATEUR VISUEL :
+  Navigation transparente → fond #1A1A2E sticky
+  Cards projets : bg #242442, border 1px rgba(187,134,252,0.2)
+    Image avec overlay gradient vertical bas
+    Titre overlay en bas de l&apos;image
+  Section "Process" (si données) : étapes avec ligne violette
+  À propos : layout asymétrique — texte 60% + visuel 40%
+MICROINTERACTIONS :
+  Cards hover : border-color: #BB86FC + subtle glow violet
+  Navigation links : couleur violet au hover
+  Sections : fade-in depuis le bas au scroll
+PROMPT S-05  — Template &apos;Baobab&apos; — Africain Contemporain
+TEMPLATE : "Baobab"
+PLAN : Starter
+PERSONNALITÉ : Ancré dans la culture africaine, moderne, fier
+PUBLIC : Entrepreneurs africains, professionnels diaspora, marchés locaux
+PALETTE :
+  Fond : #FFFBF5 | Accent vert : #2E7D32 | Accent orange : #E65100
+  Accent gold : #C9A84C | Texte : #1A1A1A
+HERO :
+  Fond : motif géométrique inspiré des tissus africains (SVG subtle)
+  Couleurs du motif : vert et orange très légers (#F0FFF0, #FFF0E0)
+  Nom : Inter 800 / 54px / #1A1A1A
+  Titre : Inter 500 / 20px / vert #2E7D32
+  Tagline : "Shaping Africa&apos;s digital future"
+  Petits flags/icônes localisation Sénégal/Afrique
+DIFFÉRENCIATEUR VISUEL :
+  Section hero : bande décorative géométrique colorée (verte/orange)
+    sur le côté gauche (3px wide, full height)
+  Cards projets : accent border-left 4px orange ou vert alternés
+  Section compétences : pills avec couleurs africaines
+  Section À propos : stat "Impact local" mis en avant
+  Footer : message en français + wolof si disponible
+  Éléments décoratifs : formes inspirées art africain
+MICROINTERACTIONS :
+  Cards hover : border-left passe de 4px à 6px + couleur s&apos;intensifie
+  Apparitions au scroll avec légère rotation -2° → 0°
+3. Plan Pro — 15 Templates
+15 templates haut de gamme avec des identités visuelles très distinctes. Chaque template cible un profil métier ou une esthétique précise. Niveau d&apos;élaboration : élevé.
+PROMPT P-01  — Template &apos;Larsson&apos; — Editorial Scandinave
+TEMPLATE : "Larsson"
+PERSONNALITÉ : Editorial, épuré, scandinave, confiant
+PUBLIC : Designers graphiques, directeurs artistiques
+PALETTE : Fond #FAFAFA | Accent rouge #E63946 | Texte #1A1A2E
+HÉRO : Nom 64px/800 à gauche, image à droite (50/50 split layout)
+Typographie dominante : titres très grands, corps très petit
+Grid projets : 3 col, hover = scale image + apparition overlay texte
+Section "Selected Work" avec numérotation 01/02/03
+Séparateurs : lignes fines 1px #E8E8E8
+PROMPT P-02  — Template &apos;Obsidian&apos; — Dark Cinématique
+TEMPLATE : "Obsidian"
+PERSONNALITÉ : Cinématique, dramatique, luxueux, artistique
+PUBLIC : Photographes, vidéastes, motion designers
+PALETTE : Fond #0A0A0A | Accent gold #C9A84C | Texte #F5F5F5
+HÉRO : Image pleine hauteur (vh 100) + overlay sombre dégradé bas
+Nom en bas gauche de l&apos;image, très grand, blanc
+Grid projets : pleine largeur alternée gauche/droite avec grandes images
+Curseur personnalisé : petit cercle gold qui suit la souris
+Transitions de page : fade black entre les sections
+PROMPT P-03 à P-15  — Les 13 templates Pro restants — Guide complet
+Crée les 13 templates suivants avec le même niveau de détail
+que les exemples P-01 et P-02 ci-dessus.
+P-03 "Papier" — Texture éditoriale
+  PERSONNALITÉ : Littéraire, intellectuel, print-inspired
+  PALETTE : Fond #F5EDD6 (beige papier) | Texte #2C1810 | Accent sépia #8B5E3C
+  PUBLIC : Écrivains, journalistes, blogueurs
+  HERO : Grande typo serif pour le nom, fond texturé papier CSS
+  Cards : style cartes postales avec coins arrondis généreux
+P-04 "Organic" — Nature & Durabilité
+  PERSONNALITÉ : Authentique, durabilité, nature, impact positif
+  PALETTE : Fond #F0FFF4 | Vert profond #1B5E20 | Terre #795548
+  PUBLIC : ONG, ESG, développement durable
+  HERO : Photo de nature en bg avec overlay vert, nom blanc
+P-05 "Studio" — Mode & Lifestyle
+  PERSONNALITÉ : Glamour, tendance, haute couture
+  PALETTE : Fond #FFF0F3 | Rose #C2185B | Noir #1A1A2E
+  PUBLIC : Mode, beauté, stylistes, photographes mode
+  HERO : Style éditorial mode — image grande + texte minimal
+P-06 "Gradient" — Glassmorphism
+  PERSONNALITÉ : Futuriste, tech-luxe, immersif
+  PALETTE : Fond dégradé violet→bleu | Glass cards | Blanc
+  PUBLIC : Développeurs React/Vue, UI engineers
+  HERO : Fond dégradé animé (CSS gradient animation) + cards verre
+P-07 "Savane" — Afro-Contemporain
+  PERSONNALITÉ : Entrepreneuriat africain, dynamisme, modernité
+  PALETTE : Fond #FFF8E1 | Orange chaud #E65100 | Gold #C9A84C
+  PUBLIC : Entrepreneurs africains, business development
+  HERO : Motifs géométriques africains + nom grand bold orange
+P-08 "Blueprint" — Architecture & Ingénierie
+  PERSONNALITÉ : Précis, technique, architectural, rigoureux
+  PALETTE : Fond #F0F4FF | Bleu technique #1565C0 | Lignes #90CAF9
+  PUBLIC : Architectes, ingénieurs, urbanistes
+  HERO : Grille de construction en bg + nom en typo technique
+P-09 "Kodak" — Galerie Photo Fullscreen
+  PERSONNALITÉ : Visuel avant tout, minimaliste, galerie d&apos;art
+  PALETTE : Fond #0A0A0A | Accent #FFD600 | Minimal texte
+  PUBLIC : Photographes professionnels
+  HERO : Slideshow fullscreen des meilleures photos
+  Projets : galerie fullscreen, click pour zoom
+P-10 "Terminal" — Dev Dark Terminal
+  PERSONNALITÉ : Hacker, ultra-tech, nerdy-cool
+  PALETTE : Fond #0D1117 | Vert terminal #00FF41 | Police monospace
+  PUBLIC : Développeurs, ingénieurs sécurité, DevOps
+  HERO : Fausse fenêtre terminal avec animation frappe du nom
+P-11 "Luxe Rose" — Élégance Féminine
+  PERSONNALITÉ : Sophistiqué, premium, féminin, discret
+  PALETTE : Fond #FFF5F5 | Bordeaux #880E4F | Rose poudré #F8BBD9
+  PUBLIC : Consultantes, coaches, professionnelles premium
+  HERO : Délicat, épuré, grand espace blanc, typo fine
+P-12 "Aqua" — Frais & Dynamique
+  PERSONNALITÉ : Énergie, innovation, startup, optimiste
+  PALETTE : Fond #F0FFFF | Teal #006064 | Cyan vif #00BCD4
+  PUBLIC : Startups, product managers, growth hackers
+  HERO : Vagues SVG animées en bg + couleurs vives
+P-13 "Béton" — Brutaliste Moderne
+  PERSONNALITÉ : Avant-garde, provoquant, mémorable, bold
+  PALETTE : Fond #F5F5F5 | Noir #212121 | Orange vif #FF5722
+  PUBLIC : Artistes expérimentaux, directeurs créatifs rebelles
+  HERO : Nom en très grande typo condensée noir, prend 80% de l&apos;écran
+  Layout : asymétrique, oversized, brisure de grille
+P-14 "Consulting" — Corporate Sérieux
+  PERSONNALITÉ : Autorité, crédibilité, expertise, rigueur
+  PALETTE : Fond #F8FFF0 | Vert corporate #1B5E20 | Gris #37474F
+  PUBLIC : Consultants senior, avocats, experts-comptables
+  HERO : Sobre, professionnel, photo corporate, pas de fioritures
+  Layout : structuré comme une présentation professionnelle
+P-15 "Atelier" — Artisanat & Craft
+  PERSONNALITÉ : Authentique, fait main, chaleureux, expertise
+  PALETTE : Fond #FFF8F5 | Brun #4E342E | Terracotta #8D6E63
+  PUBLIC : Artisans, makers, créateurs, bijoutiers
+  HERO : Texture bois ou tissu en bg CSS + nom en serif élégant
+  Cards : style étiquettes kraft avec coins arrondis
+Pour chaque template P-03 à P-15 :
+  → 1 fichier JSX complet avec le même niveau de détail que P-01/P-02
+  → Données mockées sénégalaises réalistes
+  → Toutes les sections : hero / à propos / projets / compétences / contact
+  → Microinteractions adaptées à la personnalité du template
+  → 100% responsive mobile-first
+4. Plan Business — 25 Templates
+25 templates ultra-premium. Ces templates représentent le summum de Portefolia. Chaque template doit être impressionnant, distinctif et cibler un profil très précis.
+PROMPT B-01 à B-10  — Premiers 10 templates Business — Ultra-premium
+Crée les 10 premiers templates Business avec ce niveau d&apos;élaboration :
+B-01 "Obsidian X" — Dark luxury suprême
+  PERSONNALITÉ : Le plus luxueux de tous les templates
+  PALETTE : Fond #080808 | Gold #C9A84C | Blanc #FFFFFF
+  PUBLIC : PDG, C-Suite, executives internationaux
+  HERO : Fullscreen, nom en 80px/800, gold accent, animation particules
+  Curseur gold personnalisé qui suit la souris
+  Transitions entre sections : morphing élégant
+  Cards projets : hover avec glow gold intense
+B-02 "Blanc Pur" — Luxe blanc absolu
+  PERSONNALITÉ : Luxe par l&apos;absence, Hermès-like, intemporel
+  PALETTE : Fond #FFFFFF vrai | Noir #1A1A1A | Gold accent très discret
+  PUBLIC : Architectes d&apos;intérieur, joailliers, luxe
+  HERO : Beaucoup d&apos;espace blanc, nom en 72px serif, minimalisme extrême
+  Le silence visuel est le luxe
+B-03 "Cyber" — Néon Futuriste
+  PERSONNALITÉ : Blade Runner, cyberpunk, technologie de pointe
+  PALETTE : Fond #0A0A1A | Néon cyan #4ECDC4 | Néon rose #FF0080
+  PUBLIC : Créatifs tech, futuristes, NFT artists
+  HERO : Grille néon animée en bg (CSS animation)
+  Texte avec effet glitch sur hover
+  Cards avec bordures néon qui brillent
+B-04 "Parchemin" — Editorial Luxe Papier
+  PERSONNALITÉ : Tradition, autorité, intemporel, lettres de noblesse
+  PALETTE : Fond #F5EDD6 | Brun profond #2C1810 | Gold #C9A84C
+  PUBLIC : Avocats d&apos;affaires, notaires, banquiers privés
+  HERO : Serif majestueux, initiales monogramme, style lettre officielle
+  Timeline carrière chronologique élégante
+B-05 "Cosmos" — Deep Space Immersif
+  PERSONNALITÉ : Vision, exploration, avenir, innovation radicale
+  PALETTE : Fond #0F1923 | Bleu stellaire #90CAF9 | Violet #7C4DFF
+  PUBLIC : Innovateurs, chercheurs, futurologues
+  HERO : Animation étoiles en background (canvas JS ou CSS)
+  Parallax depth sur scroll
+B-06 "Maison" — Haute Couture Minimaliste
+  PERSONNALITÉ : Maisons de couture parisiennes, discrétion du luxe
+  PALETTE : Fond #FAFAFA | Noir #1A1A1A | Or satiné #BFA980
+  PUBLIC : Directeurs artistiques, branding premium
+  HERO : Layout magazine de mode, asymétrique et aéré
+  Typographie très raffinée : mix serif/sans-serif
+B-07 "Ember" — Feu & Passion
+  PERSONNALITÉ : Énergie explosive, passion, leadership charismatique
+  PALETTE : Fond #1A0A00 | Orange feu #FF6D00 | Amber #FF8F00
+  PUBLIC : Speakers TED, formateurs, coachs de haut niveau
+  HERO : Particules de feu en animation + grand portrait
+B-08 "Impact" — Social Impact Premium
+  PERSONNALITÉ : Leadership humanitaire, changement systémique
+  PALETTE : Fond #F0FFF8 | Vert profond #00695C | Orange humanitaire #FF6F00
+  PUBLIC : Leaders ONG internationaux, diplomates, PNUD
+  HERO : Chiffres d&apos;impact énormes (ex: "2.3M personnes impactées")
+  Stories visuelles des projets
+B-09 "Neon Studio" — Agence Créative
+  PERSONNALITÉ : Studio de création avant-garde, expérimental
+  PALETTE : Fond #0D0D0D | Magenta #E040FB | Cyan #00E5FF
+  PUBLIC : Directeurs créatifs, agences digitales
+  HERO : Reel vidéo en autoplay (muted) ou animation interactive
+  Navigation non-conventionnelle (verticale ou circulaire)
+B-10 "Académie" — Intellectuel & Recherche
+  PERSONNALITÉ : Rigueur académique, prestige intellectuel
+  PALETTE : Fond #FFFDF5 | Bleu académique #1A237E | Rouge Oxford #B71C1C
+  PUBLIC : Professeurs d&apos;université, chercheurs, PhD
+  HERO : Liste publications avec DOI, citations, H-index
+  Section "Research Areas" avec visualisation domaines
+PROMPT B-11 à B-25  — Templates Business 11 à 25
+Crée les 15 derniers templates Business :
+B-11 "Finance" — Corporate Finance Dark
+  PALETTE : Fond #0A1628 | Bleu data #4FC3F7 | Gold #C9A84C
+  PUBLIC : Banquiers d&apos;affaires, financiers, traders
+  HERO : Dashboard style Bloomberg avec métriques
+  Graphiques de performance intégrés au design
+B-12 "Dakar Luxe" — Afrique Premium
+  PALETTE : Fond #FFF9F5 | Terre #E65100 | Gold #C9A84C
+  PUBLIC : Leaders africains du business, diaspora premium
+  HERO : Fusion patrimoine africain + luxe moderne
+  Motifs géométriques africains en gold sur fond crème
+B-13 "Manifeste" — Brutaliste Typographique
+  PALETTE : Fond #F5F5F5 | Noir pur #000000 | Rouge #FF3D00
+  PUBLIC : Directeurs artistiques d&apos;avant-garde
+  HERO : Typographie comme art — nom en 120px condensé
+  Le portfolio EST le design — layout cassé intentionnel
+B-14 "Matrix" — Dev Terminal Luxe
+  PALETTE : Fond #050510 | Vert matrix #00E676 | Blanc
+  PUBLIC : CTO, lead developers, tech executives
+  HERO : Pluie de code matrix en animation canvas
+  Cards projets : style commits GitHub premium
+B-15 "Classique" — Intemporel Élégant
+  PALETTE : Fond #FFFBF0 | Brun élégant #1A1A2E | Sépia #8D6E63
+  PUBLIC : Profils seniors toutes industries
+  HERO : Équilibre parfait, rien ne dépasse, tout respire
+  Layout inspiré des grands sites corporate suisses
+B-16 "Galactic" — Space & Innovation
+  PALETTE : Fond #0A0A2E | Violet #7C4DFF | Cyan #40C4FF
+  PUBLIC : Startuppers, VCs, innovateurs tech
+  HERO : Planètes et orbites animées en CSS
+  Sections : floating cards style zéro gravité
+B-17 "Terracotta" — Chaleur & Authenticité
+  PALETTE : Fond #FFF5E6 | Terracotta #BF360C | Amber #FF8F00
+  PUBLIC : RH, coachs business, consultants people
+  HERO : Chaleureux et humain, grande photo, texte accueillant
+B-18 "Sage" — Calme & Autorité Médicale
+  PALETTE : Fond #F0F0FF | Bleu autorité #1A237E | Lavande #9FA8DA
+  PUBLIC : Médecins, psychologues, thérapeutes
+  HERO : Apaisant, crédibilité immédiate, certifications visibles
+B-19 "Prestige" — Le Summum Absolu
+  PALETTE : Fond #000000 | Gold #C9A84C | Champagne #E8D5A3
+  PUBLIC : PDG, investisseurs, HNWI
+  HERO : Nom en 96px gold sur fond noir, une seule ligne
+  Aucun déchet visuel — chaque pixel compte
+  Animation : particles gold qui tombent lentement
+B-20 "Bioverde" — Green Finance Premium
+  PALETTE : Fond #F5FFF5 | Vert profond #1B5E20 | Vert clair #558B2F
+  PUBLIC : Green finance, impact investing, ESG leaders
+  HERO : Métriques ESG en gros (CO2 évité, etc.)
+B-21 "Velvet" — Nuit Veloutée
+  PALETTE : Fond #1A0033 | Velours violet #CE93D8 | Gold #C9A84C
+  PUBLIC : Artistes, musiciens, performers, entertainers
+  HERO : Ambiance scène / spotlight — cercle lumineux sur le portrait
+  Sections : rideaux de velours CSS
+B-22 "Strate" — Stratège Analytique
+  PALETTE : Fond #FAFFF5 | Ardoise #37474F | Teal data #00BCD4
+  PUBLIC : Directeurs stratégie, McKinsey, BCG, consulting top tier
+  HERO : Style présentation executive — clean, chiffres, impact
+  Infographies des réalisations
+B-23 "Sahel" — Afrique Luxe Contemporain
+  PALETTE : Fond #FFF0E6 | Brun chaud #4E2D0A | Gold #C9A84C
+  PUBLIC : Entrepreneurs panafricains premium
+  HERO : Luxe africain — motifs subtils + image executive
+  Présence dans plusieurs pays africains mise en avant
+B-24 "Monochrome" — Noir & Blanc Pur
+  PALETTE : Fond #0F0F0F | Blanc pur #FFFFFF | Gris moyen #888888
+  PUBLIC : Photographes fine art, motion designers
+  HERO : Image plein écran noir et blanc + nom blanc minimaliste
+  Galerie photos en mode galerie d&apos;art
+B-25 "Flagship" — Le Meilleur du Business
+  PALETTE : Fond #F5F9FF | Bleu royal #0D47A1 | Gold #C9A84C
+  PUBLIC : Tous profils Business qui veulent la référence absolue
+  HERO : Video background muted (ou animation canvas premium)
+  Toutes les sections les plus élaborées de tous les templates
+  Le template qui donne envie de souscrire au plan Business
+════════════════════════════════════════════
+LIVRAISON POUR LES 46 TEMPLATES
+════════════════════════════════════════════
+Pour chaque template :
+  1. Fichier JSX complet et autonome
+  2. Données mockées réalistes sénégalaises
+  3. 100% responsive (mobile-first)
+  4. Toutes les sections
+  5. Microinteractions définies
+Organisation des fichiers livrés :
+  /templates/
+    essai/
+      Clarte.jsx
+    starter/
+      Atlas.jsx · Miel.jsx · Horizon.jsx · Nuit.jsx · Baobab.jsx
+    pro/
+      Larsson.jsx · Obsidian.jsx · [13 autres].jsx
+    business/
+      ObsidianX.jsx · BlancPur.jsx · [23 autres].jsx
+Commence par le template &apos;Clarté&apos; (Essai) pour validation
+avant de lancer les autres. Attends mon GO.
+5. Règles de Microinteractions
+Ces règles s&apos;appliquent à tous les templates selon leur plan. Plus le plan est élevé, plus les animations sont sophistiquées.
+Plan
+Microinteractions autorisées
+Niveau d&apos;animation
+Essai
+Hover cards (translateY + shadow), transitions couleur 0.3s
+Minimal — 2-3 effets max
+Starter
+Essai + fade-in scroll, overlay hover images, barres progression
+Modéré — 5-6 effets
+Pro
+Starter + parallax, compteurs animés, transitions page, curseur custom
+Riche — 8-10 effets
+Business
+Pro + particules, canvas animations, morphing, vidéo bg, curseur gold
+Premium — effets signature
+— Portefolia · 46 templates · Expose Ton Futur —

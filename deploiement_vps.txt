@@ -379,27 +379,85 @@ PORT ATTRIBUÉ À PORTEFOLIA BACKEND : 3001  ✓ CONFIRMÉ LIBRE
   tail -50 /var/log/nginx/portefolia.error.log
 
 ═══════════════════════════════════════════════════════════════════════════════
-ÉTAPE 11 — PROCÉDURE DE MISE À JOUR (déploiements suivants)
+ÉTAPE 11 — SCRIPT DE DÉPLOIEMENT AUTOMATIQUE (deploy.sh)
 ═══════════════════════════════════════════════════════════════════════════════
 
-  cd /opt/portefolia
+  Créez le script une seule fois sur le VPS, puis appelez-le à chaque push GitHub.
 
-  # 1. Récupérer les nouvelles modifications
-  git pull origin main   # (ou le nom de votre branche)
+  ── Création du script ──────────────────────────────────────────────────────
 
-  # 2. Mettre à jour les dépendances backend si package.json a changé
-  cd backend && npm install --production && cd ..
+  cat > /opt/portefolia/deploy.sh << 'DEPLOY'
+  #!/bin/bash
+  set -e
+  APP_DIR="/opt/portefolia"
+  LOG_FILE="/var/log/pm2/portefolia-deploy.log"
+  BRANCH="main"
 
-  # 3. Rebuild le frontend
-  npm install
+  log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"; }
+
+  log "═══ DÉBUT DU DÉPLOIEMENT ═══"
+  cd "$APP_DIR"
+
+  # ── 1. Récupérer la dernière version depuis GitHub ────────────────────────
+  log "Pull GitHub ($BRANCH)..."
+  git fetch origin
+  git reset --hard origin/$BRANCH
+  log "Code mis à jour : $(git log --oneline -1)"
+
+  # ── 2. Dépendances backend (seulement si package.json a changé) ───────────
+  if git diff HEAD@{1} --name-only 2>/dev/null | grep -q "backend/package.json"; then
+    log "package.json backend modifié → npm install..."
+    cd "$APP_DIR/backend" && npm install --production && cd "$APP_DIR"
+  else
+    log "Dépendances backend inchangées, skip."
+  fi
+
+  # ── 3. Dépendances frontend (seulement si package.json a changé) ──────────
+  if git diff HEAD@{1} --name-only 2>/dev/null | grep -q "^package.json"; then
+    log "package.json frontend modifié → npm install..."
+    npm install
+  else
+    log "Dépendances frontend inchangées, skip."
+  fi
+
+  # ── 4. Rebuild du frontend ────────────────────────────────────────────────
+  log "Build Vite..."
   npm run build
+  log "Build terminé : $(ls dist/assets/*.js | head -1)"
 
-  # 4. Redémarrer le backend
-  pm2 restart portefolia-backend
+  # ── 5. Redémarrer le backend sans coupure ────────────────────────────────
+  log "Redémarrage backend PM2..."
+  pm2 reload portefolia-backend --update-env
+  pm2 save
 
-  # 5. Vérifier
+  log "═══ DÉPLOIEMENT TERMINÉ ═══"
   pm2 status
-  pm2 logs portefolia-backend --lines 20
+  DEPLOY
+
+  chmod +x /opt/portefolia/deploy.sh
+
+  ── Utilisation ─────────────────────────────────────────────────────────────
+
+  # Après chaque git push depuis votre machine locale, connectez-vous en SSH et :
+  /opt/portefolia/deploy.sh
+
+  # Ou depuis votre machine locale en une seule commande SSH :
+  ssh root@185.215.165.43 "/opt/portefolia/deploy.sh"
+
+  ── Consulter les logs de déploiement ────────────────────────────────────────
+
+  tail -50 /var/log/pm2/portefolia-deploy.log
+
+  ── BONUS : alias SSH sur votre machine locale ───────────────────────────────
+
+  # Ajoutez dans votre ~/.bashrc ou ~/.zshrc :
+  alias deploy-portefolia='ssh root@185.215.165.43 "/opt/portefolia/deploy.sh"'
+
+  # Puis rechargez :
+  source ~/.bashrc
+
+  # Désormais, après chaque push GitHub, une seule commande suffit :
+  deploy-portefolia
 
 ═══════════════════════════════════════════════════════════════════════════════
 RÉSUMÉ DES PORTS

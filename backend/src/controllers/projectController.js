@@ -1,10 +1,13 @@
 const projectModel = require('../models/projectModel');
+const { checkItemLimit } = require('../utils/planItemLimits');
 
 async function create(req, res) {
   try {
     const userId = req.userId;
     const portfolioId = Number(req.body.portfolio_id);
     if (!portfolioId) return res.status(400).json({ error: 'portfolio_id required' });
+    const limitError = await checkItemLimit({ userId, jwtRole: req.userPayload?.role, portfolioId, kind: 'projects' });
+    if (limitError) return res.status(limitError.status).json({ error: limitError.error });
     // map incoming keys to French DB columns expected by projectModel
     const project = {
       portfolio_id: portfolioId,

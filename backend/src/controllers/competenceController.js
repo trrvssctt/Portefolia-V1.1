@@ -1,9 +1,14 @@
 const competenceModel = require('../models/competenceModel');
+const { checkItemLimit } = require('../utils/planItemLimits');
 
 async function create(req, res) {
   try {
+    const portfolioId = Number(req.body.portfolio_id || req.body.portfolioId);
+    if (!portfolioId) return res.status(400).json({ error: 'portfolio_id required' });
+    const limitError = await checkItemLimit({ userId: req.userId, jwtRole: req.userPayload?.role, portfolioId, kind: 'competences' });
+    if (limitError) return res.status(limitError.status).json({ error: limitError.error });
     const competence = {
-      portfolio_id: req.body.portfolio_id || req.body.portfolioId,
+      portfolio_id: portfolioId,
       nom: req.body.name || req.body.nom || null,
       niveau: req.body.level || req.body.niveau || null,
       categorie: req.body.category || req.body.categorie || null,

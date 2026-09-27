@@ -1,9 +1,14 @@
 const experienceModel = require('../models/experienceModel');
+const { checkItemLimit } = require('../utils/planItemLimits');
 
 async function create(req, res) {
   try {
+    const portfolioId = Number(req.body.portfolio_id || req.body.portfolioId);
+    if (!portfolioId) return res.status(400).json({ error: 'portfolio_id required' });
+    const limitError = await checkItemLimit({ userId: req.userId, jwtRole: req.userPayload?.role, portfolioId, kind: 'experiences' });
+    if (limitError) return res.status(limitError.status).json({ error: limitError.error });
     const experience = {
-      portfolio_id: req.body.portfolio_id || req.body.portfolioId,
+      portfolio_id: portfolioId,
       titre_poste: req.body.title || req.body.titre_poste || req.body.titre || null,
       entreprise: req.body.company || req.body.entreprise || null,
       description: req.body.description || null,
