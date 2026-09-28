@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, Users, Settings, FolderOpen, User, LogOut, ChevronDown, CreditCard, BarChart3, SlidersHorizontal } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, FolderOpen, User, LogOut, ChevronDown, CreditCard, BarChart3, SlidersHorizontal, Wifi } from 'lucide-react';
 
 interface BusinessNavProps {
   onSignOut: () => void;
@@ -27,6 +27,7 @@ const BusinessNav: React.FC<BusinessNavProps> = ({ onSignOut }) => {
   const adminItems = [
     { title: 'Tableau de bord', path: '/business/dashboard', icon: LayoutDashboard },
     { title: 'Mes Portfolios', path: '/business/portfolios', icon: FolderOpen },
+    { title: 'Cartes NFC', path: '/business/nfc-cards', icon: Wifi },
     { title: 'Analytics', path: '/business/analytics', icon: BarChart3 },
     { title: 'Membres', path: '/business/members', icon: Users },
     { title: 'Paiements', path: '/business/payments', icon: CreditCard },
@@ -36,6 +37,7 @@ const BusinessNav: React.FC<BusinessNavProps> = ({ onSignOut }) => {
   const memberItems = [
     { title: 'Tableau de bord', path: '/business/member', icon: LayoutDashboard },
     { title: 'Mes Portfolios', path: '/business/portfolios', icon: FolderOpen },
+    { title: 'Cartes NFC', path: '/business/nfc-cards', icon: Wifi },
     { title: 'Analytics', path: '/business/analytics', icon: BarChart3 },
   ];
 

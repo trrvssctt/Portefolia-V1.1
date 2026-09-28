@@ -1,6 +1,6 @@
 import { usePlan } from '@/contexts/PlanContext';
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 const envBase = import.meta.env.VITE_API_BASE;
 const API_BASE = envBase || (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://backennfc.onrender.com');
 import { useToast } from "@/hooks/use-toast";
@@ -10,6 +10,8 @@ import {
   Search, Wifi, Zap, ShoppingCart, X, Trash2, ChevronDown, Scan,
 } from "lucide-react";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
+import BusinessNav from "@/components/business/BusinessNav";
+import { useBusiness } from "@/contexts/BusinessContext";
 import { useAuth } from "@/hooks/useAuth";
 
 /* ─── helpers ─────────────────────────────────────────────── */
@@ -208,7 +210,17 @@ const NFCCards = () => {
   const [sortBy, setSortBy]             = useState<'newest' | 'oldest' | 'status' | 'portfolio'>('newest');
 
   const navigate   = useNavigate();
+  const location   = useLocation();
   const { toast }  = useToast();
+  const { isBusinessUser } = useBusiness();
+  const portfoliosPath = isBusinessUser ? '/business/portfolios' : '/dashboard/portfolios';
+
+  // Les comptes Business ont leur propre espace : on garde leur menu
+  useEffect(() => {
+    if (isBusinessUser && location.pathname.startsWith('/dashboard')) {
+      navigate('/business/nfc-cards', { replace: true });
+    }
+  }, [isBusinessUser, location.pathname, navigate]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -453,7 +465,9 @@ const NFCCards = () => {
 
   return (
     <div className="min-h-screen" style={{ background: '#F7F8F8' }}>
-      <DashboardNav onSignOut={signOut} profile={profile || user || {}} />
+      {isBusinessUser
+        ? <BusinessNav onSignOut={signOut} />
+        : <DashboardNav onSignOut={signOut} profile={profile || user || {}} />}
 
       <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 sm:py-10 space-y-7">
 
@@ -497,7 +511,7 @@ const NFCCards = () => {
                   <p className="text-xs text-[#71717A] mt-0.5">Créez d'abord un portfolio pour pouvoir commander une carte NFC.</p>
                 </div>
                 <button
-                  onClick={() => navigate('/dashboard/portfolios')}
+                  onClick={() => navigate(portfoliosPath)}
                   className="h-9 px-4 rounded-[10px] text-sm font-medium text-white shrink-0"
                   style={{ background: '#2E7D32' }}
                 >
@@ -707,6 +721,7 @@ const NFCCards = () => {
             )}
 
             {/* ── Promo strip ── */}
+            {!isBusinessUser && (
             <div className="rounded-2xl border border-[#E7E7EA] bg-white p-6 flex flex-col sm:flex-row items-start sm:items-center gap-5">
               <span className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: '#E8F5E9', color: '#1B5E20' }}>
                 <Scan size={22} />
@@ -722,6 +737,7 @@ const NFCCards = () => {
                 Découvrir l'offre Business
               </button>
             </div>
+            )}
       </div>
 
       {/* ── Order modal ── */}

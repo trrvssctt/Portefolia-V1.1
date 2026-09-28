@@ -388,7 +388,7 @@ const Landing: React.FC = () => {
                 Créer mon portfolio
               </Link>
               <Link
-                to="/nfc-types"
+                to="/carte-3d"
                 className="inline-flex items-center h-12 px-6 rounded-xl text-sm font-semibold text-[#18181B] border border-[#E7E7EA] hover:bg-zinc-50 transition-colors"
               >
                 Voir un exemple

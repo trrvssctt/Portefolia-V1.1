@@ -44,6 +44,7 @@
     "@stripe/stripe-js": "^9.1.0",
     "@supabase/supabase-js": "^2.50.2",
     "@tanstack/react-query": "^5.56.2",
+    "@types/three": "^0.186.0",
     "canvas-confetti": "^1.9.4",
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.1",
@@ -73,6 +74,7 @@
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "theme-toggle": "^1.0.0",
+    "three": "^0.186.1",
     "vaul": "^0.9.3",
     "zod": "^3.23.8"
   },

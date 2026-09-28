@@ -23,6 +23,7 @@ import Dashboard from "./pages/Dashboard";
 import Portfolios from "./pages/Portfolios";
 import Portfolio from "./pages/Portfolio";
 import NFCCards from "./pages/NFCCards";
+import CarteNFC3D from "./pages/CarteNFC3D";
 import NFCCardTypes from "./pages/NFCCardTypes";
 import Analytics from "./pages/Analytics";
 import NotFound from "./pages/NotFound";
@@ -138,6 +139,7 @@ function App() {
                     <Route path="/dashboard/portfolios" element={<RequirePayment><RequireSubscription><Portfolios /></RequireSubscription></RequirePayment>} />
                     <Route path="/dashboard/nfc-cards" element={<NFCCards />} />
                     <Route path="/nfc-types" element={<NFCCardTypes />} />
+                    <Route path="/carte-3d" element={<CarteNFC3D />} />
                     <Route path="/upgrade" element={<UpgradePlan />} />
                     <Route path="/reabonnement" element={<Reabonnement />} />
                     <Route path="/checkout" element={<CheckoutPage />} />
@@ -194,6 +196,7 @@ function App() {
                     <Route path="/business/settings" element={<BusinessSettings />} />
                     <Route path="/business/member" element={<BusinessMemberDashboard />} />
                     <Route path="/business/portfolios" element={<BusinessPortfolios />} />
+                    <Route path="/business/nfc-cards" element={<NFCCards />} />
                     <Route path="/business/analytics" element={<BusinessAnalytics />} />
                     <Route path="/business/payments" element={<BusinessPayments />} />
                     <Route path="/business/profile" element={<ProfilsUserPage />} />
