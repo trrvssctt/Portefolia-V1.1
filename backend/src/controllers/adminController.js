@@ -12,6 +12,7 @@ const abonnementModel = require('../models/abonnementModel');
 const sendEmail = require('../utils/sendEmail');
 const { emailPaiementCommandeValide, emailCommandeLivree } = require('../utils/emailTemplates');
 const { buildInvoiceHtml } = require('../utils/buildInvoiceHtml');
+const { renderDocument, htmlToPdf } = require('../utils/portefoliaDocument');
 const checkoutModel = require('../models/checkoutModel');
 
 async function listUsers(req, res) {
@@ -1251,58 +1252,56 @@ async function adminRefuserPaiement(req, res) {
   }
 }
 
-// Generate a simple invoice HTML for a commande (fallback, no PDF rendering)
+// Facture PDF d'une commande de cartes NFC (gabarit commun facture / reçu)
 async function getCommandeInvoicePdf(req, res) {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ error: 'Invalid commande id' });
     const commande = await commandeModelLocal.findById(id);
     if (!commande) return res.status(404).json({ error: 'Not found' });
-    const [cardsRows] = await pool.query('SELECT * FROM cartes_nfc WHERE commande_id = ?', [commande.id]);
+    const [cards] = await pool.query('SELECT id FROM cartes_nfc WHERE commande_id = ?', [commande.id]);
+    const [paiements] = await pool.query(
+      'SELECT montant, statut, moyen_paiement, reference_transaction, date_paiement, created_at FROM paiements WHERE commande_id = ? ORDER BY id',
+      [commande.id]
+    );
     const user = await userModel.findById(commande.utilisateur_id);
 
-    const logoUrl = (process.env.APP_URL ? process.env.APP_URL.replace(/\/$/, '') : '') + '/lovable-uploads/logo_portefolia_remove_bg.png';
+    const total = Number(commande.montant_total) || 0;
+    const qty = Math.max(1, cards.length || 1);
+    const valides = paiements.filter(p => /reuss|paid|confirmed|success|^valide/i.test(
+      String(p.statut || '').normalize('NFD').replace(/\p{Diacritic}/gu, '')
+    ));
 
-    const itemsHtml = (cardsRows && cardsRows[0] ? cardsRows[0] : []).map((c) => `
-      <tr>
-        <td style="padding:8px;border:1px solid #ddd">${c.id}</td>
-        <td style="padding:8px;border:1px solid #ddd">${c.design || '—'}</td>
-        <td style="padding:8px;border:1px solid #ddd">${c.uid_nfc || '—'}</td>
-      </tr>
-    `).join('');
+    const html = renderDocument({
+      kind: 'facture',
+      number: commande.numero_commande || `CMD-${commande.id}`,
+      date: commande.date_commande || commande.created_at || new Date(),
+      typeLabel: 'Facture — commande de cartes NFC',
+      client: {
+        name: user ? `${user.prenom || ''} ${user.nom || ''}`.trim() : '',
+        email: user?.email || '',
+      },
+      items: [{
+        designation: 'Carte NFC Portefolia personnalisée',
+        detail: `Commande N° ${commande.numero_commande || commande.id}`,
+        code: 'NFC',
+        qty,
+        pu: total / qty,
+      }],
+      payments: valides.map(p => ({
+        date: p.date_paiement || p.created_at,
+        moyen: p.moyen_paiement,
+        reference: p.reference_transaction || '',
+        amount: Number(p.montant) || 0,
+      })),
+    });
 
-    const html = `
-      <!doctype html>
-      <html>
-      <head><meta charset="utf-8"><title>Facture ${commande.numero_commande || commande.id}</title></head>
-      <body style="font-family:Arial,Helvetica,sans-serif;color:#222">
-        <div style="max-width:800px;margin:0 auto">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div><img src="${logoUrl}" alt="logo" style="height:60px;object-fit:contain"/></div>
-            <div style="text-align:right"><h2>Facture</h2><div>Commande: ${commande.numero_commande || commande.id}</div><div>Date: ${commande.date_commande || ''}</div></div>
-          </div>
-          <hr/>
-          <h3>Client</h3>
-          <div>${user ? `${user.prenom || ''} ${user.nom || ''} &lt;${user.email || ''}&gt;` : '—'}</div>
-          <h3>Détails</h3>
-          <table style="width:100%;border-collapse:collapse">
-            <thead>
-              <tr>
-                <th style="padding:8px;border:1px solid #ddd">ID</th>
-                <th style="padding:8px;border:1px solid #ddd">Design</th>
-                <th style="padding:8px;border:1px solid #ddd">UID NFC</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHtml || '<tr><td colspan="3" style="padding:8px;border:1px solid #ddd">Aucun item</td></tr>'}
-            </tbody>
-          </table>
-          <h3>Total: ${commande.montant_total || '0'}</h3>
-        </div>
-      </body>
-      </html>
-    `;
-
+    const pdf = await htmlToPdf(html);
+    if (pdf) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="facture-portefolia-${commande.numero_commande || commande.id}.pdf"`);
+      return res.send(pdf);
+    }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.send(html);
   } catch (err) {

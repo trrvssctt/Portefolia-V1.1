@@ -116,7 +116,7 @@ const BusinessNav: React.FC<BusinessNavProps> = ({ onSignOut }) => {
                 <User className="mr-2 h-4 w-4" /> Mon profil
               </DropdownMenuItem>
               {isBusinessAdmin && (
-                <DropdownMenuItem onClick={() => navigate('/dashboard/paiements')}>
+                <DropdownMenuItem onClick={() => navigate('/business/payments')}>
                   <CreditCard className="mr-2 h-4 w-4" /> Mes paiements
                 </DropdownMenuItem>
               )}

@@ -4,6 +4,17 @@ const userModel = require('../models/userModel');
 const { pool } = require('../db');
 const { generateReceiptPDF, buildReceiptHtml } = require('../utils/generateReceiptPDF');
 const { buildInvoiceHtml } = require('../utils/buildInvoiceHtml');
+const { htmlToPdf } = require('../utils/portefoliaDocument');
+
+// Nom de l'entreprise si l'utilisateur administre un compte Business (affiché sur reçus et factures)
+async function businessNameFor(userId) {
+  try {
+    const [[acc]] = await pool.query('SELECT company_name FROM business_accounts WHERE admin_user_id = ? LIMIT 1', [userId]);
+    return acc?.company_name || '';
+  } catch {
+    return '';
+  }
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 
@@ -146,10 +157,12 @@ async function getMyReceiptPDF(req, res) {
     const receiptNumber = `RECU-${now.getFullYear()}${receiptMonth}-${String(paiementId).padStart(5, '0')}`;
 
     const isCommandeNFC = !!(row.commande_id && !row.abo_id);
-    const pdfBuffer = await generateReceiptPDF({
+    const entreprise = await businessNameFor(utilisateur_id);
+    const receiptData = {
       receiptNumber,
       type:            isCommandeNFC ? 'commande_nfc' : 'abonnement',
       client:          { prenom: row.prenom || '', nom: row.nom || '', email: row.email || '' },
+      entreprise,
       plan:            { name: row.plan_name || 'Portefolia Premium' },
       numero_commande: row.numero_commande || null,
       montant:         Number(isCommandeNFC ? (row.commande_montant || row.montant) : row.montant) || 0,
@@ -158,23 +171,11 @@ async function getMyReceiptPDF(req, res) {
       moyen_paiement:  row.moyen_paiement || 'wave',
       date_paiement:   now,
       date_echeance:   isCommandeNFC ? null : (row.date_echeance ?? null),
-    });
+    };
+    const pdfBuffer = await generateReceiptPDF(receiptData);
 
     if (!pdfBuffer) {
       // Puppeteer non disponible sur ce serveur → on sert le HTML (imprimable en PDF via le navigateur)
-      const receiptData = {
-        receiptNumber,
-        type:            isCommandeNFC ? 'commande_nfc' : 'abonnement',
-        client:          { prenom: row.prenom || '', nom: row.nom || '', email: row.email || '' },
-        plan:            { name: row.plan_name || 'Portefolia Premium' },
-        numero_commande: row.numero_commande || null,
-        montant:         Number(isCommandeNFC ? (row.commande_montant || row.montant) : row.montant) || 0,
-        duree_mois:      row.duree_mois ?? 1,
-        reference_wave:  row.reference_wave || row.reference_transaction || null,
-        moyen_paiement:  row.moyen_paiement || 'wave',
-        date_paiement:   now,
-        date_echeance:   isCommandeNFC ? null : (row.date_echeance ?? null),
-      };
       const html = buildReceiptHtml(receiptData);
       res.set({
         'Content-Type':        'text/html; charset=utf-8',
@@ -223,6 +224,7 @@ async function getMyInvoicePDF(req, res) {
     const html = buildInvoiceHtml({
       invoiceNumber,
       client:        { prenom: user?.prenom || '', nom: user?.nom || '', email: user?.email || '' },
+      entreprise:    await businessNameFor(utilisateur_id),
       planName:      inv.plan_name || 'Abonnement Portefolia',
       montant:       amount,
       currency,
@@ -231,21 +233,15 @@ async function getMyInvoicePDF(req, res) {
       date_echeance: inv.date_echeance || null,
     });
 
-    try {
-      const puppeteer = require('puppeteer');
-      const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
-      const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'load', timeout: 20000 });
-      const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
-      await browser.close();
+    const pdfBuffer = await htmlToPdf(html);
+    if (pdfBuffer) {
       res.set({
         'Content-Type':        'application/pdf',
         'Content-Disposition': `attachment; filename="facture-portefolia-${invoiceNumber}.pdf"`,
         'Content-Length':      pdfBuffer.length,
       });
-      return res.end(Buffer.from(pdfBuffer));
-    } catch (e) {
-      console.warn('getMyInvoicePDF: puppeteer failed, returning HTML:', e.message);
+      return res.end(pdfBuffer);
+    } else {
       res.set({
         'Content-Type':        'text/html; charset=utf-8',
         'Content-Disposition': `attachment; filename="facture-portefolia-${invoiceNumber}.html"`,

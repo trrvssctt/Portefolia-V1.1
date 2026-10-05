@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
   CreditCard, Clock, CheckCircle, XCircle, RefreshCw,
-  Download, Search, Eye, Receipt, Printer, Copy, AlertTriangle,
+  Download, Search, Eye, Receipt, Copy, AlertTriangle,
   Wallet, BarChart3, TrendingUp, Building2, ExternalLink, ChevronDown, ChevronUp,
   CalendarClock,
 } from 'lucide-react';
@@ -56,62 +56,6 @@ const fmt = (date: string | null | undefined, pattern = 'dd MMM yyyy') => {
 };
 
 const fmtMoney = (n: number) => `${n.toLocaleString('fr-FR')} F CFA`;
-
-function printReceipt(p: Paiement, companyName: string) {
-  const win = window.open('', '_blank', 'width=600,height=700');
-  if (!win) return;
-  const ref = p.reference_transaction || `#${p.id}`;
-  win.document.write(`<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8"/>
-  <title>Reçu ${ref}</title>
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family: 'Helvetica Neue', Arial, sans-serif; background:#f5f5f5; display:flex; justify-content:center; padding:40px 20px; }
-    .receipt { background:#fff; width:100%; max-width:480px; border-radius:12px; overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,.12); }
-    .header { background:linear-gradient(135deg,#1a1a2e,#0f3460); color:#fff; padding:28px 24px; text-align:center; }
-    .header h1 { font-size:22px; font-weight:700; }
-    .header p { font-size:13px; opacity:.85; margin-top:4px; }
-    .status-badge { display:inline-flex; align-items:center; gap:6px; margin-top:14px; background:rgba(255,255,255,.2); border-radius:20px; padding:5px 14px; font-size:13px; font-weight:600; }
-    .body { padding:24px; }
-    .amount-block { text-align:center; padding:20px 0; border-bottom:1px dashed #e5e7eb; margin-bottom:20px; }
-    .amount-block .label { font-size:12px; color:#6b7280; text-transform:uppercase; letter-spacing:.5px; }
-    .amount-block .amount { font-size:36px; font-weight:800; color:#111827; margin-top:4px; }
-    .amount-block .currency { font-size:14px; color:#6b7280; margin-top:2px; }
-    .row { display:flex; justify-content:space-between; align-items:flex-start; padding:9px 0; border-bottom:1px solid #f3f4f6; }
-    .row .key { font-size:13px; color:#6b7280; }
-    .row .val { font-size:13px; font-weight:600; color:#111827; text-align:right; max-width:55%; word-break:break-all; }
-    .footer { text-align:center; padding:18px 24px; background:#f9fafb; font-size:11px; color:#9ca3af; border-top:1px solid #f3f4f6; }
-    @media print { body { background:#fff; padding:0; } .receipt { box-shadow:none; border-radius:0; } }
-  </style>
-</head>
-<body>
-  <div class="receipt">
-    <div class="header">
-      <h1>${companyName}</h1>
-      <p>Reçu de paiement Business</p>
-      <div class="status-badge">✓ Paiement confirmé</div>
-    </div>
-    <div class="body">
-      <div class="amount-block">
-        <div class="label">Montant payé</div>
-        <div class="amount">${p.montant.toLocaleString('fr-FR')}</div>
-        <div class="currency">F CFA</div>
-      </div>
-      <div class="row"><span class="key">Référence</span><span class="val">${ref}</span></div>
-      <div class="row"><span class="key">Compte</span><span class="val">${companyName}</span></div>
-      ${p.plan_name ? `<div class="row"><span class="key">Plan</span><span class="val">${p.plan_name}</span></div>` : ''}
-      <div class="row"><span class="key">Date</span><span class="val">${fmt(p.created_at, 'dd MMMM yyyy à HH:mm')}</span></div>
-      ${p.moyen_paiement ? `<div class="row"><span class="key">Méthode</span><span class="val">${p.moyen_paiement}</span></div>` : ''}
-    </div>
-    <div class="footer">Ce reçu est généré automatiquement par Portefolia. Conservez-le pour vos archives.</div>
-  </div>
-  <script>window.onload=()=>{window.print();}<\/script>
-</body>
-</html>`);
-  win.document.close();
-}
 
 function exportCSV(paiements: Paiement[]) {
   const rows = [
@@ -181,6 +125,38 @@ const BusinessPayments: React.FC = () => {
   const [selected, setSelected] = useState<Paiement | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [copying, setCopying] = useState<number | null>(null);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  // Reçu PDF généré par le serveur (même gabarit que les autres formules, tampon « PAYÉ »)
+  const downloadReceipt = async (p: Paiement) => {
+    if (downloadingId === p.id) return;
+    setDownloadingId(p.id);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE}/api/users/me/paiements/${p.id}/receipt`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Erreur ${res.status}`);
+      }
+      const isPdf = (res.headers.get('content-type') || '').includes('application/pdf');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recu-portefolia-${p.reference_transaction || p.id}.${isPdf ? 'pdf' : 'html'}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: 'Reçu téléchargé' });
+    } catch (e) {
+      toast({ title: 'Téléchargement impossible', description: e instanceof Error ? e.message : undefined, variant: 'destructive' });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const primaryColor = account?.primary_color || '#1a1a2e';
   const secondaryColor = account?.secondary_color || '#16213e';
@@ -531,8 +507,8 @@ const BusinessPayments: React.FC = () => {
                         <Eye className="w-3.5 h-3.5" /> Détails
                       </Button>
                       {p.statut === 'completed' && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-green-700" onClick={() => printReceipt(p, companyName)}>
-                          <Printer className="w-3.5 h-3.5" /> Reçu
+                        <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-green-700" onClick={() => downloadReceipt(p)} disabled={downloadingId === p.id}>
+                          <Download className="w-3.5 h-3.5" /> Reçu
                         </Button>
                       )}
                       {p.statut === 'pending' && p.checkout_token && (
@@ -591,10 +567,10 @@ const BusinessPayments: React.FC = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => printReceipt(p, companyName)}
+                                onClick={() => downloadReceipt(p)} disabled={downloadingId === p.id}
                                 className="h-7 px-2.5 text-xs gap-1 text-green-700 border-green-200 hover:bg-green-50"
                               >
-                                <Printer className="w-3.5 h-3.5" /> Reçu
+                                <Download className="w-3.5 h-3.5" /> Reçu
                               </Button>
                             )}
                             {p.statut === 'pending' && p.checkout_token && (
@@ -674,8 +650,8 @@ const BusinessPayments: React.FC = () => {
 
               <div className="flex flex-wrap gap-2 pt-2 border-t">
                 {selected.statut === 'completed' && (
-                  <Button size="sm" variant="outline" onClick={() => printReceipt(selected, companyName)} className="gap-1.5">
-                    <Printer className="w-3.5 h-3.5" /> Imprimer le reçu
+                  <Button size="sm" variant="outline" onClick={() => downloadReceipt(selected)} disabled={downloadingId === selected.id} className="gap-1.5">
+                    <Download className="w-3.5 h-3.5" /> Télécharger le reçu
                   </Button>
                 )}
                 {selected.statut === 'pending' && selected.checkout_token && (
