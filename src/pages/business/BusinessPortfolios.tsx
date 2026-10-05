@@ -95,23 +95,23 @@ function PortfolioCard({
 
       <div className="border-t border-gray-100 px-4 py-2.5 flex items-center justify-between gap-1 bg-gray-50/50">
         <div className="flex items-center gap-1">
-          <ActionBtn title="Copier le lien" onClick={onCopyLink}><Copy className="w-3.5 h-3.5" /></ActionBtn>
+          <ActionBtn tour="pf-share" title="Copier le lien" onClick={onCopyLink}><Copy className="w-3.5 h-3.5" /></ActionBtn>
           <ActionBtn title="Voir en ligne" onClick={onView}><ExternalLink className="w-3.5 h-3.5" /></ActionBtn>
         </div>
         <div className="flex items-center gap-1">
-          <ActionBtn title="Modifier" onClick={onEdit} className="text-gray-500 hover:text-blue-600 hover:bg-blue-50"><Edit className="w-3.5 h-3.5" /></ActionBtn>
-          <ActionBtn title="Supprimer" onClick={onDelete} className="text-gray-400 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /></ActionBtn>
+          <ActionBtn tour="pf-edit" title="Modifier" onClick={onEdit} className="text-gray-500 hover:text-blue-600 hover:bg-blue-50"><Edit className="w-3.5 h-3.5" /></ActionBtn>
+          <ActionBtn tour="pf-delete" title="Supprimer" onClick={onDelete} className="text-gray-400 hover:text-red-600 hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /></ActionBtn>
         </div>
       </div>
     </div>
   );
 }
 
-function ActionBtn({ children, title, onClick, className = 'text-gray-500 hover:text-gray-800 hover:bg-gray-100' }: {
-  children: React.ReactNode; title: string; onClick: () => void; className?: string;
+function ActionBtn({ children, title, onClick, tour, className = 'text-gray-500 hover:text-gray-800 hover:bg-gray-100' }: {
+  children: React.ReactNode; title: string; onClick: () => void; tour?: string; className?: string;
 }) {
   return (
-    <button type="button" title={title} onClick={onClick} className={`p-1.5 rounded-lg transition-colors ${className}`}>
+    <button type="button" data-tour={tour} title={title} onClick={onClick} className={`p-1.5 rounded-lg transition-colors ${className}`}>
       {children}
     </button>
   );
@@ -302,6 +302,7 @@ const BusinessPortfolios: React.FC = () => {
             </div>
           </div>
           <Button
+            data-tour="portfolios-create"
             onClick={openCreate}
             disabled={isAtLimit}
             className="bg-white/20 hover:bg-white/30 text-white border border-white/30 h-9 px-4 font-semibold shrink-0 disabled:opacity-50"

@@ -129,6 +129,8 @@ app.use('/api/business', businessRoutes);
 app.use('/api/nfc', require('./routes/nfcRoutes'));
 // Contact form (public POST + admin GET/PATCH/DELETE)
 app.use('/api/contact', require('./routes/contactRoutes'));
+// Onboarding (visites guidées) — progression par utilisateur
+app.use('/api/onboarding', require('./routes/onboardingRoutes'));
 
 // Webhooks (public endpoint) - keep minimal and verify signatures in production
 app.post('/webhooks/payment', (req, res) => adminController.paymentWebhook(req, res));
@@ -176,6 +178,7 @@ app.post('/webhooks/payment', (req, res) => adminController.paymentWebhook(req, 
     const refreshTokenModel = require('./models/refreshTokenModel');
     await refreshTokenModel.init();
     await businessAccountModel.init();
+    await require('./models/onboardingModel').init();
   const visiteModel = require('./models/visiteModel');
   await visiteModel.init();
     // Sync RBAC permission matrix (idempotent)

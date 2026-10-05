@@ -142,23 +142,23 @@ function PFCard({
       {/* Actions */}
       <div className="border-t border-[#E7E7EA] px-3 py-2.5 flex items-center justify-between bg-zinc-50/50">
         <div className="flex items-center gap-0.5">
-          <button onClick={onShare} title="Copier le lien" className="w-8 h-8 rounded-lg flex items-center justify-center text-[#71717A] hover:text-[#18181B] hover:bg-white transition-colors">
+          <button data-tour="pf-share" onClick={onShare} title="Copier le lien" className="w-8 h-8 rounded-lg flex items-center justify-center text-[#71717A] hover:text-[#18181B] hover:bg-white transition-colors">
             <Share2 size={15} />
           </button>
           <button onClick={onView} title="Voir en ligne" className="w-8 h-8 rounded-lg flex items-center justify-center text-[#71717A] hover:text-[#18181B] hover:bg-white transition-colors">
             <ExternalLink size={15} />
           </button>
           {showAnalytics && (
-            <button onClick={onAnalytics} title="Statistiques" className="w-8 h-8 rounded-lg flex items-center justify-center text-[#71717A] hover:text-[#18181B] hover:bg-white transition-colors">
+            <button data-tour="pf-analytics" onClick={onAnalytics} title="Statistiques" className="w-8 h-8 rounded-lg flex items-center justify-center text-[#71717A] hover:text-[#18181B] hover:bg-white transition-colors">
               <BarChart2 size={15} />
             </button>
           )}
         </div>
         <div className="flex items-center gap-0.5">
-          <button onClick={onEdit} title="Modifier" className="w-8 h-8 rounded-lg flex items-center justify-center text-[#71717A] hover:text-[#18181B] hover:bg-white transition-colors">
+          <button data-tour="pf-edit" onClick={onEdit} title="Modifier" className="w-8 h-8 rounded-lg flex items-center justify-center text-[#71717A] hover:text-[#18181B] hover:bg-white transition-colors">
             <Edit size={15} />
           </button>
-          <button onClick={onDelete} title="Supprimer" className="w-8 h-8 rounded-lg flex items-center justify-center text-[#71717A] hover:text-red-600 hover:bg-white transition-colors">
+          <button data-tour="pf-delete" onClick={onDelete} title="Supprimer" className="w-8 h-8 rounded-lg flex items-center justify-center text-[#71717A] hover:text-red-600 hover:bg-white transition-colors">
             <Trash2 size={15} />
           </button>
         </div>
@@ -400,6 +400,7 @@ export default function Portfolios() {
             <p className="text-[#71717A] text-sm">Créez, gérez et partagez vos portfolios professionnels.</p>
           </div>
           <button
+            data-tour="portfolios-new"
             onClick={openCreate}
             disabled={isAtLimit}
             className="flex items-center gap-1.5 h-10 px-4 rounded-[10px] text-sm font-semibold text-white shrink-0 transition-colors disabled:opacity-50"

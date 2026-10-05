@@ -5,7 +5,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import {
   Wifi, Globe, UserPlus, BarChart2, Shield, QrCode, Check,
-  Sparkles, LayoutGrid,
+  Sparkles, Play, Pause, ArrowRight,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -39,36 +39,84 @@ function fmt(n: number): string {
   return Math.round(n).toLocaleString('fr-FR');
 }
 
+// ── NFC demo video ────────────────────────────────────────────────────────────
+// Chargée seulement à l'approche de la section, lue en boucle (muette) quand elle
+// est visible, mise en pause hors écran. Pas de lecture auto si « réduire les animations ».
+function NFCDemoVideo() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [src, setSrc] = useState<string | undefined>(undefined);
+  const [playing, setPlaying] = useState(false);
+  const userPaused = useRef(false);
+  const reduceMotion = typeof window !== 'undefined'
+    && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const io = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setSrc('/videos/demo-carte-nfc.mp4');
+        if (!reduceMotion && !userPaused.current) video.play().catch(() => {});
+      } else {
+        video.pause();
+      }
+    }, { rootMargin: '200px 0px', threshold: 0.25 });
+    io.observe(video);
+    return () => io.disconnect();
+  }, [reduceMotion, src]);
+
+  const toggle = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (!src) setSrc('/videos/demo-carte-nfc.mp4');
+    if (video.paused) { userPaused.current = false; video.play().catch(() => {}); }
+    else { userPaused.current = true; video.pause(); }
+  };
+
+  return (
+    <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden border border-white/10 shadow-[0_30px_80px_rgba(0,0,0,0.45)] bg-[#0B0D0E]">
+      <video
+        ref={videoRef}
+        src={src}
+        poster="/videos/demo-carte-nfc-poster.jpg"
+        muted
+        loop
+        playsInline
+        preload="none"
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onClick={toggle}
+        className="block w-full aspect-video object-cover cursor-pointer"
+        aria-label="Démonstration : la carte NFC Portefolia approchée d'un téléphone ouvre le portfolio"
+      />
+      <button
+        type="button"
+        onClick={toggle}
+        aria-label={playing ? 'Mettre la vidéo en pause' : 'Lire la vidéo'}
+        className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 w-10 h-10 rounded-full bg-black/55 backdrop-blur text-white flex items-center justify-center hover:bg-black/75 transition-colors"
+      >
+        {playing ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
+      </button>
+    </div>
+  );
+}
+
 // ── NFC Card Visual ───────────────────────────────────────────────────────────
 function NFCCardVisual() {
   return (
     <div className="relative" style={{ perspective: '1200px' }}>
-      <div
-        className="relative w-[300px] h-[190px] rounded-3xl p-6 flex flex-col justify-between"
+      <img
+        src="/nfc-card/carte-recto.webp"
+        alt="Carte NFC Portefolia : Awa Ndiaye, Product Designer"
+        width={475}
+        height={299}
+        draggable={false}
+        className="relative w-[320px] sm:w-[380px] h-auto select-none"
         style={{
-          background: 'linear-gradient(145deg, #1A1A1F 0%, #2A2D3A 100%)',
           transform: 'rotateY(-16deg) rotateX(6deg)',
-          boxShadow: '0 30px 60px -20px rgba(16,24,40,0.4)',
+          filter: 'drop-shadow(0 30px 40px rgba(16,24,40,0.35))',
         }}
-      >
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#2E7D32]">
-              <LayoutGrid size={14} color="white" strokeWidth={2.2} />
-            </span>
-            <span className="text-white font-bold tracking-tight text-sm">Portefolia</span>
-          </div>
-          <Wifi size={20} className="text-white/70 rotate-90" />
-        </div>
-        <div
-          className="w-11 h-8 rounded-md"
-          style={{ background: 'linear-gradient(135deg,#E6C171,#B8923D)' }}
-        />
-        <div>
-          <p className="text-white font-semibold text-lg leading-tight">Awa Ndiaye</p>
-          <p className="text-white/50 text-xs">Product Designer · Dakar</p>
-        </div>
-      </div>
+      />
       <div
         className="absolute -bottom-6 -right-4 bg-white rounded-2xl border border-[#E7E7EA] p-3 flex items-center gap-2.5 w-52"
         style={{ boxShadow: '0 16px 40px rgba(16,24,40,0.16)', transform: 'rotate(4deg)' }}
@@ -418,6 +466,39 @@ const Landing: React.FC = () => {
           {['Dakar', 'Abidjan', 'Paris', 'Casablanca', 'Montréal'].map(city => (
             <span key={city} className="text-[#18181B]/70">{city}</span>
           ))}
+        </div>
+      </section>
+
+      {/* ── Démo carte NFC ── */}
+      <section className="bg-[#0B0D0E] text-white">
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 py-20 sm:py-24">
+          <div className="max-w-2xl mx-auto text-center mb-10 sm:mb-12">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4ADE80] mb-3">
+              La carte NFC en action
+            </p>
+            <h2
+              className="font-extrabold leading-[1.02] tracking-tight"
+              style={{ fontSize: 'clamp(2rem, 4vw, 3rem)' }}
+            >
+              Un geste, et votre portfolio s'ouvre.
+            </h2>
+            <p className="mt-4 text-white/65 leading-relaxed">
+              Approchez la carte d'un smartphone : votre profil, vos compétences et votre parcours
+              s'affichent instantanément.
+            </p>
+          </div>
+
+          <NFCDemoVideo />
+
+          <div className="mt-10 flex flex-wrap justify-center gap-3">
+            <Link
+              to="/nfc-types"
+              className="inline-flex items-center gap-2 h-12 px-6 rounded-xl text-sm font-semibold text-white transition-transform hover:-translate-y-0.5"
+              style={{ background: '#2E7D32' }}
+            >
+              Rejoindre la liste d'attente <ArrowRight size={16} />
+            </Link>
+          </div>
         </div>
       </section>
 

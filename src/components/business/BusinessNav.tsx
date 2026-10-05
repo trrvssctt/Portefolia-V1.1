@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
@@ -12,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LayoutDashboard, Users, Settings, FolderOpen, User, LogOut, ChevronDown, CreditCard, BarChart3, SlidersHorizontal, Wifi } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, FolderOpen, User, LogOut, ChevronDown, CreditCard, BarChart3, SlidersHorizontal, Wifi, Compass } from 'lucide-react';
 
 interface BusinessNavProps {
   onSignOut: () => void;
@@ -23,22 +24,23 @@ const BusinessNav: React.FC<BusinessNavProps> = ({ onSignOut }) => {
   const location = useLocation();
   const { account, isBusinessAdmin } = useBusiness();
   const { user } = useAuth();
+  const onboarding = useOnboarding();
 
   const adminItems = [
-    { title: 'Tableau de bord', path: '/business/dashboard', icon: LayoutDashboard },
-    { title: 'Mes Portfolios', path: '/business/portfolios', icon: FolderOpen },
-    { title: 'Cartes NFC', path: '/business/nfc-cards', icon: Wifi },
-    { title: 'Analytics', path: '/business/analytics', icon: BarChart3 },
-    { title: 'Membres', path: '/business/members', icon: Users },
-    { title: 'Paiements', path: '/business/payments', icon: CreditCard },
-    { title: 'Personnalisation', path: '/business/settings', icon: Settings },
+    { title: 'Tableau de bord', path: '/business/dashboard', icon: LayoutDashboard, tour: 'nav-dashboard' },
+    { title: 'Mes Portfolios', path: '/business/portfolios', icon: FolderOpen, tour: 'nav-portfolios' },
+    { title: 'Cartes NFC', path: '/business/nfc-cards', icon: Wifi, tour: 'nav-nfc' },
+    { title: 'Analytics', path: '/business/analytics', icon: BarChart3, tour: 'nav-analytics' },
+    { title: 'Membres', path: '/business/members', icon: Users, tour: 'nav-members' },
+    { title: 'Paiements', path: '/business/payments', icon: CreditCard, tour: 'nav-payments' },
+    { title: 'Personnalisation', path: '/business/settings', icon: Settings, tour: 'nav-settings' },
   ];
 
   const memberItems = [
-    { title: 'Tableau de bord', path: '/business/member', icon: LayoutDashboard },
-    { title: 'Mes Portfolios', path: '/business/portfolios', icon: FolderOpen },
-    { title: 'Cartes NFC', path: '/business/nfc-cards', icon: Wifi },
-    { title: 'Analytics', path: '/business/analytics', icon: BarChart3 },
+    { title: 'Tableau de bord', path: '/business/member', icon: LayoutDashboard, tour: 'nav-dashboard' },
+    { title: 'Mes Portfolios', path: '/business/portfolios', icon: FolderOpen, tour: 'nav-portfolios' },
+    { title: 'Cartes NFC', path: '/business/nfc-cards', icon: Wifi, tour: 'nav-nfc' },
+    { title: 'Analytics', path: '/business/analytics', icon: BarChart3, tour: 'nav-analytics' },
   ];
 
   const items = isBusinessAdmin ? adminItems : memberItems;
@@ -79,6 +81,7 @@ const BusinessNav: React.FC<BusinessNavProps> = ({ onSignOut }) => {
                 return (
                   <Button
                     key={item.path}
+                    data-tour={item.tour}
                     variant={active ? 'default' : 'ghost'}
                     onClick={() => navigate(item.path)}
                     className={`flex items-center space-x-2 ${active ? 'text-white' : 'text-gray-600 hover:text-gray-900'}`}
@@ -95,7 +98,7 @@ const BusinessNav: React.FC<BusinessNavProps> = ({ onSignOut }) => {
           {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 rounded-lg px-2 py-2 min-h-[44px] hover:bg-gray-100 transition-colors outline-none">
+              <button data-tour="user-menu" className="flex items-center gap-2 rounded-lg px-2 py-2 min-h-[44px] hover:bg-gray-100 transition-colors outline-none">
                 <Avatar className="h-8 w-8 shrink-0">
                   <AvatarFallback className="text-xs font-bold text-white" style={{ backgroundColor: primaryColor }}>
                     {(user as any)?.prenom?.[0]?.toUpperCase() || (user as any)?.nom?.[0]?.toUpperCase() || <User size={14} />}
@@ -120,6 +123,12 @@ const BusinessNav: React.FC<BusinessNavProps> = ({ onSignOut }) => {
               <DropdownMenuItem onClick={() => navigate('/dashboard/settings')}>
                 <SlidersHorizontal className="mr-2 h-4 w-4" /> Paramètres du compte
               </DropdownMenuItem>
+              {onboarding.tour && (
+                <DropdownMenuItem onClick={() => onboarding.start()}>
+                  <Compass className="mr-2 h-4 w-4" />
+                  {onboarding.record?.status === 'in_progress' ? 'Reprendre la visite guidée' : 'Visite guidée'}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onSignOut} className="text-red-600 focus:text-red-600 focus:bg-red-50">
                 <LogOut className="mr-2 h-4 w-4" /> Déconnexion
@@ -138,6 +147,7 @@ const BusinessNav: React.FC<BusinessNavProps> = ({ onSignOut }) => {
             return (
               <Button
                 key={item.path}
+                data-tour={item.tour}
                 variant={active ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => navigate(item.path)}

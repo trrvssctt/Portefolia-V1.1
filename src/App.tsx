@@ -7,6 +7,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { PlanProvider } from '@/contexts/PlanContext';
 import { BusinessProvider } from '@/contexts/BusinessContext';
 import BusinessThemeProvider from '@/contexts/BusinessThemeProvider';
+import { OnboardingProvider } from '@/contexts/OnboardingContext';
+import OnboardingTour from '@/components/onboarding/OnboardingTour';
 import BusinessDashboard from './pages/business/BusinessDashboard';
 import BusinessMembers from './pages/business/BusinessMembers';
 import BusinessSettings from './pages/business/BusinessSettings';
@@ -123,9 +125,11 @@ function App() {
           <PlanProvider>
             <BusinessProvider>
               <BusinessThemeProvider>
+                <OnboardingProvider>
                 <TooltipProvider>
                   <Toaster />
                   <Sonner />
+                  <OnboardingTour />
                   <Routes>
                     <Route path="/" element={<Landing />} />
                     <Route path="/auth" element={<Auth />} />
@@ -204,6 +208,7 @@ function App() {
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </TooltipProvider>
+                </OnboardingProvider>
               </BusinessThemeProvider>
             </BusinessProvider>
           </PlanProvider>

@@ -182,7 +182,7 @@ const BusinessMemberDashboard: React.FC = () => {
           </Card>
 
           {/* Quick actions */}
-          <Card>
+          <Card data-tour="member-actions">
             <CardContent className="p-6 flex flex-col justify-between h-full gap-3">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Actions rapides</p>
               <div className="space-y-2">

@@ -237,7 +237,7 @@ const BusinessSettings: React.FC = () => {
         <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
           {/* ── Informations entreprise ── */}
-          <Card>
+          <Card data-tour="settings-info">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Building2 className="h-4 w-4 text-gray-500" />
@@ -317,7 +317,7 @@ const BusinessSettings: React.FC = () => {
           </Card>
 
           {/* ── Logo ── */}
-          <Card>
+          <Card data-tour="settings-logo">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Logo de l'entreprise</CardTitle>
             </CardHeader>
@@ -330,7 +330,7 @@ const BusinessSettings: React.FC = () => {
           </Card>
 
           {/* ── Couleurs ── */}
-          <Card>
+          <Card data-tour="settings-colors">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Palette className="h-4 w-4 text-gray-500" />
@@ -403,7 +403,7 @@ const BusinessSettings: React.FC = () => {
           </Card>
 
           {/* ── Typographie ── */}
-          <Card>
+          <Card data-tour="settings-font">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Type className="h-4 w-4 text-gray-500" />
@@ -446,6 +446,7 @@ const BusinessSettings: React.FC = () => {
             )}
             <div className={saved ? '' : 'ml-auto'}>
               <Button
+                data-tour="settings-save"
                 type="submit"
                 disabled={saving}
                 className="text-white px-8 gap-2"

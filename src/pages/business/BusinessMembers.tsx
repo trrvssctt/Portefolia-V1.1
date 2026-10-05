@@ -370,7 +370,7 @@ const BusinessMembers: React.FC = () => {
         </div>
 
         {/* ── Invite form ── */}
-        <div className="bg-white rounded-2xl border border-[#E7E7EA] p-6">
+        <div data-tour="members-invite" className="bg-white rounded-2xl border border-[#E7E7EA] p-6">
           <div className="flex items-center gap-2.5 mb-4">
             <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${primary}20`, color: primary }}>
               <UserPlus size={17} />
@@ -417,7 +417,7 @@ const BusinessMembers: React.FC = () => {
         </div>
 
         {/* ── Member list ── */}
-        <div>
+        <div data-tour="members-list">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
             <h2 className="text-base font-semibold text-[#18181B] shrink-0">
               Membres <span className="text-[#71717A] font-normal">({filtered.length})</span>

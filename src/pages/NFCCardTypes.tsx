@@ -31,6 +31,7 @@ export default function NFCCardTypes() {
   const [alreadyIn, setAlreadyIn] = useState(false);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
+  const [showBack, setShowBack]   = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,44 +98,58 @@ export default function NFCCardTypes() {
         {/* Card preview + form */}
         <div className="flex flex-col lg:flex-row items-center gap-12">
 
-          {/* Card visual */}
-          <div className="shrink-0 flex flex-col items-center gap-3">
-            <div
-              style={{
-                width: 340,
-                height: 215,
-                borderRadius: 12,
-                background: 'linear-gradient(135deg, #1A1A2E 0%, #16213E 60%, #0F3460 100%)',
-                boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
-                padding: '28px 32px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                position: 'relative',
-                overflow: 'hidden',
-              }}
+          {/* Card visual — recto / verso, cliquable pour retourner la carte */}
+          <div className="shrink-0 flex flex-col items-center gap-4 w-full max-w-[360px]">
+            <button
+              type="button"
+              onClick={() => setShowBack(v => !v)}
+              aria-label={showBack ? 'Voir le recto de la carte' : 'Voir le verso de la carte'}
+              className="relative w-full outline-none focus-visible:ring-2 focus-visible:ring-[#2E7D32] rounded-2xl"
+              style={{ aspectRatio: '475 / 300', perspective: 1200 }}
             >
-              {/* Decorative circles */}
-              <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(43,196,154,0.1)' }} />
-              <div style={{ position: 'absolute', bottom: -20, left: 20, width: 80, height: 80, borderRadius: '50%', background: 'rgba(43,196,154,0.06)' }} />
-
-              {/* Top row */}
-              <div className="flex items-center justify-between relative">
-                <img src="/lovable-uploads/logo_portefolia_remove_bg.png" alt="Portefolia" style={{ height: 28, filter: 'brightness(0) invert(1)' }} />
-                <Wifi size={22} className="text-[#1BC29A]" />
+              <div
+                className="absolute inset-0 transition-transform duration-700"
+                style={{
+                  transformStyle: 'preserve-3d',
+                  transform: showBack ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                  transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                }}
+              >
+                <img
+                  src="/nfc-card/carte-recto.webp"
+                  alt="Recto de la carte NFC Portefolia : nom, poste, coordonnées et lien du portfolio"
+                  className="absolute inset-0 w-full h-full object-contain"
+                  style={{ backfaceVisibility: 'hidden', filter: 'drop-shadow(0 24px 40px rgba(0,0,0,0.28))' }}
+                  draggable={false}
+                />
+                <img
+                  src="/nfc-card/carte-verso.webp"
+                  alt="Verso de la carte NFC Portefolia : logo Portefolia, « Expose ton futur »"
+                  className="absolute inset-0 w-full h-full object-contain"
+                  style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', filter: 'drop-shadow(0 24px 40px rgba(0,0,0,0.28))' }}
+                  draggable={false}
+                />
               </div>
+            </button>
 
-              {/* Bottom row */}
-              <div className="relative">
-                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginBottom: 4 }}>votre-nom.portefolia.tech</p>
-                <p style={{ color: '#fff', fontWeight: 700, fontSize: 18, letterSpacing: 0.5 }}>Votre Nom</p>
-              </div>
+            <div className="inline-flex p-1 rounded-full bg-white border border-gray-200 shadow-sm">
+              {[{ back: false, label: 'Recto' }, { back: true, label: 'Verso' }].map(f => (
+                <button
+                  key={f.label}
+                  type="button"
+                  onClick={() => setShowBack(f.back)}
+                  className="px-4 py-1.5 rounded-full text-xs font-semibold transition-colors"
+                  style={showBack === f.back ? { background: '#2E7D32', color: '#fff' } : { color: '#6B7280' }}
+                >
+                  {f.label}
+                </button>
+              ))}
             </div>
-            <p className="text-xs text-gray-400">Aperçu du design</p>
+            <p className="text-xs text-gray-400">Cliquez sur la carte pour la retourner</p>
           </div>
 
           {/* Waitlist form */}
-          <div className="flex-1 w-full max-w-sm mx-auto lg:mx-0">
+          <div data-tour="nfc-waitlist" className="flex-1 w-full max-w-sm mx-auto lg:mx-0">
             {submitted ? (
               <div className="text-center py-8 px-6 bg-white rounded-2xl border border-green-100 shadow-sm">
                 <CheckCircle2 size={44} className="text-[#2E7D32] mx-auto mb-4" />

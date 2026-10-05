@@ -269,7 +269,7 @@ const Dashboard = () => {
         )}
 
         {/* ── KPIs ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div data-tour="dashboard-kpis" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {kpis.map(k => {
             const Icon = k.icon;
             return (
@@ -310,6 +310,7 @@ const Dashboard = () => {
                 )}
               </div>
               <button
+                data-tour="dashboard-create"
                 onClick={openCreate}
                 disabled={isAtLimit}
                 className="flex items-center gap-1.5 h-10 px-4 rounded-[10px] text-sm font-semibold text-white shrink-0 transition-colors disabled:opacity-50"

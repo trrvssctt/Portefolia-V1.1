@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { usePlan } from '@/contexts/PlanContext';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -11,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User, FolderOpen, CreditCard, BarChart3, ChevronDown, Settings } from "lucide-react";
+import { LogOut, User, FolderOpen, CreditCard, BarChart3, ChevronDown, Settings, Compass } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 interface DashboardNavProps {
@@ -23,25 +24,30 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isFreePlan } = usePlan();
+  const onboarding = useOnboarding();
 
   const navigationItems = [
     {
       title: "Tableau de bord",
+      tour: "nav-dashboard",
       path: "/dashboard",
       icon: BarChart3,
     },
     {
       title: "Mes Portfolios",
+      tour: "nav-portfolios",
       path: "/dashboard/portfolios",
       icon: FolderOpen,
     },
     {
       title: "Formules",
+      tour: "nav-upgrade",
       path: "/upgrade",
       icon: CreditCard,
     },
     {
       title: "Cartes NFC",
+      tour: "nav-nfc",
       path: "/dashboard/nfc-cards",
       icon: CreditCard,
       soon: true,
@@ -75,6 +81,7 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
                 return (
                   <Button
                     key={`desktop-${item.path}`}
+                    data-tour={item.tour}
                     variant={isActive(item.path) ? "default" : "ghost"}
                     onClick={() => navigate(item.path)}
                     className={`flex items-center space-x-2 ${
@@ -98,7 +105,7 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
           <div className="flex items-center space-x-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-lg px-2 py-2 min-h-[44px] hover:bg-gray-100 transition-colors outline-none">
+                <button data-tour="user-menu" className="flex items-center gap-2 rounded-lg px-2 py-2 min-h-[44px] hover:bg-gray-100 transition-colors outline-none">
                   <Avatar className="h-8 w-8 shrink-0">
                     <AvatarImage
                       src={profile?.photo_profil || profile?.avatar_url || ''}
@@ -149,6 +156,12 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
                   <Settings className="mr-2 h-4 w-4" />
                   Paramètres du compte
                 </DropdownMenuItem>
+                {onboarding.tour && (
+                  <DropdownMenuItem onClick={() => onboarding.start()}>
+                    <Compass className="mr-2 h-4 w-4" />
+                    {onboarding.record?.status === 'in_progress' ? 'Reprendre la visite guidée' : 'Visite guidée'}
+                  </DropdownMenuItem>
+                )}
 
                 <DropdownMenuSeparator />
 
@@ -174,6 +187,7 @@ export const DashboardNav = ({ onSignOut, profile }: DashboardNavProps) => {
               return (
                 <Button
                   key={`mobile-${item.path}`}
+                  data-tour={item.tour}
                   variant={isActive(item.path) ? "default" : "ghost"}
                   size="sm"
                   onClick={() => navigate(item.path)}

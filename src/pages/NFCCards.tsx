@@ -483,12 +483,13 @@ const NFCCards = () => {
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  data-tour="nfc-learn"
                   onClick={() => navigate('/nfc-types')}
                   className="h-10 px-4 rounded-[10px] border border-[#E7E7EA] text-sm font-medium text-[#18181B] hover:bg-zinc-50 transition-colors"
                 >
                   En savoir plus
                 </button>
-                <div title="Disponible très prochainement">
+                <div data-tour="nfc-order" title="Disponible très prochainement">
                   <button
                     disabled
                     className="flex items-center gap-1.5 h-10 px-4 rounded-[10px] text-sm font-semibold text-white cursor-not-allowed opacity-50"

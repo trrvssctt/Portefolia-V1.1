@@ -192,7 +192,7 @@ const BusinessDashboard: React.FC = () => {
       <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8 space-y-8">
 
         {/* ── Stats ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div data-tour="biz-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <BizStat label="Membres actifs"        value={statsLoading ? '…' : String(activeMemberCount)} sub="sur 50 max"      icon={<Users      size={16} />} />
           <BizStat label="Invitations en attente" value={statsLoading ? '…' : String(pendingCount)}      sub="à accepter"     icon={<Clock      size={16} />} />
           <BizStat label="Portfolios créés"       value={statsLoading ? '…' : String(totalPortfolios)}   sub="par vos agents"  icon={<FolderOpen size={16} />} />
@@ -228,7 +228,7 @@ const BusinessDashboard: React.FC = () => {
         )}
 
         {/* ── Quick actions ── */}
-        <div>
+        <div data-tour="biz-actions">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#71717A] mb-3">Actions rapides</p>
           <div className="grid sm:grid-cols-3 gap-4">
             {actions.map(a => (
