@@ -45,6 +45,7 @@ async function init() {
                                NOT NULL DEFAULT 'pending_payment',
       wave_transaction_id      VARCHAR(64)  NULL,
       wave_sender_phone        VARCHAR(20)  NULL,
+      payment_proof_url        VARCHAR(500) NULL,
       payment_submitted_at     DATETIME     NULL,
       paid_at                  DATETIME     NULL,
       rejected_at              DATETIME     NULL,
@@ -66,6 +67,9 @@ async function init() {
       KEY idx_preorder_email (email)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  // Tables créées avant l'ajout de la preuve de paiement
+  await pool.query('ALTER TABLE nfc_preorders ADD COLUMN IF NOT EXISTS payment_proof_url VARCHAR(500) NULL AFTER wave_sender_phone');
 
   // Outbox : événements à transmettre à n8n (renvoyés tant qu'ils n'ont pas été reçus)
   await pool.query(`

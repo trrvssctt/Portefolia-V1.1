@@ -147,6 +147,30 @@ async function getCheckoutStatus(req, res) {
 }
 
 // Submit Wave payment reference — marks checkout as pending_admin review (does NOT activate account)
+// Capture du paiement Wave (abonnement, réabonnement, upgrade) : le jeton du checkout sert d'authentification
+async function uploadCheckoutProof(req, res) {
+  try {
+    const { uploadProof } = require('../utils/paymentProof');
+    const checkout = await checkoutModel.findByToken(req.params.token);
+    if (!checkout) return res.status(404).json({ error: 'Not found' });
+    if (['confirmed', 'paid', 'cancelled', 'expired'].includes(String(checkout.status || '').toLowerCase())) {
+      return res.status(409).json({ error: 'Ce paiement est déjà traité.' });
+    }
+    const url = await uploadProof(req.file, { folder: 'preuves_paiement/abonnements', publicIdPrefix: `checkout_${checkout.id}` });
+    const { pool: dbPool } = require('../db');
+    await dbPool.query('UPDATE paiements SET image_paiement = ? WHERE id = ?', [url, checkout.paiement_id]);
+    // Le panneau admin « Validation Wave » lit la preuve sur l'abonnement
+    if (checkout.abonnement_id) {
+      await dbPool.query('UPDATE abonnements SET preuve_paiement = ? WHERE id = ?', [url, checkout.abonnement_id]);
+    }
+    return res.json({ ok: true, url });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('checkout.uploadCheckoutProof error:', err);
+    return res.status(500).json({ error: 'Envoi de la capture impossible, réessayez.' });
+  }
+}
+
 async function confirmCheckout(req, res) {
   try {
     const token = req.params.token;
@@ -159,6 +183,17 @@ async function confirmCheckout(req, res) {
 
     if (!reference_transaction || !reference_transaction.trim()) {
       return res.status(400).json({ error: 'La référence de transaction Wave est requise.' });
+    }
+
+    // Preuve de paiement obligatoire pour un paiement Wave
+    if (!payment_method || payment_method === 'wave') {
+      const { pool: dbPool } = require('../db');
+      const [[proof]] = await dbPool.query(
+        "SELECT NULLIF(image_paiement, '') AS url FROM paiements WHERE id = ? LIMIT 1", [checkout.paiement_id]
+      );
+      if (!proof || !proof.url) {
+        return res.status(400).json({ error: "Ajoutez la capture d'écran de votre paiement Wave avant de confirmer." });
+      }
     }
 
     // Mark paiement and checkout as pending_admin (NOT confirmed — admin must validate)
@@ -540,4 +575,4 @@ async function getWavePendingPayments(req, res) {
   }
 }
 
-module.exports = { createCheckout, getCheckout, getCheckoutStatus, confirmCheckout, approveWavePayment, getWavePendingPayments };
+module.exports = { createCheckout, getCheckout, getCheckoutStatus, confirmCheckout, uploadCheckoutProof, approveWavePayment, getWavePendingPayments };

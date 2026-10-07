@@ -7,6 +7,7 @@ const auth = require('../middlewares/authMiddleware');
 const adminAuth = require('../middlewares/adminAuth');
 const optionalAuth = require('../middlewares/optionalAuth');
 const internalAuth = require('../middlewares/internalAuth');
+const { receiveProof } = require('../utils/paymentProof');
 
 // Le backend tourne derrière un proxy : on limite par IP réelle du client
 function clientKey(req) {
@@ -38,6 +39,7 @@ publicRouter.post('/', createLimiter, optionalAuth, ctrl.create);
 publicRouter.post('/check', checkLimiter, ctrl.checkContact);
 publicRouter.post('/resend-link', resendLimiter, ctrl.resendLink);
 publicRouter.get('/:reference', ctrl.getPublic);
+publicRouter.post('/:reference/proof', paymentLimiter, receiveProof, ctrl.submitProof);
 publicRouter.post('/:reference/payment', paymentLimiter, ctrl.submitPayment);
 
 // ── Admin ─────────────────────────────────────────────────────────────────────

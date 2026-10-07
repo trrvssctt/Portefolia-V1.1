@@ -244,6 +244,19 @@ async function findByReferenceAndToken(reference, token) {
   return p;
 }
 
+// Enregistre la capture du paiement Wave (déjà envoyée sur Cloudinary)
+async function attachProof(reference, token, url) {
+  return withTransaction(async (conn) => {
+    const [[p]] = await conn.query('SELECT * FROM nfc_preorders WHERE reference = ? FOR UPDATE', [String(reference || '')]);
+    if (!p || !safeEqual(p.public_token, token)) throw new PreorderError(404, 'Précommande introuvable.');
+    if (!['pending_payment', 'rejected', 'payment_submitted'].includes(p.status)) {
+      throw new PreorderError(409, 'Cette précommande n\'attend plus de preuve de paiement.');
+    }
+    await conn.query('UPDATE nfc_preorders SET payment_proof_url = ? WHERE id = ?', [url, p.id]);
+    return { ok: true, has_proof: true };
+  });
+}
+
 async function submitPayment(reference, token, body) {
   const txId = normalizeWaveTx(body.wave_transaction_id);
   if (!txId) {
@@ -263,6 +276,9 @@ async function submitPayment(reference, token, body) {
     const [[p]] = await conn.query('SELECT * FROM nfc_preorders WHERE reference = ? FOR UPDATE', [String(reference || '')]);
     if (!p || !safeEqual(p.public_token, token)) throw new PreorderError(404, 'Précommande introuvable.');
     assertTransition(p, 'payment_submitted');
+    if (!p.payment_proof_url) {
+      throw new PreorderError(422, "Ajoutez d'abord la capture d'écran de votre paiement Wave.");
+    }
 
     const [[dup]] = await conn.query(
       'SELECT id FROM nfc_preorders WHERE wave_transaction_id = ? AND id <> ? LIMIT 1', [txId, p.id]
@@ -388,9 +404,9 @@ async function recordPaidPreorder(conn, p) {
   const [pay] = await conn.query(
     `INSERT INTO paiements
       (commande_id, moyen_paiement, reference_transaction, montant, statut, type_flux, type_paiement,
-       metadata, date_paiement, created_at, updated_at)
-     VALUES (?, 'wave', ?, ?, 'Réussi', 'NFC', 'commande_nfc', ?, ?, ?, NOW())`,
-    [cmd.insertId, p.wave_transaction_id, p.total_amount, metadata, paidAt, paidAt]
+       metadata, image_paiement, date_paiement, created_at, updated_at)
+     VALUES (?, 'wave', ?, ?, 'Réussi', 'NFC', 'commande_nfc', ?, ?, ?, ?, NOW())`,
+    [cmd.insertId, p.wave_transaction_id, p.total_amount, metadata, p.payment_proof_url || '', paidAt, paidAt]
   );
   await conn.query('UPDATE commandes SET paiement_id = ? WHERE id = ?', [pay.insertId, cmd.insertId]);
   await conn.query('UPDATE nfc_preorders SET commande_id = ?, user_id = ? WHERE id = ?', [cmd.insertId, userId, p.id]);
@@ -627,6 +643,7 @@ module.exports = {
   safeEqual,
   createPreorder,
   findByReferenceAndToken,
+  attachProof,
   checkContact,
   resendTrackingLink,
   submitPayment,

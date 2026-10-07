@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Wifi, Copy, Check, Loader2, CheckCircle2, Clock, XCircle, AlertTriangle, ExternalLink, Home, MessageCircle, LayoutDashboard } from 'lucide-react';
 import { NFC_API_BASE, formatFcfa } from '@/hooks/useNfcConfig';
+import PaymentProofUpload from '@/components/payment/PaymentProofUpload';
 
 type Status = 'pending_payment' | 'payment_submitted' | 'paid' | 'rejected' | 'expired' | 'cancelled' | 'converted';
 
@@ -15,6 +16,7 @@ interface PublicPreorder {
   unit_price: number;
   total_amount: number;
   wave_transaction_id: string | null;
+  has_proof: boolean;
   rejection_reason: string | null;
   created_at: string;
   expiry_hours: number;
@@ -93,7 +95,8 @@ function Timeline({ status }: { status: Status }) {
   );
 }
 
-function PaymentForm({ reference, token, onDone }: { reference: string; token: string; onDone: () => void }) {
+function PaymentForm({ reference, token, hasProof, onDone }: { reference: string; token: string; hasProof: boolean; onDone: () => void }) {
+  const [proofOk, setProofOk] = useState(hasProof);
   const [tx, setTx] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
@@ -103,6 +106,7 @@ function PaymentForm({ reference, token, onDone }: { reference: string; token: s
     e.preventDefault();
     if (loading) return;
     if (tx.trim().length < 6) { setError("Saisissez l'identifiant de la transaction Wave."); return; }
+    if (!proofOk) { setError("Ajoutez la capture d'écran de votre paiement Wave."); return; }
     setLoading(true);
     setError('');
     try {
@@ -135,8 +139,14 @@ function PaymentForm({ reference, token, onDone }: { reference: string; token: s
         <input type="tel" inputMode="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setError(''); }} placeholder="77 123 45 67"
           className="w-full h-11 px-4 rounded-xl border border-gray-200 bg-[#FAFAFA] text-sm outline-none focus:border-[#2E7D32]" />
       </div>
+      <PaymentProofUpload
+        uploadUrl={`${NFC_API_BASE}/api/nfc/preorders/${encodeURIComponent(reference)}/proof`}
+        extraFields={{ token }}
+        alreadyUploaded={hasProof}
+        onUploaded={() => { setProofOk(true); setError(''); }}
+      />
       {error && <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</p>}
-      <button type="submit" disabled={loading}
+      <button type="submit" disabled={loading || !proofOk}
         className="w-full h-11 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-70"
         style={{ background: 'linear-gradient(135deg, #2E7D32, #1BC29A)' }}>
         {loading && <Loader2 size={16} className="animate-spin" />} Déclarer mon paiement
@@ -220,10 +230,22 @@ export default function NfcPreorderTracking() {
                 <div className="space-y-3">
                   <p className="text-sm font-bold text-gray-900">Payer avec Wave</p>
                   <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-                    <li>Envoyez <strong className="text-gray-900">{formatFcfa(p.total_amount)}</strong> au numéro ci-dessous.</li>
-                    <li>Mettez la référence <strong className="text-gray-900">{p.reference}</strong> en note du transfert.</li>
-                    <li>Saisissez l'identifiant de la transaction dans le formulaire.</li>
+                    <li>Payez <strong className="text-gray-900">{formatFcfa(p.total_amount)}</strong> en scannant le QR code, ou par transfert au numéro ci-dessous.</li>
+                    <li>Mettez la référence <strong className="text-gray-900">{p.reference}</strong> en note si possible.</li>
+                    <li>Faites une capture d'écran du reçu Wave, puis remplissez le formulaire.</li>
                   </ol>
+                  <div className="flex flex-col items-center gap-2 py-2">
+                    <div className="relative">
+                      <div className="bg-white rounded-2xl shadow-md border-4 border-[#1DC4FF]/30 p-3">
+                        <img src="/qr_code_marchant_wave.png" alt="QR code marchand Wave Portefolia" className="w-44 h-44 object-contain" />
+                      </div>
+                      <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white border border-gray-200 pl-1 pr-3 py-1 rounded-full shadow">
+                        <img src="/logo_wave.png" alt="" className="w-6 h-6 rounded-full" />
+                        <span className="text-xs font-bold text-gray-800">Wave</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-3 text-center">Scannez avec l'application Wave (onglet <strong>Scanner</strong>), puis saisissez <strong>{formatFcfa(p.total_amount)}</strong>.</p>
+                  </div>
                   <div className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5" style={{ background: '#EEF6FF' }}>
                     <div><p className="text-[11px] text-gray-500">Numéro Wave</p><p className="font-bold text-gray-900">{p.payment.wave_number}</p></div>
                     <CopyButton value={p.payment.wave_number.replace(/\s/g, '')} label="le numéro Wave" />
@@ -240,7 +262,7 @@ export default function NfcPreorderTracking() {
                   )}
                 </div>
                 <div className="border-t border-gray-100 pt-5">
-                  <PaymentForm reference={p.reference} token={token} onDone={() => qc.invalidateQueries({ queryKey })} />
+                  <PaymentForm reference={p.reference} token={token} hasProof={p.has_proof} onDone={() => qc.invalidateQueries({ queryKey })} />
                 </div>
                 {p.status === 'pending_payment' && (
                   <p className="text-[11px] text-gray-400 text-center">Sans paiement sous {Math.round(p.expiry_hours / 24)} jours, la précommande est annulée automatiquement.</p>

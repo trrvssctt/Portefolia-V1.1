@@ -13,6 +13,12 @@ router.get('/:token', checkoutController.getCheckout);
 // lightweight status polling endpoint — returns only status + plan name (public)
 router.get('/:token/status', checkoutController.getCheckoutStatus);
 
+// capture du paiement Wave (public — le jeton du checkout sert d'authentification)
+const { receiveProof } = require('../utils/paymentProof');
+const rateLimit = require('express-rate-limit');
+const proofLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 15, standardHeaders: true, legacyHeaders: false, validate: { xForwardedForHeader: false }, message: { error: 'Trop d\'envois. Réessayez dans 15 minutes.' } });
+router.post('/:token/proof', proofLimiter, receiveProof, checkoutController.uploadCheckoutProof);
+
 // confirm checkout via Wave/Mobile Money (user clicks "J'ai payé")
 router.post('/:token/confirm', checkoutController.confirmCheckout);
 

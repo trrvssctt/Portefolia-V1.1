@@ -143,6 +143,24 @@ function DetailPanel({ id, onClose }: { id: number; onClose: () => void }) {
               ))}
             </div>
 
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">Preuve de paiement Wave</p>
+              {p.payment_proof_url ? (
+                /\.pdf($|\?)/i.test(p.payment_proof_url) ? (
+                  <a href={p.payment_proof_url} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-[#2E7D32] underline">Ouvrir la preuve (PDF)</a>
+                ) : (
+                  <a href={p.payment_proof_url} target="_blank" rel="noopener noreferrer" title="Ouvrir en grand">
+                    <img src={p.payment_proof_url} alt="Capture du paiement Wave" className="max-h-72 rounded-xl border border-gray-200 object-contain bg-gray-50" />
+                  </a>
+                )
+              ) : (
+                <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">Aucune capture envoyée par le client.</p>
+              )}
+              {p.status === 'payment_submitted' && (
+                <p className="text-[11px] text-gray-500 mt-1.5">Comparez le montant, la date et l'identifiant de transaction avec Wave Business avant de valider.</p>
+              )}
+            </div>
+
             <dl className="text-sm divide-y divide-gray-100 border-y border-gray-100">
               {([
                 ['Client', p.full_name],

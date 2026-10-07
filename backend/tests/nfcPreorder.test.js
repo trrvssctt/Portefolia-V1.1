@@ -128,3 +128,19 @@ test('submitPayment refuse la référence saisie à la place de l\'identifiant W
     (e) => e.status === 422 && /référence de votre précommande/.test(e.message)
   );
 });
+
+test('preuve de paiement : seuls JPG, PNG, WebP et PDF sont acceptés (type réel du fichier)', () => {
+  const { sniffMime, validateProofFile } = require('../src/utils/paymentProof');
+  const png = Buffer.from('89504e470d0a1a0a0000000d', 'hex');
+  const jpg = Buffer.from('ffd8ffe000104a4649460001', 'hex');
+  const pdf = Buffer.from('%PDF-1.7\n%âãÏÓ', 'latin1');
+  const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBPVP8 ')]);
+  assert.equal(sniffMime(png), 'image/png');
+  assert.equal(sniffMime(jpg), 'image/jpeg');
+  assert.equal(sniffMime(pdf), 'application/pdf');
+  assert.equal(sniffMime(webp), 'image/webp');
+  // Un fichier HTML renommé en .png est refusé
+  assert.throws(() => validateProofFile({ buffer: Buffer.from('<html><script>alert(1)</script>') }), (e) => e.status === 422);
+  assert.throws(() => validateProofFile(undefined), (e) => e.status === 422);
+  assert.equal(validateProofFile({ buffer: png }), 'image/png');
+});

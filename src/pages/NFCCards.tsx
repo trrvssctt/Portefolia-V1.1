@@ -8,7 +8,7 @@ import { useNfcConfig, formatFcfa } from "@/hooks/useNfcConfig";
 import { isTokenExpired } from '@/utils/authUtils';
 import {
   Plus, CreditCard, CheckCircle, Clock, XCircle, Eye, Package,
-  Search, Wifi, Zap, ShoppingCart, X, Trash2, ChevronDown, Scan,
+  Search, Wifi, Zap, ShoppingCart, X, Trash2, ChevronDown, Scan, Loader2, Download,
 } from "lucide-react";
 import { DashboardNav } from "@/components/dashboard/DashboardNav";
 import BusinessNav from "@/components/business/BusinessNav";
@@ -190,6 +190,37 @@ const NFCCards = () => {
   const { user, profile, loading: authLoading, signOut } = useAuth();
   const { config: nfcConfig } = useNfcConfig();
   const unitPrice = nfcConfig.unit_price;
+  const [receiptLoadingId, setReceiptLoadingId] = useState<number | null>(null);
+
+  // Reçu PDF du paiement d'une commande (même document que dans l'historique des paiements)
+  const downloadOrderReceipt = async (order: any) => {
+    const token = localStorage.getItem('token');
+    if (!token || !order.paiement_id) return;
+    setReceiptLoadingId(order.id);
+    try {
+      const res = await fetch(`${API_BASE}/api/users/me/paiements/${order.paiement_id}/receipt`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: 'Erreur', description: (err as any).error || 'Impossible de générer le reçu', variant: 'destructive' });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recu-portefolia-${order.numero_commande || order.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de télécharger le reçu', variant: 'destructive' });
+    } finally {
+      setReceiptLoadingId(null);
+    }
+  };
   const { isFreePlan: ctxFree } = usePlan();
   const [isFreePlan, setIsFreePlan]       = useState(false);
   const [nfcCards, setNfcCards]           = useState<any[]>([]);
@@ -531,6 +562,50 @@ const NFCCards = () => {
               <NFCStat icon={<Clock size={18} />}       label="En attente"    value={pendingCount} />
               <NFCStat icon={<Zap size={18} />}         label="Prix unitaire" value={formatFcfa(unitPrice).replace(' CFA', '')} />
             </div>
+
+            {/* ── Commandes payées (dont précommandes) : statut de fabrication + reçu ── */}
+            {orders.filter(o => o.statut !== 'Annulée' && o.paiement_statut === 'payé').length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-[#71717A] uppercase tracking-wide">Commandes payées</p>
+                {orders
+                  .filter(o => o.statut !== 'Annulée' && o.paiement_statut === 'payé')
+                  .map(order => {
+                    const STEP_LABEL: Record<string, string> = {
+                      En_attente: 'Paiement confirmé · fabrication à venir',
+                      En_traitement: 'En fabrication',
+                      'Gravée': 'Carte gravée',
+                      'Expédiée': 'Expédiée',
+                      'Livrée': 'Livrée',
+                    };
+                    const dateStr = new Date(order.paiement_date || order.date_commande || order.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+                    const preorderRef = (String(order.paiement_note || '').match(/PF-NFC-\d+/) || [])[0];
+                    return (
+                      <div key={order.id} className="bg-white border border-[#E4E4E7] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-[#09090B]">{preorderRef ? `Précommande ${preorderRef}` : `Commande ${order.numero_commande}`}</span>
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#DCFCE7', color: '#166534' }}>Payée</span>
+                          </div>
+                          <p className="text-xs text-[#71717A] mt-0.5">
+                            {Number(order.montant_total).toLocaleString('fr-FR')} F CFA · payé le {dateStr} · {STEP_LABEL[order.statut] || order.statut}
+                          </p>
+                        </div>
+                        {order.paiement_id ? (
+                          <button onClick={() => downloadOrderReceipt(order)} disabled={receiptLoadingId === order.id}
+                            className="shrink-0 h-9 px-3 rounded-lg border border-green-200 text-green-700 text-xs font-semibold hover:bg-green-50 flex items-center justify-center gap-1.5 disabled:opacity-60">
+                            {receiptLoadingId === order.id ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Reçu PDF
+                          </button>
+                        ) : (
+                          <button onClick={() => navigate('/dashboard/paiements')}
+                            className="shrink-0 h-9 px-3 rounded-lg border border-[#E4E4E7] text-xs font-semibold text-[#09090B] hover:bg-gray-50">
+                            Voir mes paiements
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
 
             {/* ── Suivi commandes (uniquement paiements non finalisés) ── */}
             {orders.filter(o => o.statut !== 'Annulée' && o.paiement_statut !== 'payé').length > 0 && (

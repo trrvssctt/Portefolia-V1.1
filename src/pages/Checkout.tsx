@@ -10,6 +10,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import PaymentProofUpload from '@/components/payment/PaymentProofUpload';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
 
@@ -38,6 +39,7 @@ export default function CheckoutPage() {
   const [copied, setCopied] = useState(false);
   const [waveConfirming, setWaveConfirming] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
+  const [proofUploaded, setProofUploaded] = useState(false);
 
   // ── Load checkout data ────────────────────────────────────────────────────
   useEffect(() => {
@@ -56,6 +58,7 @@ export default function CheckoutPage() {
           json = await res.json();
         }
         setData(json);
+        setProofUploaded(!!json?.paiement?.image_paiement);
         if (json.expires_at) {
           const diff = Math.max(0, Math.floor((new Date(json.expires_at).getTime() - Date.now()) / 1000));
           setTimeLeft(diff);
@@ -92,6 +95,10 @@ export default function CheckoutPage() {
       toast({ title: 'Référence requise', description: 'Veuillez saisir votre référence de transaction Wave.', variant: 'destructive' });
       return;
     }
+    if (!proofUploaded) {
+      toast({ title: 'Capture requise', description: "Ajoutez la capture d'écran de votre paiement Wave.", variant: 'destructive' });
+      return;
+    }
     setWaveConfirming(true);
     try {
       const authToken = localStorage.getItem('token');
@@ -102,7 +109,8 @@ export default function CheckoutPage() {
         method: 'POST', headers,
         body: JSON.stringify({ reference_transaction: waveReference, payment_method: 'wave' }),
       });
-      if (!res.ok) {
+      // Ancien format de jeton uniquement : ne jamais basculer sur une autre erreur (preuve manquante…)
+      if (res.status === 404) {
         res = await fetch(`${API_BASE}/api/abonnements/checkout/${token}/confirm`, {
           method: 'POST', headers,
           body: JSON.stringify({ reference_transaction: waveReference, payment_method: 'wave' }),
@@ -324,8 +332,9 @@ export default function CheckoutPage() {
                           />
                         </div>
                         {/* Wave logo badge */}
-                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#1BC29A] text-white text-xs font-bold px-4 py-1.5 rounded-full shadow">
-                          Wave
+                        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-white border border-gray-200 pl-1 pr-3 py-1 rounded-full shadow">
+                          <img src="/logo_wave.png" alt="" className="w-6 h-6 rounded-full" />
+                          <span className="text-xs font-bold text-gray-800">Wave</span>
                         </div>
                       </div>
 
@@ -394,12 +403,19 @@ export default function CheckoutPage() {
                       <p className="text-[10px] text-gray-500 leading-tight">
                         Vous trouverez cette référence dans votre historique Wave après avoir validé le paiement.
                       </p>
+                      {token && (
+                        <PaymentProofUpload
+                          uploadUrl={`${API_BASE}/api/checkout/${token}/proof`}
+                          alreadyUploaded={!!data?.paiement?.image_paiement}
+                          onUploaded={() => setProofUploaded(true)}
+                        />
+                      )}
                     </div>
 
                     {/* Confirm button */}
                     <Button
                       size="lg"
-                      disabled={waveConfirming || expired}
+                      disabled={waveConfirming || expired || !proofUploaded}
                       onClick={handleWaveConfirm}
                       className="w-full h-13 bg-[#1BC29A] hover:bg-[#17a884] text-base font-bold gap-2"
                     >

@@ -1,6 +1,7 @@
 const svc = require('../services/nfcPreorderService');
 const { getNfcConfig, updateNfcConfig, buildWaveLink } = require('../utils/nfcConfig');
 const { trackingUrl, iso } = require('../utils/nfcPreorderPayload');
+const { uploadProof } = require('../utils/paymentProof');
 
 function handleError(res, err, label) {
   if (err instanceof svc.PreorderError || err.status) {
@@ -72,6 +73,7 @@ async function getPublic(req, res) {
       total_amount: Number(p.total_amount),
       currency: p.currency,
       wave_transaction_id: p.wave_transaction_id,
+      has_proof: !!p.payment_proof_url,
       rejection_reason: p.rejection_reason,
       created_at: iso(p.created_at),
       payment_submitted_at: iso(p.payment_submitted_at),
@@ -80,6 +82,16 @@ async function getPublic(req, res) {
       payment: paymentInfo(cfg, p.total_amount),
     });
   } catch (err) { return handleError(res, err, 'getPublic'); }
+}
+
+async function submitProof(req, res) {
+  try {
+    const token = (req.body || {}).token;
+    // Vérifier la précommande AVANT d'envoyer le fichier sur Cloudinary
+    const p = await svc.findByReferenceAndToken(req.params.reference, token);
+    const url = await uploadProof(req.file, { folder: 'preuves_paiement/nfc', publicIdPrefix: p.reference });
+    return res.json(await svc.attachProof(p.reference, token, url));
+  } catch (err) { return handleError(res, err, 'submitProof'); }
 }
 
 async function submitPayment(req, res) {
@@ -184,7 +196,7 @@ async function internalNotification(req, res) {
 }
 
 module.exports = {
-  getPublicConfig, create, getPublic, submitPayment, checkContact, resendLink,
+  getPublicConfig, create, getPublic, submitPayment, submitProof, checkContact, resendLink,
   adminList, adminStats, adminDetail, adminValidate, adminReject, adminCancel, adminConvert, adminResend,
   adminExport, adminGetSettings, adminUpdateSettings,
   internalExpireStale, internalRemindersDue, internalNotification,
