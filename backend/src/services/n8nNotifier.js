@@ -19,7 +19,8 @@ async function computeStats(conn) {
 }
 
 // À appeler DANS la transaction, après le changement de statut. Retourne l'event_id.
-async function emit(conn, preorderId, event) {
+// options.clientOnly : n8n n'envoie que l'e-mail client (renvoi du lien de suivi)
+async function emit(conn, preorderId, event, options = {}) {
   const [[preorder]] = await conn.query('SELECT * FROM nfc_preorders WHERE id = ?', [preorderId]);
   if (!preorder) throw new Error(`Précommande ${preorderId} introuvable`);
   const cfg = await getNfcConfig();
@@ -29,6 +30,7 @@ async function emit(conn, preorderId, event) {
     event_id: eventId,
     event,
     occurred_at: new Date().toISOString(),
+    audience: options.clientOnly ? 'client' : 'all',
     ...buildPreorderPayload(preorder, cfg, stats),
   };
   await conn.query(
@@ -106,7 +108,7 @@ function start() {
 }
 
 // Renvoie le dernier événement d'une précommande, avec des données à jour et un nouvel event_id
-async function resendLast(preorderId) {
+async function resendLast(preorderId, options = {}) {
   const [[last]] = await pool.query(
     'SELECT event FROM nfc_preorder_events WHERE preorder_id = ? ORDER BY created_at DESC LIMIT 1',
     [preorderId]
@@ -115,7 +117,7 @@ async function resendLast(preorderId) {
   const conn = await pool.getConnection();
   let eventId;
   try {
-    eventId = await emit(conn, preorderId, last.event);
+    eventId = await emit(conn, preorderId, last.event, options);
   } finally {
     conn.release();
   }

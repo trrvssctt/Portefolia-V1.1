@@ -28,11 +28,15 @@ function limiter(max, message) {
 
 const createLimiter = limiter(5, 'Trop de précommandes depuis cette connexion. Réessayez dans 15 minutes.');
 const paymentLimiter = limiter(10, 'Trop de tentatives. Réessayez dans 15 minutes.');
+const checkLimiter = limiter(40, 'Trop de vérifications. Réessayez dans 15 minutes.');
+const resendLimiter = limiter(3, 'Lien déjà renvoyé plusieurs fois. Vérifiez vos e-mails (et les spams) ou réessayez dans 15 minutes.');
 
 // ── Public ────────────────────────────────────────────────────────────────────
 const publicRouter = express.Router();
 publicRouter.get('/config', ctrl.getPublicConfig);
 publicRouter.post('/', createLimiter, optionalAuth, ctrl.create);
+publicRouter.post('/check', checkLimiter, ctrl.checkContact);
+publicRouter.post('/resend-link', resendLimiter, ctrl.resendLink);
 publicRouter.get('/:reference', ctrl.getPublic);
 publicRouter.post('/:reference/payment', paymentLimiter, ctrl.submitPayment);
 

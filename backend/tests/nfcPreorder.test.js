@@ -121,3 +121,10 @@ test('internalAuth : 401 sans la bonne clé', () => {
   process.env.INTERNAL_API_KEY = '';
   assert.equal(run(''), 401);
 });
+
+test('submitPayment refuse la référence saisie à la place de l\'identifiant Wave', async () => {
+  await assert.rejects(
+    svc.submitPayment('PF-NFC-0002', 'tok', { wave_transaction_id: 'pf-nfc-0002' }),
+    (e) => e.status === 422 && /référence de votre précommande/.test(e.message)
+  );
+});

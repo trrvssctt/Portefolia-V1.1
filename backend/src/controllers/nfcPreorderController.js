@@ -90,6 +90,14 @@ async function submitPayment(req, res) {
   } catch (err) { return handleError(res, err, 'submitPayment'); }
 }
 
+async function checkContact(req, res) {
+  try { return res.json(await svc.checkContact(req.body || {})); } catch (err) { return handleError(res, err, 'checkContact'); }
+}
+
+async function resendLink(req, res) {
+  try { return res.json(await svc.resendTrackingLink(req.body || {})); } catch (err) { return handleError(res, err, 'resendLink'); }
+}
+
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
 async function adminList(req, res) {
@@ -176,7 +184,7 @@ async function internalNotification(req, res) {
 }
 
 module.exports = {
-  getPublicConfig, create, getPublic, submitPayment,
+  getPublicConfig, create, getPublic, submitPayment, checkContact, resendLink,
   adminList, adminStats, adminDetail, adminValidate, adminReject, adminCancel, adminConvert, adminResend,
   adminExport, adminGetSettings, adminUpdateSettings,
   internalExpireStale, internalRemindersDue, internalNotification,

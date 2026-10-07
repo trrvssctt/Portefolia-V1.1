@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, ShoppingBag } from 'lucide-react';
+import { Loader2, ShoppingBag, AlertTriangle, MailCheck } from 'lucide-react';
 import { useNfcConfig, formatFcfa, NFC_API_BASE } from '@/hooks/useNfcConfig';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -14,6 +14,8 @@ type Fields = {
   quantity: number;
   website: string; // honeypot
 };
+
+type ActivePreorder = { reference: string; status: string; message: string };
 
 const inputClass = 'w-full h-11 px-4 rounded-xl border text-sm outline-none transition-colors focus:border-[#2E7D32]';
 
@@ -35,6 +37,47 @@ export default function NfcPreorderForm() {
   const [errors, setErrors] = useState<Partial<Record<keyof Fields, string>>>({});
   const [serverError, setServerError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [active, setActive] = useState<ActivePreorder | null>(null);
+  const [resend, setResend] = useState<{ state: 'idle' | 'sending' | 'sent' | 'error'; text?: string }>({ state: 'idle' });
+
+  // Vérifie en direct si l'e-mail ou le téléphone a déjà une précommande en cours
+  const checkContact = async (email: string, phone: string) => {
+    const validEmail = EMAIL_RE.test(email.trim());
+    const validPhone = phone.replace(/\D/g, '').length >= 9;
+    if (!validEmail && !validPhone) { setActive(null); return; }
+    try {
+      const res = await fetch(`${NFC_API_BASE}/api/nfc/preorders/check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: validEmail ? email.trim() : undefined, phone: validPhone ? phone : undefined }),
+      });
+      if (!res.ok) return;
+      const d = await res.json();
+      setActive(d.active ? { reference: d.reference, status: d.status, message: d.message } : null);
+      if (!d.active) setResend({ state: 'idle' });
+    } catch { /* la vérification serveur à l'envoi prend le relais */ }
+  };
+
+  useEffect(() => {
+    const t = setTimeout(() => checkContact(f.email, f.phone), 600);
+    return () => clearTimeout(t);
+  }, [f.email, f.phone]);
+
+  const resendLink = async () => {
+    setResend({ state: 'sending' });
+    try {
+      const res = await fetch(`${NFC_API_BASE}/api/nfc/preorders/resend-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: f.email.trim() || undefined, phone: f.phone || undefined }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setResend({ state: 'error', text: d?.error || 'Envoi impossible, réessayez.' }); return; }
+      setResend({ state: 'sent', text: `Lien envoyé à ${d.email_hint}. Pensez à vérifier vos spams.` });
+    } catch {
+      setResend({ state: 'error', text: 'Connexion impossible. Réessayez.' });
+    }
+  };
 
   // Pré-remplir nom et e-mail si l'utilisateur est connecté
   useEffect(() => {
@@ -79,7 +122,7 @@ export default function NfcPreorderForm() {
 
   const handleSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
-    if (loading || !validate()) return;
+    if (loading || active || !validate()) return;
     setLoading(true);
     setServerError('');
     try {
@@ -91,6 +134,10 @@ export default function NfcPreorderForm() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 409 && data?.reference) {
+          setActive({ reference: data.reference, status: data.active_status, message: data.error });
+          return;
+        }
         if (data?.errors) setErrors(data.errors);
         setServerError(data?.error || 'Une erreur est survenue. Veuillez réessayer.');
         return;
@@ -164,11 +211,33 @@ export default function NfcPreorderForm() {
         <span className="text-lg font-black" style={{ color: '#1B5E20' }}>{formatFcfa(total)}</span>
       </div>
 
+      {active && (
+        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 space-y-2">
+          <div className="flex gap-2">
+            <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-900">{active.message}</p>
+          </div>
+          {resend.state === 'sent' ? (
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-[#2E7D32]"><MailCheck size={14} /> {resend.text}</p>
+          ) : (
+            <>
+              <button type="button" onClick={resendLink} disabled={resend.state === 'sending'}
+                className="w-full h-9 rounded-lg bg-white border border-amber-200 text-xs font-bold text-amber-900 hover:bg-amber-100 flex items-center justify-center gap-1.5 disabled:opacity-60">
+                {resend.state === 'sending' ? <Loader2 size={13} className="animate-spin" /> : <MailCheck size={13} />}
+                Recevoir à nouveau mon lien de suivi par e-mail
+              </button>
+              {resend.state === 'error' && <p className="text-xs text-red-600">{resend.text}</p>}
+            </>
+          )}
+          <p className="text-[11px] text-amber-800/80">Pour une autre personne, utilisez son propre e-mail et son numéro.</p>
+        </div>
+      )}
+
       {serverError && (
         <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{serverError}</p>
       )}
 
-      <button type="submit" disabled={loading}
+      <button type="submit" disabled={loading || !!active}
         className="w-full h-11 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-70"
         style={{ background: 'linear-gradient(135deg, #2E7D32, #1BC29A)' }}>
         {loading ? <Loader2 size={16} className="animate-spin" /> : <ShoppingBag size={16} />}

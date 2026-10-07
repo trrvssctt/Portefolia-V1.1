@@ -146,21 +146,74 @@ async function logAdmin(conn, ctx, action, details) {
 
 // ── Côté client ───────────────────────────────────────────────────────────────
 
+// Statuts qui empêchent une nouvelle précommande pour le même e-mail / téléphone
+const ACTIVE_STATUSES = ['pending_payment', 'payment_submitted', 'rejected'];
+
+const ACTIVE_MESSAGES = {
+  pending_payment: 'est en attente de paiement',
+  payment_submitted: 'a un paiement en cours de vérification',
+  rejected: 'attend une nouvelle déclaration de paiement',
+};
+
+async function findActiveByContact({ email, phone }) {
+  const conds = [];
+  const params = [];
+  if (email) { conds.push('email = ?'); params.push(email); }
+  if (phone) { conds.push('phone = ?'); params.push(phone); }
+  if (!conds.length) return null;
+  const [[p]] = await pool.query(
+    `SELECT * FROM nfc_preorders
+     WHERE status IN (?) AND (${conds.join(' OR ')})
+     ORDER BY id DESC LIMIT 1`,
+    [ACTIVE_STATUSES, ...params]
+  );
+  if (!p) return null;
+  return { preorder: p, match: email && p.email === email ? 'email' : 'phone' };
+}
+
+function contactFromBody(body = {}) {
+  const email = String(body.email || '').trim().toLowerCase();
+  return {
+    email: EMAIL_RE.test(email) ? email : null,
+    phone: body.phone ? normalizePhone(body.phone) : null,
+  };
+}
+
+// Vérification en direct depuis le formulaire : ne révèle ni le lien de suivi ni les données du client
+async function checkContact(body) {
+  const found = await findActiveByContact(contactFromBody(body));
+  if (!found) return { active: false };
+  const { preorder: p, match } = found;
+  return {
+    active: true,
+    match,
+    reference: p.reference,
+    status: p.status,
+    message: `Une précommande (${p.reference}) ${ACTIVE_MESSAGES[p.status]} pour ${match === 'email' ? 'cet e-mail' : 'ce numéro'}.`,
+  };
+}
+
+// Renvoie au client (et seulement au client) le dernier e-mail, qui contient son lien de suivi
+async function resendTrackingLink(body) {
+  const found = await findActiveByContact(contactFromBody(body));
+  if (!found) throw new PreorderError(404, 'Aucune précommande en cours pour ces coordonnées.');
+  const r = await notifier.resendLast(found.preorder.id, { clientOnly: true });
+  if (!r) throw new PreorderError(409, 'Impossible de renvoyer le lien pour le moment.');
+  const [user, domain] = found.preorder.email.split('@');
+  return { ok: true, email_hint: `${user.slice(0, 2)}***@${domain}` };
+}
+
 async function createPreorder(body, { userId = null } = {}) {
   const cfg = await getNfcConfig();
   const input = validateCreateInput(body, cfg);
 
-  // Une seule précommande en attente de paiement par e-mail
-  const [[existing]] = await pool.query(
-    `SELECT reference FROM nfc_preorders
-     WHERE email = ? AND status = 'pending_payment' AND created_at > NOW() - INTERVAL ? HOUR
-     ORDER BY id DESC LIMIT 1`,
-    [input.email, cfg.expiry_hours]
-  );
+  // Une seule précommande en cours par e-mail et par téléphone
+  const existing = await findActiveByContact({ email: input.email, phone: input.phone });
   if (existing) {
+    const p = existing.preorder;
     throw new PreorderError(409,
-      `Vous avez déjà une précommande en attente de paiement (${existing.reference}). Retrouvez-la dans l'e-mail que nous vous avons envoyé.`,
-      { reference: existing.reference });
+      `Une précommande (${p.reference}) ${ACTIVE_MESSAGES[p.status]} pour ${existing.match === 'email' ? 'cet e-mail' : 'ce numéro'}. Retrouvez-la grâce au lien reçu par e-mail.`,
+      { reference: p.reference, active_status: p.status, match: existing.match });
   }
 
   const token = crypto.randomBytes(32).toString('hex');
@@ -195,6 +248,10 @@ async function submitPayment(reference, token, body) {
   const txId = normalizeWaveTx(body.wave_transaction_id);
   if (!txId) {
     throw new PreorderError(422, "Identifiant de transaction Wave invalide (6 à 64 caractères : lettres, chiffres, - ou _).");
+  }
+  if (txId.startsWith('PF-NFC')) {
+    throw new PreorderError(422,
+      "Ceci est la référence de votre précommande. Saisissez l'identifiant de la transaction affiché dans l'application Wave.");
   }
   let senderPhone = null;
   if (body.wave_sender_phone) {
@@ -536,6 +593,8 @@ module.exports = {
   safeEqual,
   createPreorder,
   findByReferenceAndToken,
+  checkContact,
+  resendTrackingLink,
   submitPayment,
   validatePayment,
   rejectPayment,

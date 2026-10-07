@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Wifi, Copy, Check, Loader2, CheckCircle2, Clock, XCircle, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Wifi, Copy, Check, Loader2, CheckCircle2, Clock, XCircle, AlertTriangle, ExternalLink, Home, MessageCircle, LayoutDashboard } from 'lucide-react';
 import { NFC_API_BASE, formatFcfa } from '@/hooks/useNfcConfig';
 
 type Status = 'pending_payment' | 'payment_submitted' | 'paid' | 'rejected' | 'expired' | 'cancelled' | 'converted';
@@ -19,6 +19,32 @@ interface PublicPreorder {
   created_at: string;
   expiry_hours: number;
   payment: { wave_number: string; wave_link: string | null };
+}
+
+const SUPPORT_WHATSAPP = '221781311371';
+
+function waSupportLink(reference?: string) {
+  const text = reference ? `Bonjour, je vous contacte au sujet de ma précommande ${reference}.` : 'Bonjour, une question sur la carte NFC Portefolia.';
+  return `https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(text)}`;
+}
+
+// Actions toujours disponibles en bas de page : le client n'est jamais bloqué
+function PageActions({ reference }: { reference?: string }) {
+  const loggedIn = typeof window !== 'undefined' && !!localStorage.getItem('token');
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+      <Link to="/" className="h-11 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2">
+        <Home size={15} /> Accueil
+      </Link>
+      <Link to={loggedIn ? '/dashboard' : '/auth'} className="h-11 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2">
+        <LayoutDashboard size={15} /> {loggedIn ? 'Mon espace' : 'Créer mon portfolio'}
+      </Link>
+      <a href={waSupportLink(reference)} target="_blank" rel="noopener noreferrer"
+        className="h-11 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-[#2E7D32] hover:bg-green-50 flex items-center justify-center gap-2">
+        <MessageCircle size={15} /> Nous écrire
+      </a>
+    </div>
+  );
 }
 
 const STEPS = ['Précommande reçue', 'Paiement déclaré', 'Paiement confirmé', 'Fabrication & livraison'];
@@ -141,10 +167,13 @@ export default function NfcPreorderTracking() {
       <header style={{ background: 'linear-gradient(135deg, #1B5E20 0%, #2E7D32 60%, #1BC29A 100%)' }}>
         <div className="max-w-xl mx-auto px-4 py-6 flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><Wifi size={18} className="text-white" /></div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-lg font-bold text-white leading-tight">Ma précommande NFC</h1>
             {p && <p className="text-white/80 text-xs font-mono">{p.reference}</p>}
           </div>
+          <Link to="/" className="h-9 px-3 rounded-xl border border-white/40 text-white text-xs font-semibold hover:bg-white/10 flex items-center gap-1.5">
+            <Home size={14} /> Accueil
+          </Link>
         </div>
       </header>
 
@@ -220,12 +249,18 @@ export default function NfcPreorderTracking() {
             )}
 
             {p.status === 'payment_submitted' && (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex gap-3">
-                <Clock size={22} className="text-amber-500 shrink-0" />
-                <div className="text-sm">
-                  <p className="font-semibold text-gray-900">Vérification en cours</p>
-                  <p className="text-gray-500 mt-0.5">Nous vérifions votre transaction Wave <span className="font-mono">{p.wave_transaction_id}</span>. Confirmation par e-mail sous 24 h ouvrées.</p>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+                <div className="flex gap-3">
+                  <Clock size={22} className="text-amber-500 shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-semibold text-gray-900">Merci, votre paiement est en cours de vérification</p>
+                    <p className="text-gray-500 mt-0.5">Transaction Wave déclarée : <span className="font-mono font-semibold text-gray-700">{p.wave_transaction_id}</span>. Vous recevrez une confirmation par e-mail sous 24 h ouvrées. Vous pouvez fermer cette page : le lien de l'e-mail permet d'y revenir à tout moment.</p>
+                  </div>
                 </div>
+                <p className="text-xs text-gray-500 bg-gray-50 rounded-xl px-3 py-2">
+                  Erreur dans l'identifiant de transaction ? <a href={waSupportLink(p.reference)} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#2E7D32] underline">Écrivez-nous sur WhatsApp</a>, nous corrigerons.
+                </p>
+                <p className="text-sm text-gray-600">En attendant, préparez le portfolio qui s'affichera quand on approchera un téléphone de votre carte.</p>
               </div>
             )}
 
@@ -255,9 +290,11 @@ export default function NfcPreorderTracking() {
               </div>
             )}
 
-            <p className="text-xs text-center text-gray-400">Une question ? Écrivez-nous sur WhatsApp au +221 78 131 13 71 ou à contact@portefolia.tech.</p>
           </>
         )}
+
+        <PageActions reference={p?.reference} />
+        <p className="text-xs text-center text-gray-400">Une question ? WhatsApp +221 78 131 13 71 · support@portefolia.tech</p>
       </main>
     </div>
   );
