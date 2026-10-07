@@ -487,18 +487,23 @@ async function getBusinessPayments(req, res) {
     const { pool } = require('../db');
     const [rows] = await pool.query(`
       SELECT p.id, p.montant, p.statut, p.moyen_paiement, p.reference_transaction,
-             p.created_at, p.updated_at,
+             p.created_at, p.updated_at, p.type_flux,
              a.statut AS abonnement_statut,
-             pl.name AS plan_name, pl.slug AS plan_slug,
-             c.token AS checkout_token
+             COALESCE(pl.name,
+               CASE WHEN p.type_flux = 'NFC' OR p.type_paiement = 'commande_nfc' THEN 'Carte NFC Portefolia' END) AS plan_name,
+             pl.slug AS plan_slug,
+             c.token AS checkout_token,
+             cmd.numero_commande
       FROM paiements p
       LEFT JOIN abonnements a ON a.id = p.abonnement_id
       LEFT JOIN plans pl ON pl.id = a.plan_id
       LEFT JOIN checkouts c ON c.paiement_id = p.id
-      WHERE a.utilisateur_id = ?
+      LEFT JOIN commandes cmd ON cmd.id = p.commande_id
+      -- Abonnements ET commandes de cartes NFC (dont les précommandes payées)
+      WHERE a.utilisateur_id = ? OR cmd.utilisateur_id = ?
       ORDER BY p.created_at DESC
       LIMIT 100
-    `, [req.userId]);
+    `, [req.userId, req.userId]);
     return res.json({ paiements: rows });
   } catch (err) {
     console.error('getBusinessPayments:', err);
