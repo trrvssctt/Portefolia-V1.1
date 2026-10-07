@@ -120,6 +120,17 @@ async function getPipelineEnAttente() {
      LIMIT 10`
   );
 
+  // Précommandes NFC dont le paiement Wave est déclaré et attend la validation admin
+  try {
+    const [[nfc]] = await pool.query(
+      `SELECT COUNT(*) AS nb, COALESCE(SUM(total_amount), 0) AS total
+       FROM nfc_preorders WHERE status = 'payment_submitted'`
+    );
+    if (Number(nfc.nb) > 0) {
+      parFlux.push({ type_flux: 'NFC', nb_en_attente: Number(nfc.nb), total_attendu: Number(nfc.total) });
+    }
+  } catch (e) { /* table absente : pas de précommandes */ }
+
   const nb_en_attente_total = parFlux.reduce((s, r) => s + Number(r.nb_en_attente), 0);
   const total_attendu_global = parFlux.reduce((s, r) => s + Number(r.total_attendu), 0);
 
@@ -205,7 +216,7 @@ async function getKpiNFC() {
        SUM(CASE WHEN statut_paiement = 'PENDING' THEN montant ELSE 0 END) AS ca_nfc_attendu,
        AVG(CASE WHEN statut_paiement = 'PAID'    THEN montant END)    AS panier_moyen_nfc
      FROM commandes
-     WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)`
+     WHERE date_commande >= DATE_SUB(NOW(), INTERVAL 30 DAY)`
   );
 
   return {

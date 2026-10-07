@@ -88,7 +88,15 @@ function CardNFC({ kpi }: { kpi: KpiPlateforme }) {
     <CompactCard>
       <div className="flex items-center justify-between">
         <CardIcon><CreditCard size={20} /></CardIcon>
-        {kpi.nfc_en_cours > 0 && (
+        {kpi.nfc_precommandes_a_valider > 0 ? (
+          <a
+            href="/admin/nfc-preorders"
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded-full hover:underline"
+            style={{ color: '#E65100', backgroundColor: '#E6510018' }}
+          >
+            {kpi.nfc_precommandes_a_valider} à valider
+          </a>
+        ) : kpi.nfc_en_cours > 0 && (
           <span
             className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
             style={{ color: '#E65100', backgroundColor: '#E6510018' }}
@@ -98,7 +106,7 @@ function CardNFC({ kpi }: { kpi: KpiPlateforme }) {
         )}
       </div>
       <CardValue>{kpi.nfc_en_cours.toLocaleString('fr-FR')}</CardValue>
-      <CardSub>en production/transit</CardSub>
+      <CardSub>cartes payées en production/transit · {kpi.nfc_precommandes_payees} précommande{kpi.nfc_precommandes_payees > 1 ? 's' : ''} payée{kpi.nfc_precommandes_payees > 1 ? 's' : ''}</CardSub>
     </CompactCard>
   );
 }

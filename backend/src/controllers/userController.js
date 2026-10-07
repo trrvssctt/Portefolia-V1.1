@@ -65,7 +65,8 @@ async function getMyPayments(req, res) {
         p.date_paiement, p.created_at, p.updated_at, p.abonnement_id, p.invoice_id,
         p.metadata, p.image_paiement, p.type_flux,
         c.numero_commande,
-        COALESCE(pl.name, pl2.name) AS plan_name,
+        COALESCE(pl.name, pl2.name,
+          CASE WHEN p.type_flux = 'NFC' OR p.type_paiement = 'commande_nfc' THEN 'Carte NFC Portefolia' END) AS plan_name,
         COALESCE(a.duree_mois, a2.duree_mois) AS duree_mois,
         COALESCE(a.date_echeance, a2.date_echeance) AS date_echeance,
         COALESCE(a.reference_wave, p.reference_transaction) AS reference_wave

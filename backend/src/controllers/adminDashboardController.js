@@ -12,6 +12,11 @@ function debutMoisPrecedent(date = new Date()) {
 function finMoisPrecedent(date = new Date()) {
   return new Date(date.getFullYear(), date.getMonth(), 0, 23, 59, 59);
 }
+// Fin du mois en cours : évite d'exclure les paiements récents quand l'heure de la base
+// (CEST) est en avance sur celle de Node (UTC)
+function finMois(date = new Date()) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
+}
 function moisStr(date = new Date()) {
   return date.toISOString().slice(0, 7);
 }
@@ -40,6 +45,26 @@ async function getAlertes() {
       count: Number(pendingWave.total),
     });
   }
+
+  // Précommandes NFC : paiements Wave déclarés à valider
+  try {
+    const [[nfc]] = await pool.query(
+      `SELECT COUNT(*) AS total,
+         SUM(CASE WHEN TIMESTAMPDIFF(HOUR, payment_submitted_at, NOW()) > 24 THEN 1 ELSE 0 END) AS urgents
+       FROM nfc_preorders WHERE status = 'payment_submitted'`
+    );
+    if (Number(nfc.total) > 0) {
+      alertes.push({
+        type: 'NFC_PREORDER_PENDING',
+        niveau: Number(nfc.urgents) > 0 ? 'CRITIQUE' : 'ATTENTION',
+        message: `${nfc.total} paiement(s) de précommande NFC à valider`,
+        detail: Number(nfc.urgents) > 0 ? `dont ${nfc.urgents} depuis +24h` : null,
+        action_label: 'Valider maintenant',
+        action_url: '/admin/nfc-preorders',
+        count: Number(nfc.total),
+      });
+    }
+  } catch (e) { /* table absente */ }
 
   const [[expirantAujourdhui]] = await pool.query(
     `SELECT COUNT(*) AS total FROM abonnements
@@ -99,7 +124,7 @@ async function getKpiFinanciers() {
   const now = new Date();
   const [mrr, revenusMois, revenusMoisPrecedent, pipeline, churn] = await Promise.all([
     financialKpiModel.getMRR(),
-    financialKpiModel.getRevenusReels({ date_debut: debutMois(now), date_fin: now }),
+    financialKpiModel.getRevenusReels({ date_debut: debutMois(now), date_fin: finMois(now) }),
     financialKpiModel.getRevenusReels({ date_debut: debutMoisPrecedent(now), date_fin: finMoisPrecedent(now) }),
     financialKpiModel.getPipelineEnAttente(),
     financialKpiModel.getChurnStats({ mois: moisStr(now) }),
@@ -135,9 +160,13 @@ async function getKpiPlateforme() {
        (SELECT COUNT(*) FROM utilisateurs WHERE subscription_status = 'ACTIVE') AS users_actifs,
        (SELECT COUNT(*) FROM portfolios WHERE est_public = TRUE  AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')) AS portfolios_publies,
        (SELECT COUNT(*) FROM portfolios WHERE est_public = FALSE AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00')) AS portfolios_brouillon,
-       (SELECT COUNT(*) FROM commandes WHERE statut_paiement = 'PENDING') AS nfc_en_cours,
+       (SELECT COUNT(*) FROM commandes
+         WHERE (statut_paiement = 'PAID' OR paiement_statut = 'payé')
+           AND statut NOT IN ('Livrée', 'Annulée')) AS nfc_en_cours,
+       (SELECT COUNT(*) FROM nfc_preorders WHERE status IN ('paid', 'converted')) AS nfc_precommandes_payees,
+       (SELECT COUNT(*) FROM nfc_preorders WHERE status = 'payment_submitted') AS nfc_precommandes_a_valider,
        (SELECT COUNT(*) FROM commandes WHERE statut_paiement = 'PAID'
-         AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)) AS nfc_livrees_mois,
+         AND date_commande >= DATE_SUB(NOW(), INTERVAL 30 DAY)) AS nfc_livrees_mois,
        (SELECT COUNT(*) FROM visites
          WHERE date_visite >= DATE_SUB(NOW(), INTERVAL 7 DAY)) AS vues_7j,
        (SELECT COUNT(*) FROM visites
@@ -157,6 +186,8 @@ async function getKpiPlateforme() {
     portfolios_brouillon: Number(row.portfolios_brouillon) || 0,
     nfc_en_cours: Number(row.nfc_en_cours) || 0,
     nfc_livrees_mois: Number(row.nfc_livrees_mois) || 0,
+    nfc_precommandes_payees: Number(row.nfc_precommandes_payees) || 0,
+    nfc_precommandes_a_valider: Number(row.nfc_precommandes_a_valider) || 0,
     vues_7j: vues7j,
     variation_vues: variationVues,
   };

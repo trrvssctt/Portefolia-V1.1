@@ -296,8 +296,13 @@ async function validatePayment(id, ctx) {
       "UPDATE nfc_preorders SET status = 'paid', paid_at = NOW(), validated_by = ? WHERE id = ?",
       [ctx.adminId || null, p.id]
     );
+    // Commande + paiement réussi : la précommande apparaît dans les finances, les stats,
+    // le dashboard admin et l'historique de paiement du client
+    const accounting = await recordPaidPreorder(conn, await lockById(conn, p.id));
     events.push(await notifier.emit(conn, p.id, 'preorder.paid'));
-    await logAdmin(conn, ctx, 'NFC_PREORDER_VALIDATE', { id: p.id, reference: p.reference, wave_transaction_id: p.wave_transaction_id });
+    await logAdmin(conn, ctx, 'NFC_PREORDER_VALIDATE', {
+      id: p.id, reference: p.reference, wave_transaction_id: p.wave_transaction_id, ...accounting,
+    });
     return getById(p.id, conn);
   });
 }
@@ -340,62 +345,91 @@ function splitName(fullName) {
   return { prenom, nom };
 }
 
-// Crée la commande correspondante (sans renvoyer d'e-mail de paiement : le client l'a déjà reçu via n8n)
+// Compte client de la précommande : celui de la précommande, sinon par e-mail, sinon compte invité
+async function resolveCustomer(conn, p) {
+  if (p.user_id) return { userId: p.user_id, guestCreated: false };
+  const [[u]] = await conn.query(
+    "SELECT id FROM utilisateurs WHERE LOWER(TRIM(email)) = ? AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') LIMIT 1",
+    [p.email]
+  );
+  if (u) return { userId: u.id, guestCreated: false };
+  const { prenom, nom } = splitName(p.full_name);
+  const hash = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
+  const [ins] = await conn.query(
+    `INSERT INTO utilisateurs (nom, prenom, email, mot_de_passe, phone, photo_profil, biographie, role, is_active, verified)
+     VALUES (?, ?, ?, ?, ?, NULL, NULL, 'GUEST', 1, 0)`,
+    [nom, prenom, p.email, hash, p.phone]
+  );
+  return { userId: ins.insertId, guestCreated: true };
+}
+
+// Crée la commande payée et le paiement réussi d'une précommande payée (idempotent).
+// Aucun e-mail n'est envoyé ici : le client a déjà la confirmation via n8n.
+async function recordPaidPreorder(conn, p) {
+  if (p.commande_id) return { commande_id: p.commande_id, already: true };
+  const { userId, guestCreated } = await resolveCustomer(conn, p);
+  const paidAt = p.paid_at || new Date();
+  const numero = `CMD-${Date.now()}-${p.reference}`;
+  const note = `Précommande ${p.reference} — ${p.quantity} carte(s), nom imprimé : ${p.card_name}`;
+
+  // Les deux jeux de colonnes de commandes sont remplis : paiement_statut/montant_total (page Commandes)
+  // et statut_paiement/montant (KPI finance et dashboard)
+  const [cmd] = await conn.query(
+    `INSERT INTO commandes
+      (utilisateur_id, numero_commande, type_commande, statut, montant_total, montant, adresse_livraison,
+       statut_paiement, paiement_statut, paiement_mode, paiement_reference, paiement_date, paiement_note, created_at)
+     VALUES (?, ?, 'commande_carte', 'En_attente', ?, ?, ?, 'PAID', 'payé', 'wave', ?, ?, ?, NOW())`,
+    [userId, numero, p.total_amount, p.total_amount, p.city, p.wave_transaction_id, paidAt, note]
+  );
+  const metadata = JSON.stringify({
+    source: 'nfc_preorder', preorder_id: p.id, preorder_reference: p.reference,
+    quantity: Number(p.quantity), unit_price: Number(p.unit_price), wave_sender_phone: p.wave_sender_phone || null,
+  });
+  const [pay] = await conn.query(
+    `INSERT INTO paiements
+      (commande_id, moyen_paiement, reference_transaction, montant, statut, type_flux, type_paiement,
+       metadata, date_paiement, created_at, updated_at)
+     VALUES (?, 'wave', ?, ?, 'Réussi', 'NFC', 'commande_nfc', ?, ?, ?, NOW())`,
+    [cmd.insertId, p.wave_transaction_id, p.total_amount, metadata, paidAt, paidAt]
+  );
+  await conn.query('UPDATE commandes SET paiement_id = ? WHERE id = ?', [pay.insertId, cmd.insertId]);
+  await conn.query('UPDATE nfc_preorders SET commande_id = ?, user_id = ? WHERE id = ?', [cmd.insertId, userId, p.id]);
+  return { commande_id: cmd.insertId, paiement_id: pay.insertId, numero_commande: numero, guest_created: guestCreated };
+}
+
+// Lancement de la fabrication : la commande (créée à la validation du paiement) passe « En traitement »
 async function convertToCommande(id, ctx) {
   return withTransaction(async (conn) => {
-    const p = await lockById(conn, id);
+    let p = await lockById(conn, id);
     assertTransition(p, 'converted');
-
-    // Compte client : celui de la précommande, sinon par e-mail, sinon compte invité (comme createPublicOrder)
-    let userId = p.user_id;
-    let guestCreated = false;
-    if (!userId) {
-      const [[u]] = await conn.query(
-        "SELECT id FROM utilisateurs WHERE LOWER(TRIM(email)) = ? AND (deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00') LIMIT 1",
-        [p.email]
-      );
-      if (u) {
-        userId = u.id;
-      } else {
-        const { prenom, nom } = splitName(p.full_name);
-        const hash = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
-        const [ins] = await conn.query(
-          `INSERT INTO utilisateurs (nom, prenom, email, mot_de_passe, phone, photo_profil, biographie, role, is_active, verified)
-           VALUES (?, ?, ?, ?, ?, NULL, NULL, 'GUEST', 1, 0)`,
-          [nom, prenom, p.email, hash, p.phone]
-        );
-        userId = ins.insertId;
-        guestCreated = true;
-      }
-    }
-
-    const numero = `CMD-${Date.now()}-${p.reference}`;
-    const note = `Précommande ${p.reference} — ${p.quantity} carte(s), nom imprimé : ${p.card_name}`;
-    const [cmd] = await conn.query(
-      `INSERT INTO commandes
-        (utilisateur_id, numero_commande, type_commande, statut, montant_total, adresse_livraison,
-         paiement_statut, paiement_mode, paiement_reference, paiement_date, paiement_note)
-       VALUES (?, ?, 'commande_carte', 'En_traitement', ?, ?, 'payé', 'wave', ?, ?, ?)`,
-      [userId, numero, p.total_amount, p.city, p.wave_transaction_id, p.paid_at, note]
-    );
-
-    try {
-      await conn.query(
-        `INSERT INTO paiements (commande_id, moyen_paiement, reference_transaction, montant, statut, date_paiement, type_paiement)
-         VALUES (?, 'wave', ?, ?, 'confirmed', ?, 'commande_nfc')`,
-        [cmd.insertId, p.wave_transaction_id, p.total_amount, p.paid_at || new Date()]
-      );
-    } catch (err) {
-      console.warn('convertToCommande: paiement non enregistré', err.message);
-    }
-
+    const accounting = await recordPaidPreorder(conn, p); // précommandes validées avant cette version
+    p = await lockById(conn, id);
     await conn.query(
-      "UPDATE nfc_preorders SET status = 'converted', commande_id = ?, user_id = ? WHERE id = ?",
-      [cmd.insertId, userId, p.id]
+      "UPDATE commandes SET statut = 'En_traitement' WHERE id = ? AND statut = 'En_attente'",
+      [p.commande_id]
     );
-    await logAdmin(conn, ctx, 'NFC_PREORDER_CONVERT', { id: p.id, reference: p.reference, commande_id: cmd.insertId, guest_created: guestCreated });
-    return { preorder: await getById(p.id, conn), commande_id: cmd.insertId, numero_commande: numero, guest_created: guestCreated };
+    await conn.query("UPDATE nfc_preorders SET status = 'converted' WHERE id = ?", [p.id]);
+    const [[cmd]] = await conn.query('SELECT numero_commande FROM commandes WHERE id = ?', [p.commande_id]);
+    await logAdmin(conn, ctx, 'NFC_PREORDER_CONVERT', { id: p.id, reference: p.reference, commande_id: p.commande_id });
+    return {
+      preorder: await getById(p.id, conn),
+      commande_id: p.commande_id,
+      numero_commande: cmd ? cmd.numero_commande : null,
+      guest_created: !!accounting.guest_created,
+    };
   });
+}
+
+// Rattrapage : précommandes payées sans commande ni paiement (validées avant cette version)
+async function backfillPaidPreorders() {
+  const [rows] = await pool.query(
+    "SELECT id FROM nfc_preorders WHERE status IN ('paid','converted') AND commande_id IS NULL"
+  );
+  const done = [];
+  for (const { id } of rows) {
+    done.push(await withTransaction(async (conn) => recordPaidPreorder(conn, await lockById(conn, id))));
+  }
+  return done;
 }
 
 async function resendLastNotification(id, ctx) {
@@ -600,6 +634,7 @@ module.exports = {
   rejectPayment,
   cancelPreorder,
   convertToCommande,
+  backfillPaidPreorders,
   resendLastNotification,
   getDetail,
   list,

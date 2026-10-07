@@ -186,6 +186,11 @@ app.post('/webhooks/payment', (req, res) => adminController.paymentWebhook(req, 
     await businessAccountModel.init();
     await require('./models/onboardingModel').init();
     await require('./models/nfcPreorderModel').init();
+    // Précommandes payées avant l'enregistrement automatique commande + paiement
+    try {
+      const fixed = await require('./services/nfcPreorderService').backfillPaidPreorders();
+      if (fixed.length) console.log(`[nfc] ${fixed.length} précommande(s) payée(s) enregistrée(s) en commande + paiement`);
+    } catch (e) { console.warn('[nfc] rattrapage des précommandes payées:', e.message); }
   const visiteModel = require('./models/visiteModel');
   await visiteModel.init();
     // Sync RBAC permission matrix (idempotent)

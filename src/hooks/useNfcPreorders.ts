@@ -54,7 +54,7 @@ export const STATUS_META: Record<PreorderStatus, { label: string; color: string;
   pending_payment:   { label: 'Attente paiement', color: '#1D4ED8', bg: '#DBEAFE' },
   paid:              { label: 'Payée',           color: '#1B5E20', bg: '#DCFCE7' },
   rejected:          { label: 'Refusée',         color: '#B91C1C', bg: '#FEE2E2' },
-  converted:         { label: 'Convertie',       color: '#6D28D9', bg: '#EDE9FE' },
+  converted:         { label: 'En fabrication',  color: '#6D28D9', bg: '#EDE9FE' },
   expired:           { label: 'Expirée',         color: '#6B7280', bg: '#F3F4F6' },
   cancelled:         { label: 'Annulée',         color: '#6B7280', bg: '#F3F4F6' },
 };

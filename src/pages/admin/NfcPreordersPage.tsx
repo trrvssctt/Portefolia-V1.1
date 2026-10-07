@@ -17,7 +17,7 @@ const TABS: { key: '' | PreorderStatus; label: string }[] = [
   { key: 'payment_submitted', label: 'À valider' },
   { key: 'pending_payment', label: 'Attente paiement' },
   { key: 'paid', label: 'Payées' },
-  { key: 'converted', label: 'Converties' },
+  { key: 'converted', label: 'En fabrication' },
   { key: 'rejected', label: 'Refusées' },
   { key: 'expired', label: 'Expirées' },
   { key: 'cancelled', label: 'Annulées' },
@@ -52,10 +52,10 @@ function CopyText({ value }: { value: string }) {
 // ── Dialogue de confirmation (avec motif pour refus / annulation) ─────────────
 
 const ACTION_META: Record<PreorderAction, { title: string; text: string; confirm: string; color: string; reason?: 'required' | 'optional' }> = {
-  validate: { title: 'Valider le paiement', text: 'Vous confirmez avoir trouvé cette transaction dans Wave Business, avec le bon montant. Le client recevra un e-mail de confirmation.', confirm: 'Valider le paiement', color: '#2E7D32' },
+  validate: { title: 'Valider le paiement', text: 'Vous confirmez avoir trouvé cette transaction dans Wave Business, avec le bon montant. Le client recevra un e-mail de confirmation ; la commande et le paiement sont enregistrés (finances, statistiques, historique du client).', confirm: 'Valider le paiement', color: '#2E7D32' },
   reject: { title: 'Refuser le paiement', text: 'Le client recevra un e-mail avec le motif et pourra déclarer à nouveau son paiement.', confirm: 'Refuser', color: '#DC2626', reason: 'required' },
   cancel: { title: 'Annuler la précommande', text: 'Le client recevra un e-mail d\'annulation.', confirm: 'Annuler la précommande', color: '#DC2626', reason: 'optional' },
-  convert: { title: 'Convertir en commande', text: 'Une commande payée (Wave) sera créée dans « Commandes ». Si le client n\'a pas de compte, un compte invité est créé avec son e-mail. Aucun e-mail n\'est envoyé.', confirm: 'Convertir', color: '#6D28D9' },
+  convert: { title: 'Lancer la fabrication', text: 'La commande liée passe « En traitement » dans la page Commandes, d\'où vous suivrez gravure, expédition et livraison. Aucun e-mail n\'est envoyé.', confirm: 'Lancer la fabrication', color: '#6D28D9' },
   resend: { title: 'Renvoyer la dernière notification', text: 'Le dernier e-mail envoyé pour cette précommande sera renvoyé au client (et à l\'admin si concerné).', confirm: 'Renvoyer', color: '#2E7D32' },
 };
 
@@ -113,7 +113,7 @@ function DetailPanel({ id, onClose }: { id: number; onClose: () => void }) {
   const buttons: { action: PreorderAction; label: string; icon: React.ElementType; show: boolean; color: string }[] = p ? [
     { action: 'validate', label: 'Valider le paiement', icon: CheckCircle2, show: p.status === 'payment_submitted', color: '#2E7D32' },
     { action: 'reject', label: 'Refuser', icon: XCircle, show: p.status === 'payment_submitted', color: '#DC2626' },
-    { action: 'convert', label: 'Convertir en commande', icon: PackageCheck, show: p.status === 'paid', color: '#6D28D9' },
+    { action: 'convert', label: 'Lancer la fabrication', icon: PackageCheck, show: p.status === 'paid', color: '#6D28D9' },
     { action: 'cancel', label: 'Annuler', icon: Ban, show: ['pending_payment', 'payment_submitted', 'rejected'].includes(p.status), color: '#6B7280' },
     { action: 'resend', label: 'Renvoyer la dernière notification', icon: Send, show: true, color: '#2E7D32' },
   ] : [];

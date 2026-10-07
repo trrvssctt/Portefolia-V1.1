@@ -51,6 +51,8 @@ export interface KpiPlateforme {
   portfolios_brouillon: number;
   nfc_en_cours: number;
   nfc_livrees_mois: number;
+  nfc_precommandes_payees: number;
+  nfc_precommandes_a_valider: number;
   vues_7j: number;
   variation_vues: number;
 }
