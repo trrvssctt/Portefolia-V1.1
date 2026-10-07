@@ -177,7 +177,7 @@ export default function AdminCartes() {
           items = rawItems.items || [];
         }
         const computedTotal = items.reduce((s: number, it: any) => {
-          const price = Number(it.price || it.prix || it.montant || it.unit_price || 30000) || 30000;
+          const price = Number(it.price || it.prix || it.montant || it.unit_price || 12500) || 12500;
           const qty = Number(it.quantity || it.qty || 1) || 1;
           return s + price * qty;
         }, 0);

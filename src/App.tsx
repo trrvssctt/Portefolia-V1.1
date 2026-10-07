@@ -47,6 +47,8 @@ import AdminPortfolios from "./pages/admin/Portfolios";
 import AdminCommandes from "./pages/admin/Commandes";
 import AdminCartes from "./pages/admin/Cartes";
 import NfcWaitlistPage from "./pages/admin/NfcWaitlistPage";
+import NfcPreordersPage from "./pages/admin/NfcPreordersPage";
+import NfcPreorderTracking from "./pages/NfcPreorderTracking";
 import AdminPaiements from "./pages/admin/Paiements";
 import AdminInvoices from "./pages/admin/Invoices";
 import AdminPlans from "./pages/admin/Plans";
@@ -143,6 +145,7 @@ function App() {
                     <Route path="/dashboard/portfolios" element={<RequirePayment><RequireSubscription><Portfolios /></RequireSubscription></RequirePayment>} />
                     <Route path="/dashboard/nfc-cards" element={<NFCCards />} />
                     <Route path="/nfc-types" element={<NFCCardTypes />} />
+                    <Route path="/nfc/precommande/:reference" element={<NfcPreorderTracking />} />
                     <Route path="/carte-3d" element={<CarteNFC3D />} />
                     <Route path="/upgrade" element={<UpgradePlan />} />
                     <Route path="/reabonnement" element={<Reabonnement />} />
@@ -166,6 +169,7 @@ function App() {
                       <Route path="/admin/plans" element={<AdminPlans />} />
                       <Route path="/admin/cartes" element={<AdminCartes />} />
                       <Route path="/admin/nfc-waitlist" element={<NfcWaitlistPage />} />
+                      <Route path="/admin/nfc-preorders" element={<NfcPreordersPage />} />
                       <Route path="/admin/paiements" element={<AdminPaiements />} />
                       <Route path="/admin/wave-payments" element={<WavePayments />} />
                       <Route path="/admin/wave-validation" element={<WaveValidation />} />

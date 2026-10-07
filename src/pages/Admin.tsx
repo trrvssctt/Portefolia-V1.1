@@ -400,7 +400,7 @@ export default function AdminDashboard() {
                                 {safeFormatDate(order.ordered_at)}
                               </td>
                               <td className="py-4 text-right font-bold text-[#2E7D32]">
-                                {(order.montant_total || 30000).toLocaleString()} F CFA
+                                {(order.montant_total || 12500).toLocaleString()} F CFA
                               </td>
                               <td className="py-4">
                                 <Badge

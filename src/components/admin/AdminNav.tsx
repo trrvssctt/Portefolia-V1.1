@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, UserCheck, Briefcase, CreditCard,
   TrendingUp, Banknote, BarChart3, FileText, BookOpen,
   UserCog, LogOut, Waves, Receipt, Menu, X, Mail, MessageSquare,
-  PanelLeftClose, PanelLeftOpen, DollarSign, Wifi,
+  PanelLeftClose, PanelLeftOpen, DollarSign, Wifi, ShoppingBag,
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
@@ -28,6 +28,7 @@ interface AdminBadges {
   pending_upgrades: number;
   expired_accounts: number;
   nfc_waitlist: number;
+  nfc_preorders_to_validate: number;
   unread_contact: number;
 }
 
@@ -61,6 +62,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Factures',     to: '/admin/invoices',       icon: Receipt,         roles: ['super_admin', 'admin_technique'], group: 'Opérations' },
   { label: 'Formules',     to: '/admin/plans',          icon: CreditCard,      roles: ['super_admin', 'admin_technique'], group: 'Opérations' },
   { label: 'Cartes NFC',  to: '/admin/cartes',         icon: Wifi,            roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations' },
+  { label: 'Précommandes NFC', to: '/admin/nfc-preorders', icon: ShoppingBag,   roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations', badgeKey: 'nfc_preorders_to_validate', badgeColor: '#F59E0B' },
   { label: 'NFC Waitlist', to: '/admin/nfc-waitlist',  icon: Mail,            roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations', badgeKey: 'nfc_waitlist', badgeColor: '#F59E0B' },
   { label: 'Upgrades',     to: '/admin/upgrades',       icon: TrendingUp,      roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations', badgeKey: 'pending_upgrades' },
   { label: 'Finance',      to: '/admin/finance',        icon: DollarSign,      roles: ['super_admin', 'admin_technique'], group: 'Analytique' },
@@ -85,7 +87,7 @@ const ROLE_CONFIG: Record<string, { label: string; color: string; dot: string; b
 // ─── Real-time badges hook ────────────────────────────────────────────────────
 
 function useAdminBadges(): AdminBadges {
-  const [badges, setBadges] = useState<AdminBadges>({ pending_wave_payments: 0, pending_upgrades: 0, expired_accounts: 0, nfc_waitlist: 0, unread_contact: 0 });
+  const [badges, setBadges] = useState<AdminBadges>({ pending_wave_payments: 0, pending_upgrades: 0, expired_accounts: 0, nfc_waitlist: 0, nfc_preorders_to_validate: 0, unread_contact: 0 });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -93,19 +95,22 @@ function useAdminBadges(): AdminBadges {
       const token = localStorage.getItem('token');
       if (!token) return;
       try {
-        const [badgesRes, nfcRes, contactRes] = await Promise.all([
+        const [badgesRes, nfcRes, contactRes, preordersRes] = await Promise.all([
           fetch(`${API_BASE}/api/admin/badges`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${API_BASE}/api/admin/nfc-waitlist`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${API_BASE}/api/contact/admin`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE}/api/admin/nfc-preorders/stats`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
-        const d       = badgesRes.ok  ? await badgesRes.json()  : {};
-        const nfc     = nfcRes.ok     ? await nfcRes.json()     : {};
-        const contact = contactRes.ok ? await contactRes.json() : {};
+        const d         = badgesRes.ok    ? await badgesRes.json()    : {};
+        const nfc       = nfcRes.ok       ? await nfcRes.json()       : {};
+        const contact   = contactRes.ok   ? await contactRes.json()   : {};
+        const preorders = preordersRes.ok ? await preordersRes.json() : {};
         setBadges({
           pending_wave_payments: d.pending_wave_payments ?? 0,
           pending_upgrades:      d.pending_upgrades ?? 0,
           expired_accounts:      d.expired_accounts ?? 0,
           nfc_waitlist:          nfc.total ?? 0,
+          nfc_preorders_to_validate: preorders.by_status?.payment_submitted ?? 0,
           unread_contact:        contact.unread ?? 0,
         });
       } catch { /* non-bloquant */ }

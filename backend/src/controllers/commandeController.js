@@ -3,6 +3,7 @@ const carteModel = require('../models/carteModel');
 const portfolioModel = require('../models/portfolioModel');
 const paiementModel = require('../models/paiementModel');
 const { pool } = require('../db');
+const { getNfcConfig } = require('../utils/nfcConfig');
 const fs = require('fs');
 const path = require('path');
 
@@ -41,7 +42,8 @@ async function createOrder(req, res) {
       resolvedItems.push({ portfolio, quantity: Number(quantity) });
     }
 
-    const montant = resolvedItems.reduce((sum, it) => sum + it.quantity * 30000, 0);
+    const { unit_price: unitPrice } = await getNfcConfig();
+    const montant = resolvedItems.reduce((sum, it) => sum + it.quantity * unitPrice, 0);
     const numero = genOrderNumber();
     const order = await commandeModel.createCommande({
       utilisateur_id: userId,

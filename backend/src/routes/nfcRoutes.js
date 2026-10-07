@@ -4,11 +4,12 @@ const express   = require('express');
 const router    = express.Router();
 const { pool }  = require('../db');
 const sendEmail = require('../utils/sendEmail');
+const { getNfcConfig, formatFcfa } = require('../utils/nfcConfig');
 
 const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FRONTEND  = process.env.FRONTEND_BASE || 'https://portefolia.tech';
 
-function buildWaitlistEmail(email) {
+function buildWaitlistEmail(email, unitPrice) {
   const prenom = email.split('@')[0];
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;font-family:'Helvetica Neue',Arial,sans-serif;background:#f4f4f4">
@@ -40,7 +41,7 @@ function buildWaitlistEmail(email) {
       <p style="font-size:13px;color:#2E7D32;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin:0 0 6px">
         Prix de lancement
       </p>
-      <p style="font-size:32px;font-weight:900;color:#1B5E20;margin:0">30 000 F CFA</p>
+      <p style="font-size:32px;font-weight:900;color:#1B5E20;margin:0">${formatFcfa(unitPrice)}</p>
       <p style="font-size:12px;color:#4CAF50;margin:8px 0 0">par carte · gravure laser incluse</p>
     </div>
 
@@ -77,11 +78,16 @@ function buildWaitlistEmail(email) {
     </p>
 
     <!-- CTA -->
-    <div style="text-align:center;margin-bottom:8px">
-      <a href="${FRONTEND}" style="display:inline-block;padding:14px 36px;
+    <div style="text-align:center;margin-bottom:12px">
+      <a href="${FRONTEND}/nfc-types#precommande" style="display:inline-block;padding:14px 36px;
         background:linear-gradient(135deg,#2E7D32,#1BC29A);color:#fff;
         font-size:15px;font-weight:700;text-decoration:none;border-radius:10px">
-        Préparer mon portfolio →
+        Précommander ma carte →
+      </a>
+    </div>
+    <div style="text-align:center;margin-bottom:8px">
+      <a href="${FRONTEND}" style="font-size:13px;color:#2E7D32;font-weight:600;text-decoration:none">
+        Préparer mon portfolio
       </a>
     </div>
   </td></tr>
@@ -123,10 +129,11 @@ router.post('/waitlist', async (req, res) => {
 
     // Envoyer l'email de confirmation (best-effort)
     try {
+      const cfg = await getNfcConfig();
       await sendEmail(
         normalised,
         '✓ Vous êtes sur la liste d\'attente — Carte NFC Portefolia',
-        buildWaitlistEmail(normalised)
+        buildWaitlistEmail(normalised, cfg.unit_price)
       );
     } catch (mailErr) {
       console.warn('nfc/waitlist mail error:', mailErr.message);

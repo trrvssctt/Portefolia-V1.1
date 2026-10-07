@@ -109,6 +109,9 @@ app.use('/api/templates', templateRoutes);
 app.use('/uploads/visites_carte', express.static(path.join(__dirname, '..', 'public', 'Visites_Carte')));
 const checkoutRoutes = require('./routes/checkoutRoutes');
 app.use('/api/checkout', checkoutRoutes);
+// Précommandes NFC (admin) — monté avant /api/admin
+const nfcPreorderRoutes = require('./routes/nfcPreorderRoutes');
+app.use('/api/admin/nfc-preorders', nfcPreorderRoutes.adminRouter);
 // admin routes
   app.use('/api/admin', adminRoutes);
   app.use('/api/abonnements', abonnementRoutes);
@@ -125,6 +128,9 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/roles', rolesRoutes);
 // Business plan routes
 app.use('/api/business', businessRoutes);
+// Précommandes NFC (public) + routes internes appelées par n8n
+app.use('/api/nfc/preorders', nfcPreorderRoutes.publicRouter);
+app.use('/api/internal/nfc', nfcPreorderRoutes.internalRouter);
 // NFC waitlist (public)
 app.use('/api/nfc', require('./routes/nfcRoutes'));
 // Contact form (public POST + admin GET/PATCH/DELETE)
@@ -179,6 +185,7 @@ app.post('/webhooks/payment', (req, res) => adminController.paymentWebhook(req, 
     await refreshTokenModel.init();
     await businessAccountModel.init();
     await require('./models/onboardingModel').init();
+    await require('./models/nfcPreorderModel').init();
   const visiteModel = require('./models/visiteModel');
   await visiteModel.init();
     // Sync RBAC permission matrix (idempotent)
@@ -197,6 +204,8 @@ app.post('/webhooks/payment', (req, res) => adminController.paymentWebhook(req, 
     // Démarrer les tâches planifiées après le démarrage du serveur
     const { startCronJobs } = require('./jobs/subscriptionReminder');
     startCronJobs();
+    // Renvoi des événements de précommande NFC non reçus par n8n
+    require('./services/n8nNotifier').start();
   } catch (err) {
     console.error('Failed to start server:', err);
     process.exit(1);

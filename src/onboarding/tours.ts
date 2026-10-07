@@ -77,7 +77,7 @@ const nfcSteps = (fromRoute: string, nfcRoute: string): TourStep[] => [
     route: nfcRoute,
     target: 'nfc-order',
     title: 'Commander une carte',
-    content: "Bientôt disponible. Pour commander, vous choisirez le portfolio relié à la carte et la quantité (30 000 F CFA par carte), puis vous paierez. À réception, vous activerez la carte depuis cette page. Il faut au moins un portfolio pour commander.",
+    content: "Bientôt disponible. Pour commander, vous choisirez le portfolio relié à la carte et la quantité (12 500 F CFA par carte), puis vous paierez. À réception, vous activerez la carte depuis cette page. Il faut au moins un portfolio pour commander.",
   },
   {
     id: 'go-waitlist',
@@ -85,15 +85,15 @@ const nfcSteps = (fromRoute: string, nfcRoute: string): TourStep[] => [
     target: 'nfc-learn',
     action: 'click',
     hint: 'Cliquez sur « En savoir plus »',
-    title: 'Soyez prévenu en premier',
-    content: 'Les cartes ne sont pas encore en vente, mais vous pouvez réserver votre place.',
+    title: 'Précommandez votre carte',
+    content: 'Les précommandes sont ouvertes : réservez votre carte et payez avec Wave.',
   },
   {
     id: 'nfc-waitlist',
     route: '/nfc-types',
     target: 'nfc-waitlist',
-    title: "La liste d'attente",
-    content: "Saisissez votre email et cliquez sur le bouton pour rejoindre la liste d'attente. Vous recevrez une confirmation, puis un email dès l'ouverture des commandes.",
+    title: 'La précommande',
+    content: "Remplissez le formulaire (nom à imprimer, email, téléphone, quantité) puis validez. Vous recevrez par email les instructions de paiement Wave et un lien pour suivre votre précommande.",
   },
 ];
 

@@ -1,0 +1,316 @@
+{
+  "name": "Portefolia — Précommandes NFC (rappels)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9-19/2 * * *"
+            }
+          ]
+        }
+      },
+      "id": "7df5e9e2-86c2-40dc-9acf-e4b9950e9ef6",
+      "name": "Toutes les 2 h (9h–19h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n//  CONFIGURATION — à adapter avant d'activer le workflow\n// ============================================================\nconst CONFIG = {\n  brand: 'Portefolia',\n  tagline: 'Expose ton futur.',\n  domain: 'portefolia.tech',\n  frontUrl: 'https://portefolia.tech',\n  apiUrl: 'https://portefolia.tech/api',          // ou http://localhost:<port>/api si n8n tourne sur le même VPS\n  fromEmail: 'Portefolia <no-reply@portefolia.tech>',\n  replyTo: 'contact@portefolia.tech',\n  adminEmail: 'contact@portefolia.tech',        // boîte qui reçoit les alertes admin\n  supportWhatsapp: '+221 78 131 13 71',\n  colors: { primary: '#1B5E20', accent: '#2E7D32' }, // vert Portefolia\n  telegram: { enabled: false, chatId: '' },          // alertes admin sur Telegram (optionnel)\n  whatsapp: {                                        // WhatsApp Cloud API (optionnel, templates approuvés par Meta)\n    enabled: false,\n    phoneNumberId: '',\n    templates: { created: 'precommande_recue', paid: 'precommande_confirmee' },\n  },\n};\nreturn $input.all().map((i) => ({ json: { ...i.json, config: CONFIG } }));\n"
+      },
+      "id": "8e9a8729-0492-46b3-b259-637ae51c9fff",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.config.apiUrl }}/internal/nfc/preorders/expire-stale",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "2b631e83-c359-43fe-a11d-86e7854ab07c",
+      "name": "Expirer les précommandes impayées",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Config').first().json.config.apiUrl }}/internal/nfc/preorders/reminders-due",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        },
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={}"
+      },
+      "id": "43e62351-8916-4856-9673-e8e83f8974bc",
+      "name": "Récupérer les rappels dus",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---------- Helpers (échappement, format, gabarit e-mail) ----------\nconst esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst fcfa = (n) => String(Math.round(Number(n) || 0)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' ') + ' F CFA';\nconst firstName = (p) => (p.first_name || String(p.full_name || '').trim().split(/\\s+/)[0] || '').trim();\nconst para = (html) => `<p style=\"font-size:15px;line-height:1.6;margin:0 0 12px\">${html}</p>`;\nconst row = (k, v) => `<tr><td style=\"padding:7px 0;color:#6b7280;width:45%;vertical-align:top\">${esc(k)}</td><td style=\"padding:7px 0;font-weight:600\">${v}</td></tr>`;\nconst table = (rows) => `<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-size:14px;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin:16px 0\">${rows.join('')}</table>`;\nconst hoursSince = (iso) => (iso ? Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 36e5)) : null);\n\nfunction layout(cfg, { preheader = '', title, body, cta }) {\n  const button = cta && cta.url\n    ? `<p style=\"margin:28px 0 8px;text-align:center\"><a href=\"${esc(cta.url)}\" style=\"background:${cfg.colors.accent};color:#ffffff;text-decoration:none;padding:14px 26px;border-radius:8px;font-weight:600;display:inline-block\">${esc(cta.label)}</a></p>`\n    : '';\n  return `<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>${esc(title)}</title></head>\n<body style=\"margin:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2937\">\n<span style=\"display:none;max-height:0;overflow:hidden;opacity:0\">${esc(preheader)}</span>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f4f5f7;padding:24px 12px\"><tr><td align=\"center\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden\">\n<tr><td style=\"background:${cfg.colors.primary};padding:22px 28px;color:#ffffff;font-size:20px;font-weight:700\">${esc(cfg.brand)}<div style=\"font-size:12px;font-weight:400;opacity:.85;margin-top:4px\">${esc(cfg.tagline)}</div></td></tr>\n<tr><td style=\"padding:28px\">\n<h1 style=\"font-size:20px;line-height:1.3;margin:0 0 16px\">${esc(title)}</h1>\n${body}\n${button}\n</td></tr>\n<tr><td style=\"padding:18px 28px;background:#f9fafb;font-size:12px;line-height:1.5;color:#6b7280\">Vous recevez cet e-mail suite à votre précommande sur ${esc(cfg.domain)}. Une question ? Répondez à cet e-mail ou écrivez-nous sur WhatsApp au ${esc(cfg.supportWhatsapp)}.</td></tr>\n</table></td></tr></table></body></html>`;\n}\n\nfunction waveBlock(p, pay) {\n  return `<div style=\"background:#eef6ff;border-radius:10px;padding:16px 18px;margin:16px 0;font-size:14px;line-height:1.7\">\n<strong>Comment payer avec Wave</strong><br>\n1. Envoyez <strong>${esc(fcfa(p.total_amount))}</strong> au <strong>${esc(pay.wave_number)}</strong>${pay.wave_link ? ` ou passez par <a href=\"${esc(pay.wave_link)}\">ce lien de paiement Wave</a>` : ''}.<br>\n2. Mettez la référence <strong>${esc(p.reference)}</strong> en note du transfert.<br>\n3. Cliquez sur le bouton ci-dessous et saisissez l'identifiant de la transaction Wave (visible dans l'historique de l'application).\n</div>`;\n}\n\nfunction recap(p, extra = []) {\n  return table([\n    row('Référence', esc(p.reference)),\n    row('Nom imprimé sur la carte', esc(p.card_name)),\n    row('Quantité', esc(p.quantity)),\n    row('Montant total', esc(fcfa(p.total_amount))),\n    ...extra,\n  ]);\n}\n\n// ---------- Construction des rappels (client + digest admin) ----------\nconst cfg = $('Config').first().json.config;\nconst data = $input.first().json || {};\nconst clients = data.client_payment_reminders || [];\nconst pending = data.admin_validation_pending || [];\nconst out = [];\n\nfor (const it of clients) {\n  const p = it.preorder || {};\n  const pay = it.payment || {};\n  const links = it.links || {};\n  if (!p.id || !p.email) continue;\n  const n = (Number(p.client_reminder_count) || 0) + 1; // numéro du rappel envoyé\n  const last = n >= 2;\n  const prenom = esc(firstName(p));\n  const subject = last\n    ? `Dernier rappel : votre précommande ${p.reference} sera bientôt annulée`\n    : `Rappel : finalisez le paiement Wave de votre précommande ${p.reference}`;\n  const html = layout(cfg, {\n    preheader: `Il reste à payer ${fcfa(p.total_amount)} avec Wave.`,\n    title: last ? `${prenom}, dernière chance pour votre carte NFC` : `${prenom}, votre carte NFC vous attend`,\n    body: para(last\n      ? 'Nous n\\'avons pas encore reçu votre paiement Wave. Sans paiement d\\'ici demain, la précommande sera annulée.'\n      : 'Votre précommande est enregistrée, mais le paiement Wave n\\'a pas encore été déclaré.')\n      + recap(p) + waveBlock(p, pay)\n      + para('<span style=\"color:#6b7280;font-size:13px\">Déjà payé ? Cliquez sur le bouton et saisissez l\\'identifiant de la transaction Wave pour que nous puissions la valider.</span>'),\n    cta: { label: 'Déclarer mon paiement Wave', url: links.tracking_url },\n  });\n  out.push({ json: { kind: 'client', apiUrl: cfg.apiUrl, from: cfg.fromEmail, replyTo: cfg.replyTo,\n    preorder_ids: [p.id], template: `reminder.client_payment_${n}`, to: p.email, subject, html } });\n}\n\nif (pending.length) {\n  const rows = pending.map((it) => {\n    const p = it.preorder || {};\n    const h = hoursSince(p.payment_submitted_at);\n    return `<tr>\n<td style=\"padding:8px 6px;border-bottom:1px solid #e5e7eb\"><a href=\"${esc((it.links || {}).admin_url)}\">${esc(p.reference)}</a></td>\n<td style=\"padding:8px 6px;border-bottom:1px solid #e5e7eb\">${esc(p.full_name)}</td>\n<td style=\"padding:8px 6px;border-bottom:1px solid #e5e7eb;white-space:nowrap\">${esc(fcfa(p.total_amount))}</td>\n<td style=\"padding:8px 6px;border-bottom:1px solid #e5e7eb;font-family:monospace\">${esc(p.wave_transaction_id)}</td>\n<td style=\"padding:8px 6px;border-bottom:1px solid #e5e7eb\">${h === null ? '—' : esc(h) + ' h'}</td></tr>`;\n  }).join('');\n  const html = layout(cfg, {\n    title: `${pending.length} paiement(s) Wave à valider`,\n    body: para('Ces clients ont déclaré leur paiement Wave et attendent votre validation.')\n      + `<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-size:13px;margin:12px 0\"><tr style=\"color:#6b7280;text-align:left\"><th style=\"padding:6px\">Réf.</th><th style=\"padding:6px\">Client</th><th style=\"padding:6px\">Montant</th><th style=\"padding:6px\">Transaction</th><th style=\"padding:6px\">Depuis</th></tr>${rows}</table>`,\n    cta: { label: 'Ouvrir les précommandes', url: data.admin_list_url || cfg.frontUrl + '/admin/nfc-preorders' },\n  });\n  out.push({ json: { kind: 'admin', apiUrl: cfg.apiUrl, from: cfg.fromEmail, replyTo: cfg.replyTo,\n    preorder_ids: pending.map((it) => (it.preorder || {}).id).filter(Boolean), template: 'reminder.admin_validation',\n    to: cfg.adminEmail, subject: `⏳ ${pending.length} paiement(s) Wave en attente de validation`, html } });\n}\n\nreturn out;\n"
+      },
+      "id": "0c22c77e-cb39-448a-8611-7bd29baf9c5f",
+      "name": "Préparer les rappels",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "8fde461a-9654-4a99-8c13-f8f4fd7c9504",
+              "leftValue": "={{ $json.kind }}",
+              "rightValue": "client",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "be6dd779-21eb-4108-9f65-5fbae987b7b1",
+      "name": "Rappel client ?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.from }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $json.replyTo }}"
+        }
+      },
+      "id": "167c2ed8-3e0d-44b2-afac-716567984d21",
+      "name": "Email rappel client",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1320,
+        200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.from }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $json.replyTo }}"
+        }
+      },
+      "id": "57be25ae-155b-4699-b7b4-2b5de9c36140",
+      "name": "Email digest admin",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1320,
+        420
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Préparer les rappels').item.json.apiUrl }}/internal/nfc/notifications",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event_id: null, preorder_ids: $('Préparer les rappels').item.json.preorder_ids, channel: 'email', audience: $('Préparer les rappels').item.json.kind, template: $('Préparer les rappels').item.json.template, recipient: $('Préparer les rappels').item.json.to, status: $json.error ? 'failed' : 'sent', error: $json.error ? String($json.error.message || $json.error).slice(0, 480) : null }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "15b73006-ad23-4864-a1f2-781916185ef2",
+      "name": "Journaliser l'envoi",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## Précommandes NFC — rappels\nToutes les 2 h entre 9 h et 19 h (heure de Dakar) :\n1. expire les précommandes impayées (72 h, 2 rappels envoyés, dernier rappel ≥ 20 h) (le backend émet `preorder.expired` → e-mail via le workflow « événements »)\n2. rappel client à 24 h puis 48 h si le paiement Wave n'est pas déclaré\n3. digest admin des paiements déclarés non validés depuis 2 h (max 1 toutes les 4 h)\n\nLe backend réserve les rappels au moment où il les renvoie (POST reminders-due) : un échec du journal ne provoque pas de rappels en boucle.",
+        "height": 220,
+        "width": 620
+      },
+      "id": "868dc114-cbb9-434d-904e-0076b219f6a9",
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -20,
+        -120
+      ]
+    }
+  ],
+  "connections": {
+    "Toutes les 2 h (9h–19h)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Expirer les précommandes impayées",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expirer les précommandes impayées": {
+      "main": [
+        [
+          {
+            "node": "Récupérer les rappels dus",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Récupérer les rappels dus": {
+      "main": [
+        [
+          {
+            "node": "Préparer les rappels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer les rappels": {
+      "main": [
+        [
+          {
+            "node": "Rappel client ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rappel client ?": {
+      "main": [
+        [
+          {
+            "node": "Email rappel client",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email digest admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email rappel client": {
+      "main": [
+        [
+          {
+            "node": "Journaliser l'envoi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email digest admin": {
+      "main": [
+        [
+          {
+            "node": "Journaliser l'envoi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Dakar",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "pinData": {},
+  "active": false,
+  "tags": []
+}

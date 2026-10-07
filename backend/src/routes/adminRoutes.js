@@ -252,6 +252,10 @@ router.post('/nfc-waitlist/notify-all', auth, adminAuth, async (req, res) => {
     if (!sujet || !message) return res.status(400).json({ error: 'sujet et message requis' });
 
     const [rows] = await pool.query('SELECT email FROM nfc_waitlist ORDER BY created_at DESC');
+    // Le texte saisi par l'admin est échappé, puis les retours à la ligne deviennent des <br>
+    const safeMessage = String(message)
+      .replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+      .replace(/\r?\n/g, '<br>');
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;font-family:'Helvetica Neue',Arial,sans-serif;background:#f4f4f4">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td>
 <table width="600" align="center" cellpadding="0" cellspacing="0" style="margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)">
@@ -260,9 +264,9 @@ router.post('/nfc-waitlist/notify-all', auth, adminAuth, async (req, res) => {
     <h1 style="color:#fff;font-size:22px;font-weight:700;margin:16px 0 0">Carte NFC Portefolia</h1>
   </td></tr>
   <tr><td style="padding:36px 40px">
-    <div style="font-size:15px;color:#374151;line-height:1.8;white-space:pre-wrap">${message}</div>
+    <div style="font-size:15px;color:#374151;line-height:1.8">${safeMessage}</div>
     <div style="text-align:center;margin-top:32px">
-      <a href="${FRONTEND_NFC}/nfc-types" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#2E7D32,#1BC29A);color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:10px">Découvrir la carte NFC</a>
+      <a href="${FRONTEND_NFC}/nfc-types#precommande" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#2E7D32,#1BC29A);color:#fff;font-size:15px;font-weight:700;text-decoration:none;border-radius:10px">Précommander ma carte</a>
     </div>
   </td></tr>
   <tr><td style="background:#f9fafb;padding:20px 40px;text-align:center;border-top:1px solid #e5e7eb">

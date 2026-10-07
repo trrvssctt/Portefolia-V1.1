@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 const envBase = import.meta.env.VITE_API_BASE;
 const API_BASE = envBase || (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://backennfc.onrender.com');
 import { useToast } from "@/hooks/use-toast";
+import { useNfcConfig, formatFcfa } from "@/hooks/useNfcConfig";
 import { isTokenExpired } from '@/utils/authUtils';
 import {
   Plus, CreditCard, CheckCircle, Clock, XCircle, Eye, Package,
@@ -187,6 +188,8 @@ function NFCCardItem({ card, onActivate, onDeactivate, onViewPortfolio }: {
 /* ─── Main component ───────────────────────────────────────── */
 const NFCCards = () => {
   const { user, profile, loading: authLoading, signOut } = useAuth();
+  const { config: nfcConfig } = useNfcConfig();
+  const unitPrice = nfcConfig.unit_price;
   const { isFreePlan: ctxFree } = usePlan();
   const [isFreePlan, setIsFreePlan]       = useState(false);
   const [nfcCards, setNfcCards]           = useState<any[]>([]);
@@ -442,8 +445,8 @@ const NFCCards = () => {
   /* ── stats ── */
   const activeCount  = nfcCards.filter(c => c.is_active).length;
   const pendingCount = nfcCards.filter(c => !c.is_active && !c.activated_at).length;
-  const totalEstimated = (orderItems.reduce((s, it) => s + it.quantity * 30000, 0)
-    + (orderItems.length === 0 && pendingItem.portfolio_id ? pendingItem.quantity * 30000 : 0));
+  const totalEstimated = (orderItems.reduce((s, it) => s + it.quantity * unitPrice, 0)
+    + (orderItems.length === 0 && pendingItem.portfolio_id ? pendingItem.quantity * unitPrice : 0));
 
   /* ── loading ── */
   if (authLoading || loading) {
@@ -526,7 +529,7 @@ const NFCCards = () => {
               <NFCStat icon={<CreditCard size={18} />} label="Total cartes"  value={nfcCards.length} />
               <NFCStat icon={<CheckCircle size={18} />} label="Actives"       value={activeCount} />
               <NFCStat icon={<Clock size={18} />}       label="En attente"    value={pendingCount} />
-              <NFCStat icon={<Zap size={18} />}         label="Prix unitaire" value="30 000 F" />
+              <NFCStat icon={<Zap size={18} />}         label="Prix unitaire" value={formatFcfa(unitPrice).replace(' CFA', '')} />
             </div>
 
             {/* ── Suivi commandes (uniquement paiements non finalisés) ── */}
@@ -753,7 +756,7 @@ const NFCCards = () => {
                 </div>
                 <div>
                   <h2 className="font-semibold text-[#18181B] text-sm">Commander une carte NFC</h2>
-                  <p className="text-xs text-[#71717A]">30 000 F CFA / carte</p>
+                  <p className="text-xs text-[#71717A]">{formatFcfa(unitPrice)} / carte</p>
                 </div>
               </div>
               <button
