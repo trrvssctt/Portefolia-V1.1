@@ -35,9 +35,9 @@ export const FINISHES: Finish[] = [
 
 export const PORTFOLIO_HOST = 'portefolia.tech/portfolio/';
 
-const FONT = "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif";
+export const FONT = "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif";
 
-function background(ctx: CanvasRenderingContext2D, f: Finish) {
+export function background(ctx: CanvasRenderingContext2D, f: Finish) {
   const g = ctx.createLinearGradient(0, 0, TEX_W, TEX_H);
   g.addColorStop(0, f.bg[0]);
   g.addColorStop(1, f.bg[1]);
@@ -46,7 +46,7 @@ function background(ctx: CanvasRenderingContext2D, f: Finish) {
 }
 
 // Pictogramme sans contact : un point + trois arcs
-function contactless(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
+export function contactless(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
   ctx.save();
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
@@ -64,7 +64,7 @@ function contactless(ctx: CanvasRenderingContext2D, x: number, y: number, size: 
 }
 
 // Écrit le texte en réduisant la police jusqu'à ce qu'il tienne dans maxW
-function fitText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, size: number, weight: number, minSize = size * 0.55) {
+export function fitText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxW: number, size: number, weight: number, minSize = size * 0.55) {
   let s = size;
   ctx.font = `${weight} ${s}px ${FONT}`;
   while (s > minSize && ctx.measureText(text).width > maxW) {

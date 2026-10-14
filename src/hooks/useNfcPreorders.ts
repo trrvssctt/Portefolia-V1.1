@@ -19,6 +19,8 @@ export interface Preorder {
   wave_transaction_id: string | null;
   wave_sender_phone: string | null;
   payment_proof_url: string | null;
+  offer_code?: string | null;
+  offer_name?: string | null;
   rejection_reason: string | null;
   client_reminder_count: number;
   payment_submitted_at: string | null;

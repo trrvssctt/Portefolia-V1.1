@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import NfcPreorderForm from '@/components/nfc/NfcPreorderForm';
+import NfcOffersGrid from '@/components/nfc/NfcOffersGrid';
 import { Wifi, Link, CreditCard, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://portefolia.tech');
@@ -35,10 +35,11 @@ export default function NFCCardTypes() {
   const [error, setError]         = useState('');
   const [showBack, setShowBack]   = useState(false);
 
-  // Les liens /nfc-types#precommande (e-mails, liste d'attente) amènent directement au formulaire
+  // Les liens /nfc-types#precommande (offres) et #liste-attente amènent directement à la section
   useEffect(() => {
-    if (location.hash !== '#precommande') return;
-    const t = setTimeout(() => document.getElementById('precommande')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+    const id = location.hash.slice(1);
+    if (id !== 'precommande' && id !== 'liste-attente') return;
+    const t = setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
     return () => clearTimeout(t);
   }, [location.hash]);
 
@@ -100,16 +101,21 @@ export default function NFCCardTypes() {
         {/* Hero section */}
         <div className="text-center space-y-4">
           <span className="inline-block px-3 py-1 rounded-full text-xs font-bold text-white" style={{ background: '#F59E0B' }}>
-            Précommandes ouvertes
+            Commandes ouvertes
           </span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">Réservez votre carte dès maintenant</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">Choisissez votre carte</h2>
           <p className="max-w-xl mx-auto text-gray-500 leading-relaxed">
             Gravée à votre nom avec le lien vers votre portfolio, la carte NFC Portefolia vous permet de
-            partager votre profil d'un simple tap. Précommandez-la et payez avec Wave : vous serez parmi les premiers à la recevoir.
+            partager votre profil d'un simple tap. Quatre formules, de l'essentiel à une carte entièrement à votre image. Paiement par Wave.
           </p>
         </div>
 
-        {/* Card preview + form */}
+        {/* Offres */}
+        <div id="precommande" data-tour="nfc-waitlist" className="scroll-mt-6">
+          <NfcOffersGrid />
+        </div>
+
+        {/* Card preview + comment ça marche */}
         <div className="flex flex-col lg:flex-row items-center gap-12">
 
           {/* Card visual — recto / verso, cliquable pour retourner la carte */}
@@ -162,9 +168,20 @@ export default function NFCCardTypes() {
             <p className="text-xs text-gray-400">Cliquez sur la carte pour la retourner</p>
           </div>
 
-          {/* Formulaire de précommande */}
-          <div data-tour="nfc-waitlist" className="flex-1 w-full max-w-md mx-auto lg:mx-0">
-            <NfcPreorderForm />
+          {/* Comment ça marche */}
+          <div className="flex-1 w-full max-w-md mx-auto lg:mx-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+            <p className="text-base font-bold text-gray-900">Comment ça marche</p>
+            {[
+              ['Choisissez votre offre', 'et personnalisez votre carte : infos, couleurs, photo ou logo selon la formule.'],
+              ['Payez avec Wave', "puis envoyez la capture de votre paiement. Nous le validons sous 24 h ouvrées."],
+              ['Validez le bon à tirer', "le visuel final de votre carte, avant l'impression à Dakar."],
+              ['Recevez votre carte', "elle ouvre votre portfolio d'un simple tap, même si vous changez de lien."],
+            ].map(([t, d], i) => (
+              <div key={t} className="flex gap-3">
+                <span className="w-7 h-7 shrink-0 rounded-full text-white text-xs font-bold flex items-center justify-center" style={{ background: '#2E7D32' }}>{i + 1}</span>
+                <p className="text-sm text-gray-600"><strong className="text-gray-900">{t}</strong> {d}</p>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -188,7 +205,7 @@ export default function NFCCardTypes() {
         </div>
 
         {/* Liste d'attente (secondaire) */}
-        <div className="max-w-sm mx-auto w-full">
+        <div id="liste-attente" className="max-w-sm mx-auto w-full scroll-mt-6">
           <p className="text-center text-sm font-semibold text-gray-700 mb-3">Pas encore prêt(e) ? Laissez-nous votre email</p>
           <div>
             {submitted ? (

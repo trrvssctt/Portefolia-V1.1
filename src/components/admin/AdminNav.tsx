@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, UserCheck, Briefcase, CreditCard,
   TrendingUp, Banknote, BarChart3, FileText, BookOpen,
   UserCog, LogOut, Waves, Receipt, Menu, X, Mail, MessageSquare,
-  PanelLeftClose, PanelLeftOpen, DollarSign, Wifi, ShoppingBag, Boxes,
+  PanelLeftClose, PanelLeftOpen, DollarSign, Wifi, ShoppingBag, Boxes, Tags,
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
@@ -63,6 +63,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Formules',     to: '/admin/plans',          icon: CreditCard,      roles: ['super_admin', 'admin_technique'], group: 'Opérations' },
   { label: 'Cartes NFC',  to: '/admin/cartes',         icon: Wifi,            roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations' },
   { label: 'Précommandes NFC', to: '/admin/nfc-preorders', icon: ShoppingBag,   roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations', badgeKey: 'nfc_preorders_to_validate', badgeColor: '#F59E0B' },
+  { label: 'Offres NFC', to: '/admin/nfc-offers', icon: Tags,               roles: ['super_admin', 'admin_technique'], group: 'Opérations' },
   { label: 'Stock & codes NFC', to: '/admin/nfc-stock', icon: Boxes,        roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations' },
   { label: 'NFC Waitlist', to: '/admin/nfc-waitlist',  icon: Mail,            roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations', badgeKey: 'nfc_waitlist', badgeColor: '#F59E0B' },
   { label: 'Upgrades',     to: '/admin/upgrades',       icon: TrendingUp,      roles: ['super_admin', 'admin_technique', 'admin_support'], group: 'Opérations', badgeKey: 'pending_upgrades' },

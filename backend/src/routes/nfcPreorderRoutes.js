@@ -5,7 +5,6 @@ const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const ctrl = require('../controllers/nfcPreorderController');
 const auth = require('../middlewares/authMiddleware');
 const adminAuth = require('../middlewares/adminAuth');
-const optionalAuth = require('../middlewares/optionalAuth');
 const internalAuth = require('../middlewares/internalAuth');
 const { receiveProof } = require('../utils/paymentProof');
 const { requirePermission } = require('../middlewares/rbac');
@@ -36,7 +35,8 @@ const resendLimiter = limiter(3, 'Lien déjà renvoyé plusieurs fois. Vérifiez
 // ── Public ────────────────────────────────────────────────────────────────────
 const publicRouter = express.Router();
 publicRouter.get('/config', ctrl.getPublicConfig);
-publicRouter.post('/', createLimiter, optionalAuth, ctrl.create);
+// Création : compte obligatoire, commande par offre (même traitement que POST /api/nfc/orders)
+publicRouter.post('/', createLimiter, auth, require('../utils/nfcAssets').receiveOrderVisuals, require('../controllers/nfcOrderController').create);
 publicRouter.post('/check', checkLimiter, ctrl.checkContact);
 publicRouter.post('/resend-link', resendLimiter, ctrl.resendLink);
 publicRouter.get('/:reference', ctrl.getPublic);

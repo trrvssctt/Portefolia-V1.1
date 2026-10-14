@@ -17,6 +17,8 @@ interface PublicPreorder {
   total_amount: number;
   wave_transaction_id: string | null;
   has_proof: boolean;
+  offer_name?: string;
+  previews?: { front: string | null; back: string | null } | null;
   rejection_reason: string | null;
   created_at: string;
   expiry_hours: number;
@@ -204,6 +206,7 @@ export default function NfcPreorderTracking() {
               <dl className="text-sm divide-y divide-gray-100 border-y border-gray-100">
                 {[
                   ['Référence', p.reference],
+                  ['Offre', `Carte ${p.offer_name || 'Standard'}`],
                   ['Nom imprimé sur la carte', p.card_name],
                   ['Quantité', `${p.quantity} carte${p.quantity > 1 ? 's' : ''}`],
                   ['Montant total', formatFcfa(p.total_amount)],
@@ -213,6 +216,13 @@ export default function NfcPreorderTracking() {
                   </div>
                 ))}
               </dl>
+              {p.previews && (p.previews.front || p.previews.back) && (
+                <div className="grid grid-cols-2 gap-2">
+                  {[p.previews.front, p.previews.back].filter(Boolean).map((src, i) => (
+                    <img key={i} src={src as string} alt={i === 0 ? 'Face logo de la carte' : 'Face infos de la carte'} className="w-full rounded-lg shadow-sm" loading="lazy" />
+                  ))}
+                </div>
+              )}
             </section>
 
             {p.status === 'rejected' && (

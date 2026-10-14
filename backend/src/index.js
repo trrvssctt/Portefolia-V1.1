@@ -115,6 +115,9 @@ app.use('/api/admin/nfc-preorders', nfcPreorderRoutes.adminRouter);
 // Cartes NFC physiques : stock, lots de codes (admin) — monté avant /api/admin
 const nfcCardRoutes = require('./routes/nfcCardRoutes');
 app.use('/api/admin/nfc-cards', nfcCardRoutes.adminRouter);
+// Offres de cartes NFC (admin) — monté avant /api/admin
+const nfcOrderRoutes = require('./routes/nfcOrderRoutes');
+app.use('/api/admin/nfc-offers', nfcOrderRoutes.adminRouter);
 // admin routes
   app.use('/api/admin', adminRoutes);
   app.use('/api/abonnements', abonnementRoutes);
@@ -136,6 +139,8 @@ app.use('/api/nfc/preorders', nfcPreorderRoutes.publicRouter);
 // Cartes NFC : redirection https://portefolia.tech/c/{CODE} (Nginx : location /c/) + résolution de secours
 app.use('/c', nfcCardRoutes.redirectRouter);
 app.use('/api/nfc/cards', nfcCardRoutes.publicRouter);
+// Offres, commandes par offre et cartes du client
+app.use('/api/nfc', nfcOrderRoutes.router);
 app.use('/api/internal/nfc', nfcPreorderRoutes.internalRouter);
 // NFC waitlist (public)
 app.use('/api/nfc', require('./routes/nfcRoutes'));
@@ -192,6 +197,7 @@ app.post('/webhooks/payment', (req, res) => adminController.paymentWebhook(req, 
     await businessAccountModel.init();
     await require('./models/onboardingModel').init();
     await require('./models/nfcPreorderModel').init();
+    await require('./models/nfcOfferModel').init();
     await require('./models/nfcCardModel').init();
     // Précommandes payées avant l'enregistrement automatique commande + paiement
     try {

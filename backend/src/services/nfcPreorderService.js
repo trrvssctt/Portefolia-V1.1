@@ -203,41 +203,6 @@ async function resendTrackingLink(body) {
   return { ok: true, email_hint: `${user.slice(0, 2)}***@${domain}` };
 }
 
-async function createPreorder(body, { userId = null } = {}) {
-  const cfg = await getNfcConfig();
-  const input = validateCreateInput(body, cfg);
-
-  // Une seule précommande en cours par e-mail et par téléphone
-  const existing = await findActiveByContact({ email: input.email, phone: input.phone });
-  if (existing) {
-    const p = existing.preorder;
-    throw new PreorderError(409,
-      `Une précommande (${p.reference}) ${ACTIVE_MESSAGES[p.status]} pour ${existing.match === 'email' ? 'cet e-mail' : 'ce numéro'}. Retrouvez-la grâce au lien reçu par e-mail.`,
-      { reference: p.reference, active_status: p.status, match: existing.match });
-  }
-
-  const token = crypto.randomBytes(32).toString('hex');
-  const unitPrice = cfg.unit_price;
-  const total = unitPrice * input.quantity;
-
-  const preorder = await withTransaction(async (conn, events) => {
-    const [res] = await conn.query(
-      `INSERT INTO nfc_preorders
-        (public_token, user_id, full_name, card_name, email, phone, city, quantity, unit_price, total_amount, currency, notes, source)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'web')`,
-      [token, userId || null, input.full_name, input.card_name, input.email, input.phone, input.city,
-        input.quantity, unitPrice, total, cfg.currency, input.notes]
-    );
-    const reference = `PF-NFC-${String(res.insertId).padStart(4, '0')}`;
-    await conn.query('UPDATE nfc_preorders SET reference = ? WHERE id = ?', [reference, res.insertId]);
-    events.push(await notifier.emit(conn, res.insertId, 'preorder.created'));
-    const [[row]] = await conn.query('SELECT * FROM nfc_preorders WHERE id = ?', [res.insertId]);
-    return row;
-  });
-
-  return { preorder, token, cfg };
-}
-
 async function findByReferenceAndToken(reference, token) {
   const [[p]] = await pool.query('SELECT * FROM nfc_preorders WHERE reference = ? LIMIT 1', [String(reference || '')]);
   if (!p || !safeEqual(p.public_token, token)) throw new PreorderError(404, 'Précommande introuvable.');
@@ -386,7 +351,7 @@ async function recordPaidPreorder(conn, p) {
   const { userId, guestCreated } = await resolveCustomer(conn, p);
   const paidAt = p.paid_at || new Date();
   const numero = `CMD-${Date.now()}-${p.reference}`;
-  const note = `Précommande ${p.reference} — ${p.quantity} carte(s), nom imprimé : ${p.card_name}`;
+  const note = `Précommande ${p.reference} — carte ${p.offer_name || 'Standard'}, ${p.quantity} carte(s), nom imprimé : ${p.card_name}`;
 
   // Les deux jeux de colonnes de commandes sont remplis : paiement_statut/montant_total (page Commandes)
   // et statut_paiement/montant (KPI finance et dashboard)
@@ -641,7 +606,12 @@ module.exports = {
   normalizeWaveTx,
   validateCreateInput,
   safeEqual,
-  createPreorder,
+  cleanText,
+  withTransaction,
+  findActiveByContact,
+  ACTIVE_STATUSES,
+  ACTIVE_MESSAGES,
+  EMAIL_RE,
   findByReferenceAndToken,
   attachProof,
   checkContact,

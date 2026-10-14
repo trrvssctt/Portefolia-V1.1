@@ -39,24 +39,11 @@ async function getPublicConfig(req, res) {
   } catch (err) { return handleError(res, err, 'getPublicConfig'); }
 }
 
-async function create(req, res) {
-  try {
-    const body = req.body || {};
-    // Honeypot : un robot a rempli le champ caché → réponse factice, rien n'est enregistré
-    if (body.website) {
-      return res.status(201).json({ reference: 'PF-NFC-0000', token: '', status: 'pending_payment' });
-    }
-    const { preorder, token, cfg } = await svc.createPreorder(body, { userId: req.userId || null });
-    return res.status(201).json({
-      reference: preorder.reference,
-      token,
-      status: preorder.status,
-      total_amount: Number(preorder.total_amount),
-      currency: preorder.currency,
-      payment: paymentInfo(cfg, preorder.total_amount),
-      tracking_url: trackingUrl(preorder),
-    });
-  } catch (err) { return handleError(res, err, 'create'); }
+// Visuels de la commande (première carte) pour la page de suivi
+async function previewsFor(orderId) {
+  const items = await require('../services/nfcOrderService').orderItems(orderId).catch(() => []);
+  const i = items[0];
+  return i ? { front: i.preview_front_url || null, back: i.preview_back_url || null } : null;
 }
 
 async function getPublic(req, res) {
@@ -72,6 +59,9 @@ async function getPublic(req, res) {
       unit_price: Number(p.unit_price),
       total_amount: Number(p.total_amount),
       currency: p.currency,
+      offer_code: p.offer_code || 'standard',
+      offer_name: p.offer_name || 'Standard',
+      previews: await previewsFor(p.id),
       wave_transaction_id: p.wave_transaction_id,
       has_proof: !!p.payment_proof_url,
       rejection_reason: p.rejection_reason,
@@ -196,7 +186,7 @@ async function internalNotification(req, res) {
 }
 
 module.exports = {
-  getPublicConfig, create, getPublic, submitPayment, submitProof, checkContact, resendLink,
+  getPublicConfig, getPublic, submitPayment, submitProof, checkContact, resendLink,
   adminList, adminStats, adminDetail, adminValidate, adminReject, adminCancel, adminConvert, adminResend,
   adminExport, adminGetSettings, adminUpdateSettings,
   internalExpireStale, internalRemindersDue, internalNotification,

@@ -5,6 +5,7 @@ const envBase = import.meta.env.VITE_API_BASE;
 const API_BASE = envBase || (typeof window !== 'undefined' && window.location && window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://backennfc.onrender.com');
 import { useToast } from "@/hooks/use-toast";
 import { useNfcConfig, formatFcfa } from "@/hooks/useNfcConfig";
+import MyNfcSection from "@/components/nfc/MyNfcSection";
 import { isTokenExpired } from '@/utils/authUtils';
 import {
   Plus, CreditCard, CheckCircle, Clock, XCircle, Eye, Package,
@@ -523,10 +524,10 @@ const NFCCards = () => {
                 >
                   En savoir plus
                 </button>
-                <div data-tour="nfc-order" title="Disponible très prochainement">
+                <div data-tour="nfc-order">
                   <button
-                    disabled
-                    className="flex items-center gap-1.5 h-10 px-4 rounded-[10px] text-sm font-semibold text-white cursor-not-allowed opacity-50"
+                    onClick={() => navigate('/nfc-types#precommande')}
+                    className="flex items-center gap-1.5 h-10 px-4 rounded-[10px] text-sm font-semibold text-white hover:opacity-90 transition-opacity"
                     style={{ background: '#2E7D32' }}
                   >
                     <Plus size={16} /> Commander
@@ -562,6 +563,9 @@ const NFCCards = () => {
               <NFCStat icon={<Clock size={18} />}       label="En attente"    value={pendingCount} />
               <NFCStat icon={<Zap size={18} />}         label="Prix unitaire" value={formatFcfa(unitPrice).replace(' CFA', '')} />
             </div>
+
+            {/* ── Commandes de cartes (offres) et cartes physiques du client ── */}
+            <MyNfcSection />
 
             {/* ── Commandes payées (dont précommandes) : statut de fabrication + reçu ── */}
             {orders.filter(o => o.statut !== 'Annulée' && o.paiement_statut === 'payé').length > 0 && (
@@ -760,10 +764,10 @@ const NFCCards = () => {
                   Commandez votre première carte NFC et partagez votre portfolio d'un simple geste.
                 </p>
                 {portfolios.length > 0 && (
-                  <div title="Disponible très prochainement">
+                  <div>
                     <button
-                      disabled
-                      className="h-10 px-4 rounded-[10px] text-sm font-semibold text-white flex items-center gap-1.5 mx-auto cursor-not-allowed opacity-50"
+                      onClick={() => navigate('/nfc-types#precommande')}
+                      className="h-10 px-4 rounded-[10px] text-sm font-semibold text-white flex items-center gap-1.5 mx-auto hover:opacity-90 transition-opacity"
                       style={{ background: '#2E7D32' }}
                     >
                       <Plus size={15} /> Commander ma première carte

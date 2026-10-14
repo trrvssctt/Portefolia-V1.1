@@ -169,6 +169,7 @@ function DetailPanel({ id, onClose }: { id: number; onClose: () => void }) {
                 ['Téléphone', p.phone],
                 ['Ville', p.city || '—'],
                 ['Quantité', String(p.quantity)],
+                ['Offre', p.offer_name || 'Standard'],
                 ['Montant', `${formatFcfa(p.total_amount)} (${formatFcfa(p.unit_price)} / carte)`],
                 ['Transaction Wave', p.wave_transaction_id || '—'],
                 ['Numéro Wave payeur', p.wave_sender_phone || '—'],
@@ -240,7 +241,7 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     if (data) setForm({
-      unit_price: String(data.unit_price), wave_number: data.wave_number, batch_threshold: String(data.batch_threshold),
+      wave_number: data.wave_number, batch_threshold: String(data.batch_threshold),
       max_quantity: String(data.max_quantity), expiry_hours: String(data.expiry_hours), wave_link: data.wave_link,
       wave_link_supports_amount: data.wave_link_supports_amount,
     });
@@ -249,7 +250,7 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
   const save = async () => {
     try {
       await update.mutateAsync({
-        unit_price: Number(form.unit_price), wave_number: String(form.wave_number), batch_threshold: Number(form.batch_threshold),
+        wave_number: String(form.wave_number), batch_threshold: Number(form.batch_threshold),
         max_quantity: Number(form.max_quantity), expiry_hours: Number(form.expiry_hours), wave_link: String(form.wave_link || ''),
         wave_link_supports_amount: !!form.wave_link_supports_amount,
       });
@@ -278,7 +279,7 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
         </div>
         {isLoading ? <Loader2 className="animate-spin mx-auto text-[#2E7D32]" /> : (
           <>
-            {field('unit_price', 'Prix unitaire (F CFA)', 'S\'applique aux nouvelles précommandes ; les précommandes existantes gardent leur prix.', 'number')}
+            <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">Les prix se modifient par offre, dans <a href="/admin/nfc-offers" className="font-semibold text-[#2E7D32] underline">Offres NFC</a>.</p>
             {field('wave_number', 'Numéro Wave marchand')}
             <div className="grid grid-cols-3 gap-3">
               {field('batch_threshold', 'Taille d\'un lot', undefined, 'number')}
@@ -430,7 +431,7 @@ export default function NfcPreordersPage() {
                 <tr><td colSpan={8} className="py-16 text-center text-gray-500">Aucune précommande{status ? ' dans cet onglet' : ''}.</td></tr>
               ) : liste.map((p) => (
                 <tr key={p.id} onClick={() => setOpenId(p.id)} className="border-t border-gray-50 hover:bg-green-50/40 cursor-pointer">
-                  <td className="px-4 py-3 font-mono font-semibold text-gray-900">{p.reference}</td>
+                  <td className="px-4 py-3"><span className="font-mono font-semibold text-gray-900">{p.reference}</span><span className="block text-[11px] text-gray-500">{p.offer_name || 'Standard'}</span></td>
                   <td className="px-4 py-3"><p className="font-medium text-gray-900">{p.full_name}</p><p className="text-xs text-gray-400">{p.email}</p></td>
                   <td className="px-4 py-3">
                     <a href={waLink(p.phone)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-[#2E7D32] hover:underline">{p.phone}</a>

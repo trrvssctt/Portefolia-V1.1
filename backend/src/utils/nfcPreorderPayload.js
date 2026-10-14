@@ -35,6 +35,8 @@ function buildPreorderPayload(p, cfg, stats) {
       wave_transaction_id: p.wave_transaction_id || null,
       wave_sender_phone: p.wave_sender_phone || null,
       payment_proof_url: p.payment_proof_url || null,
+      offer_code: p.offer_code || 'standard',
+      offer_name: p.offer_name || 'Standard',
       rejection_reason: p.rejection_reason || null,
       client_reminder_count: Number(p.client_reminder_count || 0),
       payment_submitted_at: iso(p.payment_submitted_at),
