@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Wifi, Copy, Check, Loader2, CheckCircle2, Clock, XCircle, AlertTriangle, ExternalLink, Home, MessageCircle, LayoutDashboard } from 'lucide-react';
+import { Wifi, Copy, Check, Loader2, CheckCircle2, Clock, XCircle, AlertTriangle, ExternalLink, Home, MessageCircle, LayoutDashboard, Palette, Printer, FileCheck2 } from 'lucide-react';
 import { NFC_API_BASE, formatFcfa } from '@/hooks/useNfcConfig';
 import PaymentProofUpload from '@/components/payment/PaymentProofUpload';
 
-type Status = 'pending_payment' | 'payment_submitted' | 'paid' | 'rejected' | 'expired' | 'cancelled' | 'converted';
+type Status = 'pending_payment' | 'payment_submitted' | 'paid' | 'rejected' | 'expired' | 'cancelled' | 'converted'
+  | 'design_en_cours' | 'bat_envoye' | 'bat_valide' | 'en_impression' | 'prete' | 'livree';
 
 interface PublicPreorder {
   reference: string;
@@ -19,6 +20,8 @@ interface PublicPreorder {
   has_proof: boolean;
   offer_name?: string;
   previews?: { front: string | null; back: string | null } | null;
+  bat_comment?: string | null;
+  bat_revision?: number;
   rejection_reason: string | null;
   created_at: string;
   expiry_hours: number;
@@ -51,16 +54,18 @@ function PageActions({ reference }: { reference?: string }) {
   );
 }
 
-const STEPS = ['Précommande reçue', 'Paiement déclaré', 'Paiement confirmé', 'Fabrication & livraison'];
+const STEPS = ['Paiement', 'Bon à tirer', 'Impression', 'Prête', 'Livrée'];
 
-function stepIndex(s: Status): number {
+// Étape en cours dans la frise ; « done » si l'étape elle-même est terminée
+function stepState(s: Status): { index: number; done: boolean } {
   switch (s) {
-    case 'pending_payment': return 0;
-    case 'rejected': return 0;
-    case 'payment_submitted': return 1;
-    case 'paid': return 2;
-    case 'converted': return 3;
-    default: return -1;
+    case 'pending_payment': case 'rejected': case 'payment_submitted': return { index: 0, done: false };
+    case 'paid': case 'design_en_cours': case 'bat_envoye': return { index: 1, done: false };
+    case 'bat_valide': return { index: 1, done: true };
+    case 'en_impression': case 'converted': return { index: 2, done: false };
+    case 'prete': return { index: 3, done: true };
+    case 'livree': return { index: 4, done: true };
+    default: return { index: -1, done: false };
   }
 }
 
@@ -76,12 +81,12 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 }
 
 function Timeline({ status }: { status: Status }) {
-  const current = stepIndex(status);
+  const { index: current, done: currentDone } = stepState(status);
   if (current < 0) return null;
   return (
-    <ol className="grid grid-cols-4 gap-2">
+    <ol className="grid grid-cols-5 gap-1.5">
       {STEPS.map((label, i) => {
-        const done = i < current || (i === current && (status === 'paid' || status === 'converted'));
+        const done = i < current || (i === current && currentDone);
         const active = i === current;
         return (
           <li key={label} className="flex flex-col items-center text-center gap-1.5">
@@ -94,6 +99,82 @@ function Timeline({ status }: { status: Status }) {
         );
       })}
     </ol>
+  );
+}
+
+// Validation du bon à tirer par le client
+function BatReview({ reference, token, previews, revision, onDone }: {
+  reference: string; token: string; previews: { front: string | null; back: string | null } | null; revision: number; onDone: () => void;
+}) {
+  const [mode, setMode] = useState<'view' | 'changes'>('view');
+  const [comment, setComment] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const send = async (path: 'approve' | 'changes') => {
+    if (path === 'changes' && comment.trim().length < 3) { setError('Décrivez la correction souhaitée.'); return; }
+    if (path === 'approve' && !window.confirm('Valider ce bon à tirer ? La carte sera imprimée telle quelle.')) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${NFC_API_BASE}/api/nfc/preorders/${encodeURIComponent(reference)}/bat/${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, comment: comment.trim() || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data?.error || 'Action impossible, réessayez.'); return; }
+      onDone();
+    } catch {
+      setError('Connexion impossible. Réessayez.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="bg-white rounded-2xl border-2 border-[#C2410C]/30 shadow-sm p-5 space-y-4">
+      <div>
+        <p className="text-sm font-bold text-gray-900 flex items-center gap-2"><FileCheck2 size={17} className="text-[#C2410C]" /> Votre bon à tirer{revision > 0 ? ` (version ${revision + 1})` : ''}</p>
+        <p className="text-xs text-gray-500 mt-1">Vérifiez attentivement l'orthographe, le numéro et les couleurs : la carte sera imprimée exactement ainsi.</p>
+      </div>
+      {previews && (
+        <div className="space-y-2">
+          {[previews.front, previews.back].filter(Boolean).map((src, i) => (
+            <a key={i} href={src as string} target="_blank" rel="noopener noreferrer">
+              <img src={src as string} alt={i === 0 ? 'Bon à tirer, face logo' : 'Bon à tirer, face infos'} className="w-full rounded-xl shadow" />
+            </a>
+          ))}
+        </div>
+      )}
+      {mode === 'view' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button onClick={() => send('approve')} disabled={loading}
+            className="h-11 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-60"
+            style={{ background: 'linear-gradient(135deg, #2E7D32, #1BC29A)' }}>
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />} Valider le BAT
+          </button>
+          <button onClick={() => setMode('changes')} disabled={loading}
+            className="h-11 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+            Demander une correction
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <textarea rows={3} maxLength={1000} value={comment} onChange={(e) => setComment(e.target.value)}
+            placeholder="Ex. : corriger le numéro de téléphone, agrandir le logo…"
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-[#FAFAFA] text-sm outline-none focus:border-[#2E7D32] resize-none" />
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setMode('view')} disabled={loading} className="h-10 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700">Retour</button>
+            <button onClick={() => send('changes')} disabled={loading}
+              className="h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2" style={{ background: '#C2410C' }}>
+              {loading && <Loader2 size={14} className="animate-spin" />} Envoyer la demande
+            </button>
+          </div>
+        </div>
+      )}
+      {error && <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</p>}
+    </section>
   );
 }
 
@@ -296,14 +377,52 @@ export default function NfcPreorderTracking() {
               </div>
             )}
 
-            {(p.status === 'paid' || p.status === 'converted') && (
+            {(p.status === 'paid' || p.status === 'design_en_cours') && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex gap-3">
+                <Palette size={22} className="text-[#7C3AED] shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold text-gray-900">{p.bat_comment ? 'Correction en cours' : 'Paiement confirmé, design en cours'}</p>
+                  <p className="text-gray-500 mt-0.5">
+                    {p.bat_comment
+                      ? 'Nous appliquons votre demande et vous renvoyons un nouveau bon à tirer très vite.'
+                      : 'Notre équipe prépare le visuel final de votre carte. Vous recevrez un bon à tirer (BAT) à valider avant impression.'}
+                  </p>
+                  {p.bat_comment && <p className="mt-2 text-xs bg-gray-50 rounded-lg px-3 py-2 text-gray-600">Votre demande : « {p.bat_comment} »</p>}
+                </div>
+              </div>
+            )}
+
+            {p.status === 'bat_envoye' && (
+              <BatReview reference={p.reference} token={token} previews={p.previews || null} revision={p.bat_revision || 0}
+                onDone={() => qc.invalidateQueries({ queryKey })} />
+            )}
+
+            {(p.status === 'bat_valide' || p.status === 'en_impression' || p.status === 'converted') && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex gap-3">
+                <Printer size={22} className="text-[#6D28D9] shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold text-gray-900">{p.status === 'bat_valide' ? 'Bon à tirer validé' : 'En impression à Dakar'}</p>
+                  <p className="text-gray-500 mt-0.5">
+                    {p.status === 'bat_valide'
+                      ? 'Merci ! Votre carte rejoint le prochain lot d\'impression. Nous vous prévenons dès qu\'elle est prête.'
+                      : 'Votre carte est en cours d\'impression. Nous vous prévenons dès qu\'elle est prête.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {(p.status === 'prete' || p.status === 'livree') && (
               <div className="bg-white rounded-2xl border border-green-100 shadow-sm p-5 text-center space-y-3">
                 <CheckCircle2 size={40} className="mx-auto text-[#2E7D32]" />
-                <p className="font-semibold text-gray-900">Paiement confirmé, votre carte est réservée !</p>
-                <p className="text-sm text-gray-500">Nous lançons la fabrication par lots et vous informons à chaque étape. En attendant, préparez le portfolio qui s'affichera quand on approchera un téléphone de votre carte.</p>
-                <Link to="/dashboard" className="inline-flex h-11 px-6 rounded-xl text-sm font-bold text-white items-center justify-center"
+                <p className="font-semibold text-gray-900">{p.status === 'prete' ? 'Votre carte est prête !' : 'Carte livrée'}</p>
+                <p className="text-sm text-gray-500">
+                  {p.status === 'prete'
+                    ? 'Nous vous contactons sur WhatsApp pour la remise. Elle est déjà active : approchez un téléphone pour ouvrir votre portfolio.'
+                    : 'Votre carte est active. Vous pouvez choisir le portfolio qu\'elle ouvre depuis votre espace, sans la réimprimer.'}
+                </p>
+                <Link to="/dashboard/nfc-cards" className="inline-flex h-11 px-6 rounded-xl text-sm font-bold text-white items-center justify-center"
                   style={{ background: 'linear-gradient(135deg, #2E7D32, #1BC29A)' }}>
-                  Préparer mon portfolio
+                  Gérer mes cartes
                 </Link>
               </div>
             )}

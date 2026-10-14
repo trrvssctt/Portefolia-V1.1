@@ -6,6 +6,14 @@
 > dans les identifiants n8n et dans le `.env` du VPS. Seule l'URL du webhook WF1 reste à fournir (`N8N_PREORDER_WEBHOOK_URL`).
 > Écart avec la spec : `reminders-due` est un **POST** qui réserve les rappels (le journal n'incrémente plus le compteur).
 
+> **Mise à jour (14 oct. 2026) — 4 offres et production** : réimportez les deux fichiers JSON dans la même instance n8n
+> (les identifiants restent associés). WF1 gère désormais : offre dans les e-mails, design, **BAT à valider**,
+> impression, **carte prête**, **carte livrée**, et côté admin : correction de BAT, **stock bas**, **lot d'impression prêt**,
+> carte perdue, devis Entreprise (demandé / envoyé / accepté / refusé). L'ancienne alerte « 10 précommandes payées »
+> est supprimée (remplacée par le seuil de lot d'impression, réglable dans « Stock & codes NFC »).
+> WF2 ajoute un rappel au client quand son BAT n'est pas validé (48 h puis 96 h) et son expéditeur repasse à
+> `support@portefolia.tech` (l'adresse du compte SMTP : `no-reply@` est refusé par le serveur mail).
+
 Deux workflows à importer :
 
 | Fichier | Rôle | Déclencheur |

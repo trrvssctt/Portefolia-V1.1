@@ -58,10 +58,19 @@ test('transitions autorisées et refusées', () => {
   assert.doesNotThrow(() => svc.assertTransition(p('pending_payment'), 'payment_submitted'));
   assert.doesNotThrow(() => svc.assertTransition(p('rejected'), 'payment_submitted'));
   assert.doesNotThrow(() => svc.assertTransition(p('payment_submitted'), 'paid'));
-  assert.doesNotThrow(() => svc.assertTransition(p('paid'), 'converted'));
+  // Production
+  assert.doesNotThrow(() => svc.assertTransition(p('paid'), 'design_en_cours'));
+  assert.doesNotThrow(() => svc.assertTransition(p('paid'), 'bat_envoye'));
+  assert.doesNotThrow(() => svc.assertTransition(p('bat_envoye'), 'design_en_cours')); // correction demandée
+  assert.doesNotThrow(() => svc.assertTransition(p('bat_envoye'), 'bat_valide'));
+  assert.doesNotThrow(() => svc.assertTransition(p('bat_valide'), 'en_impression'));
+  assert.doesNotThrow(() => svc.assertTransition(p('en_impression'), 'prete'));
+  assert.doesNotThrow(() => svc.assertTransition(p('prete'), 'livree'));
   assert.doesNotThrow(() => svc.assertTransition(p('rejected'), 'expired'));
   const refused = [
     ['pending_payment', 'paid'], ['paid', 'paid'], ['paid', 'cancelled'], ['converted', 'cancelled'],
+    ['payment_submitted', 'bat_envoye'], ['design_en_cours', 'bat_valide'], ['bat_valide', 'livree'],
+    ['bat_envoye', 'en_impression'], ['livree', 'cancelled'], ['prete', 'en_impression'],
     ['payment_submitted', 'expired'], ['expired', 'payment_submitted'], ['cancelled', 'paid'],
   ];
   for (const [from, to] of refused) {

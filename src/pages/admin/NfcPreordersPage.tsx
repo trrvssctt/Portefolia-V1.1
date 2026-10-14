@@ -3,21 +3,26 @@ import { useSearchParams } from 'react-router-dom';
 import {
   ShoppingBag, Download, Settings, Search, X, Loader2, Copy, Check, ChevronLeft, ChevronRight,
   CheckCircle2, XCircle, Ban, PackageCheck, Send, AlertTriangle, MessageCircle,
+  Palette, FileCheck2, Printer, Truck, Upload, FileText,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatFcfa } from '@/hooks/useNfcConfig';
 import {
   useNfcPreorders, useNfcPreorderStats, useNfcPreorderDetail, useNfcSettings, useUpdateNfcSettings,
-  usePreorderAction, exportPreordersCsv, STATUS_META,
-  type Preorder, type PreorderStatus, type PreorderAction,
+  usePreorderAction, exportPreordersCsv, STATUS_META, useUploadBat, usePrintQueue, useStartPrintBatch, downloadPrintSheet,
+  type Preorder, type PreorderStatus, type PreorderAction, type OrderItem,
 } from '@/hooks/useNfcPreorders';
 
 const PAGE_SIZE = 20;
 const TABS: { key: '' | PreorderStatus; label: string }[] = [
-  { key: 'payment_submitted', label: 'À valider' },
+  { key: 'payment_submitted', label: 'Paiements à valider' },
   { key: 'pending_payment', label: 'Attente paiement' },
-  { key: 'paid', label: 'Payées' },
-  { key: 'converted', label: 'En fabrication' },
+  { key: 'design_en_cours', label: 'Design' },
+  { key: 'bat_envoye', label: 'BAT envoyé' },
+  { key: 'bat_valide', label: 'BAT validé' },
+  { key: 'en_impression', label: 'En impression' },
+  { key: 'prete', label: 'Prêtes' },
+  { key: 'livree', label: 'Livrées' },
   { key: 'rejected', label: 'Refusées' },
   { key: 'expired', label: 'Expirées' },
   { key: 'cancelled', label: 'Annulées' },
@@ -54,8 +59,13 @@ function CopyText({ value }: { value: string }) {
 const ACTION_META: Record<PreorderAction, { title: string; text: string; confirm: string; color: string; reason?: 'required' | 'optional' }> = {
   validate: { title: 'Valider le paiement', text: 'Vous confirmez avoir trouvé cette transaction dans Wave Business, avec le bon montant. Le client recevra un e-mail de confirmation ; la commande et le paiement sont enregistrés (finances, statistiques, historique du client).', confirm: 'Valider le paiement', color: '#2E7D32' },
   reject: { title: 'Refuser le paiement', text: 'Le client recevra un e-mail avec le motif et pourra déclarer à nouveau son paiement.', confirm: 'Refuser', color: '#DC2626', reason: 'required' },
-  cancel: { title: 'Annuler la précommande', text: 'Le client recevra un e-mail d\'annulation.', confirm: 'Annuler la précommande', color: '#DC2626', reason: 'optional' },
-  convert: { title: 'Lancer la fabrication', text: 'La commande liée passe « En traitement » dans la page Commandes, d\'où vous suivrez gravure, expédition et livraison. Aucun e-mail n\'est envoyé.', confirm: 'Lancer la fabrication', color: '#6D28D9' },
+  cancel: { title: 'Annuler la commande', text: 'Le client recevra un e-mail d\'annulation.', confirm: 'Annuler la commande', color: '#DC2626', reason: 'optional' },
+  design: { title: 'Passer en design', text: 'La commande part chez le designer. Le client est prévenu qu\'un bon à tirer arrive.', confirm: 'Passer en design', color: '#7C3AED' },
+  send_bat: { title: 'Envoyer le BAT', text: 'Le client reçoit le bon à tirer par e-mail et le valide (ou demande une correction) depuis son lien de suivi.', confirm: 'Envoyer le BAT', color: '#C2410C' },
+  approve_bat: { title: 'Valider le BAT pour le client', text: 'À utiliser si le client a donné son accord par un autre canal (WhatsApp, téléphone). Un code de carte est attribué à chaque carte.', confirm: 'Valider le BAT', color: '#0F766E' },
+  en_impression: { title: 'Passer en impression', text: 'Chaque carte doit avoir un code (stock suffisant). Le client est prévenu que sa carte est en impression.', confirm: 'Passer en impression', color: '#6D28D9' },
+  prete: { title: 'Carte prête', text: 'Les cartes deviennent actives (le tap ouvre le portfolio) et le client est prévenu qu\'elles sont prêtes.', confirm: 'Marquer prête', color: '#15803D' },
+  livree: { title: 'Carte livrée', text: 'La commande est terminée ; le client reçoit la confirmation de livraison.', confirm: 'Marquer livrée', color: '#166534' },
   resend: { title: 'Renvoyer la dernière notification', text: 'Le dernier e-mail envoyé pour cette précommande sera renvoyé au client (et à l\'admin si concerné).', confirm: 'Renvoyer', color: '#2E7D32' },
 };
 
@@ -69,8 +79,8 @@ function ConfirmAction({ action, preorder, onClose }: { action: PreorderAction; 
   const run = async () => {
     try {
       const r = await mutation.mutateAsync({ id: preorder.id, action, reason: meta.reason ? reason.trim() : undefined });
-      const extra = action === 'convert' && r && (r as { numero_commande?: string }).numero_commande ? ` (${(r as { numero_commande: string }).numero_commande})` : '';
-      toast({ title: `✓ ${meta.title} : ${preorder.reference}${extra}` });
+      const missing = r && typeof (r as { missing?: number }).missing === 'number' ? (r as { missing: number }).missing : 0;
+      toast({ title: `✓ ${meta.title} : ${preorder.reference}`, description: missing ? `${missing} carte(s) sans code : stock insuffisant.` : undefined });
       onClose();
     } catch (e) {
       toast({ title: (e as Error).message || 'Action impossible', variant: 'destructive' });
@@ -103,6 +113,129 @@ function ConfirmAction({ action, preorder, onClose }: { action: PreorderAction; 
   );
 }
 
+// ── Cartes de la commande et dépôt du BAT ─────────────────────────────────────
+
+function ItemsBlock({ order, items }: { order: Preorder; items: OrderItem[] }) {
+  const upload = useUploadBat();
+  const { toast } = useToast();
+  const [front, setFront] = useState<File | null>(null);
+  const [back, setBack] = useState<File | null>(null);
+  const [itemId, setItemId] = useState<number | ''>('');
+  const canUpload = ['paid', 'design_en_cours', 'bat_envoye'].includes(order.status);
+  const design = items[0]?.design || {};
+
+  const submit = async () => {
+    try {
+      await upload.mutateAsync({ id: order.id, front, back, itemId: itemId || null });
+      toast({ title: '✓ BAT déposé', description: order.status === 'bat_envoye' ? undefined : 'Cliquez sur « Envoyer le BAT » pour le soumettre au client.' });
+      setFront(null); setBack(null);
+    } catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); }
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Cartes ({items.length})</p>
+      {(design.logo_url || design.photo_url || design.notes) && (
+        <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600 space-y-1">
+          {design.logo_url && <p>Logo client : <a href={design.logo_url} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#2E7D32] underline">ouvrir</a></p>}
+          {design.photo_url && <p>Photo : <a href={design.photo_url} target="_blank" rel="noopener noreferrer" className="font-semibold text-[#2E7D32] underline">ouvrir</a></p>}
+          {design.notes && <p>Notes : « {design.notes} »</p>}
+          {design.template && <p>Gabarit : {design.template}{design.finish ? ` · ${design.finish}` : ''}</p>}
+        </div>
+      )}
+      {items.map((it) => (
+        <div key={it.id} className="rounded-xl border border-gray-100 p-3 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-gray-800">Carte {it.position}/{items.length} · {it.printed_info?.name || '—'}</span>
+            <span className="font-mono">{it.card_code ? <>Code <b>{it.card_code}</b></> : <span className="text-gray-400">code attribué au BAT validé</span>}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[it.preview_front_url, it.preview_back_url].map((src, i) => src
+              ? <a key={i} href={(i === 0 ? it.print_front_url : it.print_back_url) || src} target="_blank" rel="noopener noreferrer" title="Fichier d'impression"><img src={src} alt={i === 0 ? 'Face logo' : 'Face infos'} className="w-full rounded-lg border border-gray-100" loading="lazy" /></a>
+              : <div key={i} className="aspect-[1.585] rounded-lg bg-gray-50 text-[11px] text-gray-400 flex items-center justify-center">Visuel manquant</div>)}
+          </div>
+          {it.bat_revision > 0 && <p className="text-[11px] text-gray-400">BAT déposé · révision {it.bat_revision}</p>}
+        </div>
+      ))}
+      {canUpload && (
+        <div className="rounded-xl border border-dashed border-gray-300 p-3 space-y-2">
+          <p className="text-xs font-bold text-gray-700 flex items-center gap-1.5"><Upload size={13} /> Déposer le BAT (PNG ou JPG, 600 dpi, 3 mm de fond perdu : 91,6 × 60 mm)</p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <label className="space-y-1"><span className="text-gray-500">Face logo (recto)</span>
+              <input type="file" accept="image/png,image/jpeg" onChange={(e) => setFront(e.target.files?.[0] || null)} className="block w-full text-[11px]" /></label>
+            <label className="space-y-1"><span className="text-gray-500">Face infos (verso)</span>
+              <input type="file" accept="image/png,image/jpeg" onChange={(e) => setBack(e.target.files?.[0] || null)} className="block w-full text-[11px]" /></label>
+          </div>
+          {items.length > 1 && (
+            <select value={itemId} onChange={(e) => setItemId(e.target.value ? Number(e.target.value) : '')} className="w-full h-9 px-2 rounded-lg border border-gray-200 text-xs">
+              <option value="">Appliquer à toutes les cartes de la commande</option>
+              {items.map((it) => <option key={it.id} value={it.id}>Seulement la carte {it.position} ({it.printed_info?.name || '—'})</option>)}
+            </select>
+          )}
+          <button onClick={submit} disabled={upload.isPending || (!front && !back)}
+            className="w-full h-9 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-50" style={{ background: '#7C3AED' }}>
+            {upload.isPending ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Déposer
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Lot d'impression locale ───────────────────────────────────────────────────
+
+function PrintBatchBlock({ queue, threshold, summary }: { queue: number; threshold: number; summary: string }) {
+  const start = useStartPrintBatch();
+  const { data } = usePrintQueue();
+  const { toast } = useToast();
+  const [busy, setBusy] = useState<'' | 'pdf' | 'csv'>('');
+  const items = data?.items ?? [];
+  const missingCodes = items.filter((i) => !i.card_code).length;
+
+  const download = async (format: 'pdf' | 'csv') => {
+    setBusy(format);
+    try { await downloadPrintSheet(format); } catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(''); }
+  };
+  const launch = async () => {
+    if (!window.confirm(`Passer en impression les ${queue} carte(s) au BAT validé ? Les clients seront prévenus.`)) return;
+    try {
+      const r = await start.mutateAsync();
+      toast({
+        title: `✓ ${r.started.length} commande(s) en impression`,
+        description: r.blocked.length ? `${r.blocked.length} bloquée(s) : ${r.blocked.map((b) => b.reference).join(', ')} (stock insuffisant)` : undefined,
+        variant: r.blocked.length ? 'destructive' : undefined,
+      });
+    } catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); }
+  };
+
+  return (
+    <div className="bg-white/10 rounded-2xl p-4 space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 text-white">
+        <p className="text-sm font-semibold">Lot d'impression : <span className="text-xl font-black">{queue} / {threshold}</span> carte(s) au BAT validé</p>
+        <p className="text-xs text-white/70">{summary}</p>
+      </div>
+      <div className="h-2.5 rounded-full bg-white/20 overflow-hidden">
+        <div className="h-full rounded-full bg-white transition-all" style={{ width: `${Math.min(100, (queue / Math.max(1, threshold)) * 100)}%` }} />
+      </div>
+      {queue > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={() => download('pdf')} disabled={!!busy} className="h-8 px-3 rounded-lg bg-white text-xs font-bold flex items-center gap-1.5" style={{ color: '#1B5E20' }}>
+            {busy === 'pdf' ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />} PDF imprimeur
+          </button>
+          <button onClick={() => download('csv')} disabled={!!busy} className="h-8 px-3 rounded-lg border border-white/40 text-white text-xs font-semibold flex items-center gap-1.5">
+            {busy === 'csv' ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Récapitulatif (CSV)
+          </button>
+          <button onClick={launch} disabled={start.isPending} className="h-8 px-3 rounded-lg border border-white/40 text-white text-xs font-semibold flex items-center gap-1.5">
+            {start.isPending ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />} Lancer l'impression du lot
+          </button>
+          {missingCodes > 0 && <span className="text-xs text-amber-200">{missingCodes} carte(s) sans code : recevez un lot de cartes dans « Stock & codes ».</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Panneau de détail ─────────────────────────────────────────────────────────
 
 function DetailPanel({ id, onClose }: { id: number; onClose: () => void }) {
@@ -113,7 +246,12 @@ function DetailPanel({ id, onClose }: { id: number; onClose: () => void }) {
   const buttons: { action: PreorderAction; label: string; icon: React.ElementType; show: boolean; color: string }[] = p ? [
     { action: 'validate', label: 'Valider le paiement', icon: CheckCircle2, show: p.status === 'payment_submitted', color: '#2E7D32' },
     { action: 'reject', label: 'Refuser', icon: XCircle, show: p.status === 'payment_submitted', color: '#DC2626' },
-    { action: 'convert', label: 'Lancer la fabrication', icon: PackageCheck, show: p.status === 'paid', color: '#6D28D9' },
+    { action: 'design', label: 'Passer en design', icon: Palette, show: p.status === 'paid', color: '#7C3AED' },
+    { action: 'send_bat', label: 'Envoyer le BAT', icon: Send, show: ['paid', 'design_en_cours'].includes(p.status), color: '#C2410C' },
+    { action: 'approve_bat', label: 'Valider le BAT (accord client)', icon: FileCheck2, show: p.status === 'bat_envoye', color: '#0F766E' },
+    { action: 'en_impression', label: 'Passer en impression', icon: Printer, show: p.status === 'bat_valide', color: '#6D28D9' },
+    { action: 'prete', label: 'Carte prête', icon: PackageCheck, show: p.status === 'en_impression', color: '#15803D' },
+    { action: 'livree', label: 'Livrée', icon: Truck, show: p.status === 'prete', color: '#166534' },
     { action: 'cancel', label: 'Annuler', icon: Ban, show: ['pending_payment', 'payment_submitted', 'rejected'].includes(p.status), color: '#6B7280' },
     { action: 'resend', label: 'Renvoyer la dernière notification', icon: Send, show: true, color: '#2E7D32' },
   ] : [];
@@ -142,6 +280,15 @@ function DetailPanel({ id, onClose }: { id: number; onClose: () => void }) {
                 </button>
               ))}
             </div>
+
+            {p.bat_comment && ['design_en_cours', 'paid'].includes(p.status) && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <p className="font-bold text-xs uppercase tracking-wide mb-0.5">Correction demandée par le client</p>
+                « {p.bat_comment} »
+              </div>
+            )}
+
+            <ItemsBlock order={p} items={data.items || []} />
 
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">Preuve de paiement Wave</p>
@@ -312,7 +459,8 @@ export default function NfcPreordersPage() {
   const { data: stats } = useNfcPreorderStats();
   const { toast } = useToast();
 
-  const [tab, setTab] = useState<'' | PreorderStatus | null>(refParam ? '' : null);
+  const [tab, setTab] = useState<'' | PreorderStatus | null>(
+    refParam ? '' : (searchParams.get('status') && searchParams.get('status')! in STATUS_META ? searchParams.get('status') as PreorderStatus : null));
   const [search, setSearch] = useState(refParam);
   const [q, setQ] = useState(refParam);
   const [page, setPage] = useState(1);
@@ -346,13 +494,6 @@ export default function NfcPreordersPage() {
     if (refParam) { searchParams.delete('ref'); setSearchParams(searchParams, { replace: true }); }
   };
 
-  const lot = useMemo(() => {
-    const t = stats?.batch_threshold || 10;
-    const n = stats?.paid_count || 0;
-    const inLot = n === 0 ? 0 : ((n - 1) % t) + 1;
-    return { t, n, inLot, lotNumber: n === 0 ? 1 : Math.floor((n - 1) / t) + 1 };
-  }, [stats]);
-
   const handleExport = () => {
     exportPreordersCsv({ status: status || undefined, q: q || undefined }).catch(() => toast({ title: 'Export échoué', variant: 'destructive' }));
   };
@@ -365,8 +506,8 @@ export default function NfcPreordersPage() {
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center"><ShoppingBag size={18} className="text-white" /></div>
               <div>
-                <h1 className="text-2xl font-bold text-white">Précommandes NFC</h1>
-                <p className="text-white/70 text-sm">Paiements Wave à valider, suivi et conversion en commandes</p>
+                <h1 className="text-2xl font-bold text-white">Commandes de cartes NFC</h1>
+                <p className="text-white/70 text-sm">Paiements Wave, bons à tirer, impression et livraison</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -379,15 +520,8 @@ export default function NfcPreordersPage() {
             </div>
           </div>
 
-          <div className="bg-white/10 rounded-2xl p-4">
-            <div className="flex items-baseline justify-between text-white mb-2">
-              <p className="text-sm font-semibold">Lot n°{lot.lotNumber} : <span className="text-xl font-black">{lot.inLot} / {lot.t}</span> précommandes payées</p>
-              <p className="text-xs text-white/70">{lot.n} payée{lot.n > 1 ? 's' : ''} au total · {stats?.paid_cards ?? 0} carte(s) · {formatFcfa(stats?.paid_amount ?? 0)}</p>
-            </div>
-            <div className="h-2.5 rounded-full bg-white/20 overflow-hidden">
-              <div className="h-full rounded-full bg-white transition-all" style={{ width: `${Math.min(100, (lot.inLot / lot.t) * 100)}%` }} />
-            </div>
-          </div>
+          <PrintBatchBlock queue={stats?.print_queue ?? 0} threshold={stats?.print_batch_threshold ?? 10}
+            summary={`${stats?.paid_count ?? 0} commande(s) payée(s) · ${stats?.paid_cards ?? 0} carte(s) · ${formatFcfa(stats?.paid_amount ?? 0)}`} />
         </div>
       </div>
 

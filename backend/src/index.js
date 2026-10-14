@@ -198,6 +198,7 @@ app.post('/webhooks/payment', (req, res) => adminController.paymentWebhook(req, 
     await require('./models/onboardingModel').init();
     await require('./models/nfcPreorderModel').init();
     await require('./models/nfcOfferModel').init();
+    await require('./models/nfcProductionModel').init();
     await require('./models/nfcCardModel').init();
     // Précommandes payées avant l'enregistrement automatique commande + paiement
     try {

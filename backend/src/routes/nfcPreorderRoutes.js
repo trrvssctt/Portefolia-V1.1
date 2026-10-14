@@ -42,6 +42,8 @@ publicRouter.post('/resend-link', resendLimiter, ctrl.resendLink);
 publicRouter.get('/:reference', ctrl.getPublic);
 publicRouter.post('/:reference/proof', paymentLimiter, receiveProof, ctrl.submitProof);
 publicRouter.post('/:reference/payment', paymentLimiter, ctrl.submitPayment);
+publicRouter.post('/:reference/bat/approve', paymentLimiter, ctrl.approveBat);
+publicRouter.post('/:reference/bat/changes', paymentLimiter, ctrl.requestBatChanges);
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 const adminRouter = express.Router();
@@ -54,13 +56,22 @@ adminRouter.get('/', nfcRead, ctrl.adminList);
 adminRouter.get('/stats', nfcRead, ctrl.adminStats);
 adminRouter.get('/export.csv', nfcRead, ctrl.adminExport);
 adminRouter.get('/settings', nfcRead, ctrl.adminGetSettings);
+// File et lot d'impression (avant /:id)
+adminRouter.get('/print-batch', nfcRead, ctrl.adminPrintQueue);
+adminRouter.get('/print-batch/sheet', nfcRead, ctrl.adminPrintSheet);
+adminRouter.post('/print-batch/start', nfcWrite, ctrl.adminStartPrintBatch);
 adminRouter.put('/settings', requirePermission('nfc:pricing'), ctrl.adminUpdateSettings);
 adminRouter.get('/:id', nfcRead, ctrl.adminDetail);
 adminRouter.put('/:id/validate', payWrite, ctrl.adminValidate);
 adminRouter.put('/:id/reject', payWrite, ctrl.adminReject);
 adminRouter.put('/:id/cancel', nfcWrite, ctrl.adminCancel);
-adminRouter.post('/:id/convert', nfcWrite, ctrl.adminConvert);
 adminRouter.post('/:id/resend', nfcWrite, ctrl.adminResend);
+// Production : design, BAT, impression, livraison
+adminRouter.put('/:id/design', nfcWrite, ctrl.adminStartDesign);
+adminRouter.post('/:id/bat', nfcWrite, require('../utils/nfcAssets').receiveBatFiles, ctrl.adminUploadBat);
+adminRouter.put('/:id/bat/send', nfcWrite, ctrl.adminSendBat);
+adminRouter.put('/:id/bat/approve', nfcWrite, ctrl.adminApproveBat);
+adminRouter.put('/:id/production', nfcWrite, ctrl.adminAdvance);
 
 // ── Interne (n8n) ─────────────────────────────────────────────────────────────
 const internalRouter = express.Router();

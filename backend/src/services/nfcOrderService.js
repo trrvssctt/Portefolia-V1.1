@@ -22,13 +22,13 @@ const CARD_HOST = 'portefolia.tech/portfolio/';
 // Cartes déjà promises (commandes en cours sans carte attribuée) par type de stock
 async function reservedByStockType(conn = pool) {
   const [rows] = await conn.query(
-    `SELECT o.stock_type, COUNT(i.id) AS n
+    `SELECT COALESCE(p.stock_type, o.stock_type) AS stock_type, COUNT(i.id) AS n
      FROM nfc_order_items i
      JOIN nfc_preorders p ON p.id = i.order_id
-     JOIN nfc_offers o ON o.id = p.offer_id
-     WHERE i.card_id IS NULL AND o.stock_type IS NOT NULL
+     LEFT JOIN nfc_offers o ON o.id = p.offer_id
+     WHERE i.card_id IS NULL AND COALESCE(p.stock_type, o.stock_type) IS NOT NULL
        AND p.status NOT IN ('cancelled','expired')
-     GROUP BY o.stock_type`
+     GROUP BY COALESCE(p.stock_type, o.stock_type)`
   );
   return Object.fromEntries(rows.map((r) => [r.stock_type, Number(r.n)]));
 }
@@ -181,10 +181,10 @@ async function createCardOrder({ userId, body = {}, files = {} }) {
   const order = await pre.withTransaction(async (conn, events) => {
     const [res] = await conn.query(
       `INSERT INTO nfc_preorders
-        (public_token, user_id, offer_id, offer_code, offer_name, full_name, card_name, email, phone, city,
+        (public_token, user_id, offer_id, offer_code, offer_name, stock_type, full_name, card_name, email, phone, city,
          quantity, unit_price, total_amount, currency, notes, customization, source)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'web')`,
-      [token, userId, offer.id, offer.code, offer.name, fullName, info.name, info.email, info.phone, city,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'web')`,
+      [token, userId, offer.id, offer.code, offer.name, offer.stock_type, fullName, info.name, info.email, info.phone, city,
         quantity, offer.price, total, offer.currency, design.notes || null, JSON.stringify(customization)]
     );
     const reference = `PF-NFC-${String(res.insertId).padStart(4, '0')}`;

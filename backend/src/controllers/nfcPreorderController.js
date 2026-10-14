@@ -62,6 +62,8 @@ async function getPublic(req, res) {
       offer_code: p.offer_code || 'standard',
       offer_name: p.offer_name || 'Standard',
       previews: await previewsFor(p.id),
+      bat_comment: p.bat_comment || null,
+      bat_revision: Number(p.bat_revision || 0),
       wave_transaction_id: p.wave_transaction_id,
       has_proof: !!p.payment_proof_url,
       rejection_reason: p.rejection_reason,
@@ -129,11 +131,6 @@ async function adminCancel(req, res) {
   catch (err) { return handleError(res, err, 'adminCancel'); }
 }
 
-async function adminConvert(req, res) {
-  try { return res.json(await svc.convertToCommande(Number(req.params.id), adminCtx(req))); }
-  catch (err) { return handleError(res, err, 'adminConvert'); }
-}
-
 async function adminResend(req, res) {
   try { return res.json(await svc.resendLastNotification(Number(req.params.id), adminCtx(req))); }
   catch (err) { return handleError(res, err, 'adminResend'); }
@@ -185,9 +182,90 @@ async function internalNotification(req, res) {
   catch (err) { return handleError(res, err, 'internalNotification'); }
 }
 
+// ── Production ────────────────────────────────────────────────────────────────
+
+const prod = () => require('../services/nfcProductionService');
+
+async function approveBat(req, res) {
+  try { return res.json(await prod().approveBatByClient(req.params.reference, (req.body || {}).token)); }
+  catch (err) { return handleError(res, err, 'approveBat'); }
+}
+
+async function requestBatChanges(req, res) {
+  try {
+    const body = req.body || {};
+    return res.json(await prod().requestBatChanges(req.params.reference, body.token, body.comment));
+  } catch (err) { return handleError(res, err, 'requestBatChanges'); }
+}
+
+async function adminStartDesign(req, res) {
+  try { return res.json({ preorder: await prod().startDesign(Number(req.params.id), adminCtx(req)) }); }
+  catch (err) { return handleError(res, err, 'adminStartDesign'); }
+}
+
+async function adminUploadBat(req, res) {
+  try { return res.json(await prod().uploadBat(Number(req.params.id), req.files || {}, (req.body || {}).item_id || null, adminCtx(req))); }
+  catch (err) { return handleError(res, err, 'adminUploadBat'); }
+}
+
+async function adminSendBat(req, res) {
+  try { return res.json({ preorder: await prod().sendBat(Number(req.params.id), adminCtx(req)) }); }
+  catch (err) { return handleError(res, err, 'adminSendBat'); }
+}
+
+async function adminApproveBat(req, res) {
+  try { return res.json(await prod().approveBatByAdmin(Number(req.params.id), adminCtx(req))); }
+  catch (err) { return handleError(res, err, 'adminApproveBat'); }
+}
+
+async function adminAdvance(req, res) {
+  try { return res.json({ preorder: await prod().advance(Number(req.params.id), (req.body || {}).to, adminCtx(req)) }); }
+  catch (err) { return handleError(res, err, 'adminAdvance'); }
+}
+
+function parseIds(raw) {
+  return String(raw || '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0);
+}
+
+function queueStatuses(raw) {
+  const allowed = ['bat_valide', 'en_impression'];
+  const list = String(raw || '').split(',').filter((s) => allowed.includes(s));
+  return list.length ? list : allowed;
+}
+
+async function adminPrintQueue(req, res) {
+  try {
+    return res.json({ items: await prod().printQueue({ statuses: queueStatuses(req.query.status), ids: parseIds(req.query.ids) }) });
+  } catch (err) { return handleError(res, err, 'adminPrintQueue'); }
+}
+
+async function adminPrintSheet(req, res) {
+  try {
+    const items = await prod().printQueue({ statuses: queueStatuses(req.query.status), ids: parseIds(req.query.ids) });
+    if (!items.length) return res.status(404).json({ error: 'Aucune carte à imprimer.' });
+    const date = new Date().toISOString().slice(0, 10);
+    const sheet = require('../utils/nfcPrintSheet');
+    if (req.query.format === 'csv') {
+      res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="lot-impression-${date}.csv"` });
+      return res.send(sheet.printSheetCsv(items));
+    }
+    const pdf = await sheet.renderPrintSheet(items, { title: `Lot d'impression du ${date}` });
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="lot-impression-${date}.pdf"` });
+    return res.send(pdf);
+  } catch (err) { return handleError(res, err, 'adminPrintSheet'); }
+}
+
+async function adminStartPrintBatch(req, res) {
+  try { return res.json(await prod().startPrintBatch(parseIds((req.body || {}).ids), adminCtx(req))); }
+  catch (err) { return handleError(res, err, 'adminStartPrintBatch'); }
+}
+
 module.exports = {
+  approveBat, requestBatChanges,
+  adminStartDesign, adminUploadBat, adminSendBat, adminApproveBat, adminAdvance,
+  adminPrintQueue, adminPrintSheet, adminStartPrintBatch,
   getPublicConfig, getPublic, submitPayment, submitProof, checkContact, resendLink,
-  adminList, adminStats, adminDetail, adminValidate, adminReject, adminCancel, adminConvert, adminResend,
+  adminList, adminStats, adminDetail, adminValidate, adminReject, adminCancel, adminResend,
   adminExport, adminGetSettings, adminUpdateSettings,
   internalExpireStale, internalRemindersDue, internalNotification,
 };

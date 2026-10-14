@@ -1,5 +1,4 @@
 {
-  "name": "Portefolia — Précommandes NFC (événements)",
   "nodes": [
     {
       "parameters": {
@@ -9,15 +8,21 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "1c964431-7281-4cee-a76a-05e3a5397154",
+      "id": "e1a98754-fbf7-41c5-aea6-b57ed38a869d",
       "name": "Webhook précommande",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        0,
-        300
+        752,
+        608
       ],
-      "webhookId": "10b454d2-5edc-4df5-bd35-8529e3451f91"
+      "webhookId": "10b454d2-5edc-4df5-bd35-8529e3451f91",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "VI3ADnGZr1iABIlp",
+          "name": "N8N_WEBHOOK_KEY"
+        }
+      }
     },
     {
       "parameters": {
@@ -27,39 +32,39 @@
           "responseCode": 200
         }
       },
-      "id": "a4e907c5-d665-486e-82c3-97df62ddb5a7",
+      "id": "cb168e3c-3fe0-4adb-8531-f124ecd8f27f",
       "name": "Répondre 200",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        220,
-        300
+        1056,
+        480
       ]
     },
     {
       "parameters": {
-        "jsCode": "// ============================================================\n//  CONFIGURATION — à adapter avant d'activer le workflow\n// ============================================================\nconst CONFIG = {\n  brand: 'Portefolia',\n  tagline: 'Expose ton futur.',\n  domain: 'portefolia.tech',\n  frontUrl: 'https://portefolia.tech',\n  apiUrl: 'https://portefolia.tech/api',          // ou http://localhost:<port>/api si n8n tourne sur le même VPS\n  fromEmail: 'Portefolia <support@portefolia.tech>', // doit être l'adresse du compte SMTP\n  replyTo: 'support@portefolia.tech',\n  adminEmail: 'contact@portefolia.tech',        // boîte qui reçoit les alertes admin\n  supportWhatsapp: '+221 78 131 13 71',\n  colors: { primary: '#1B5E20', accent: '#2E7D32' }, // vert Portefolia\n  telegram: { enabled: false, chatId: '' },          // alertes admin sur Telegram (optionnel)\n  whatsapp: {                                        // WhatsApp Cloud API (optionnel, templates approuvés par Meta)\n    enabled: false,\n    phoneNumberId: '',\n    templates: { created: 'precommande_recue', paid: 'precommande_confirmee' },\n  },\n};\nreturn $input.all().map((i) => ({ json: { ...i.json, config: CONFIG } }));\n"
+        "jsCode": "// ============================================================\n//  CONFIGURATION — à adapter avant d'activer le workflow\n// ============================================================\nconst CONFIG = {\n  brand: 'Portefolia',\n  tagline: 'Expose ton futur.',\n  domain: 'portefolia.tech',\n  frontUrl: 'https://portefolia.tech',\n  apiUrl: 'https://portefolia.tech/api',          // ou http://localhost:<port>/api si n8n tourne sur le même VPS\n  fromEmail: 'Portefolia <support@portefolia.tech>',\n  replyTo: 'support@portefolia.tech',\n  adminEmail: 'contact@portefolia.tech',        // boîte qui reçoit les alertes admin\n  supportWhatsapp: '+221 78 131 13 71',\n  colors: { primary: '#1B5E20', accent: '#2E7D32' }, // vert Portefolia\n  telegram: { enabled: false, chatId: '' },          // alertes admin sur Telegram (optionnel)\n  whatsapp: {                                        // WhatsApp Cloud API (optionnel, templates approuvés par Meta)\n    enabled: false,\n    phoneNumberId: '',\n    templates: { created: 'precommande_recue', paid: 'precommande_confirmee' },\n  },\n};\nreturn $input.all().map((i) => ({ json: { ...i.json, config: CONFIG } }));\n"
       },
-      "id": "d62eb705-00df-4f01-86a2-0a7088424769",
+      "id": "6f37d89a-ab69-4ada-bfbc-b8c2d2c754f5",
       "name": "Config",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        440,
-        300
+        1280,
+        480
       ]
     },
     {
       "parameters": {
-        "jsCode": "// ---------- Helpers (échappement, format, gabarit e-mail) ----------\nconst esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst fcfa = (n) => String(Math.round(Number(n) || 0)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' ') + ' F CFA';\nconst firstName = (p) => (p.first_name || String(p.full_name || '').trim().split(/\\s+/)[0] || '').trim();\nconst para = (html) => `<p style=\"font-size:15px;line-height:1.6;margin:0 0 12px\">${html}</p>`;\nconst row = (k, v) => `<tr><td style=\"padding:7px 0;color:#6b7280;width:45%;vertical-align:top\">${esc(k)}</td><td style=\"padding:7px 0;font-weight:600\">${v}</td></tr>`;\nconst table = (rows) => `<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-size:14px;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin:16px 0\">${rows.join('')}</table>`;\nconst hoursSince = (iso) => (iso ? Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 36e5)) : null);\n\nfunction layout(cfg, { preheader = '', title, body, cta }) {\n  const button = cta && cta.url\n    ? `<p style=\"margin:28px 0 8px;text-align:center\"><a href=\"${esc(cta.url)}\" style=\"background:${cfg.colors.accent};color:#ffffff;text-decoration:none;padding:14px 26px;border-radius:8px;font-weight:600;display:inline-block\">${esc(cta.label)}</a></p>`\n    : '';\n  return `<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>${esc(title)}</title></head>\n<body style=\"margin:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2937\">\n<span style=\"display:none;max-height:0;overflow:hidden;opacity:0\">${esc(preheader)}</span>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f4f5f7;padding:24px 12px\"><tr><td align=\"center\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden\">\n<tr><td style=\"background:${cfg.colors.primary};padding:22px 28px;color:#ffffff;font-size:20px;font-weight:700\">${esc(cfg.brand)}<div style=\"font-size:12px;font-weight:400;opacity:.85;margin-top:4px\">${esc(cfg.tagline)}</div></td></tr>\n<tr><td style=\"padding:28px\">\n<h1 style=\"font-size:20px;line-height:1.3;margin:0 0 16px\">${esc(title)}</h1>\n${body}\n${button}\n</td></tr>\n<tr><td style=\"padding:18px 28px;background:#f9fafb;font-size:12px;line-height:1.5;color:#6b7280\">Vous recevez cet e-mail suite à votre précommande sur ${esc(cfg.domain)}. Une question ? Répondez à cet e-mail ou écrivez-nous sur WhatsApp au ${esc(cfg.supportWhatsapp)}.</td></tr>\n</table></td></tr></table></body></html>`;\n}\n\nfunction waveBlock(p, pay) {\n  return `<div style=\"background:#eef6ff;border-radius:10px;padding:16px 18px;margin:16px 0;font-size:14px;line-height:1.7\">\n<strong>Comment payer avec Wave</strong><br>\n1. Envoyez <strong>${esc(fcfa(p.total_amount))}</strong> au <strong>${esc(pay.wave_number)}</strong>${pay.wave_link ? ` ou passez par <a href=\"${esc(pay.wave_link)}\">ce lien de paiement Wave</a>` : ''}.<br>\n2. Mettez la référence <strong>${esc(p.reference)}</strong> en note du transfert.<br>\n3. Cliquez sur le bouton ci-dessous et saisissez l'identifiant de la transaction Wave (visible dans l'historique de l'application).\n</div>`;\n}\n\nfunction recap(p, extra = []) {\n  return table([\n    row('Référence', esc(p.reference)),\n    row('Nom imprimé sur la carte', esc(p.card_name)),\n    row('Quantité', esc(p.quantity)),\n    row('Montant total', esc(fcfa(p.total_amount))),\n    ...extra,\n  ]);\n}\n\n// ---------- Construction des messages selon l'événement ----------\nconst out = [];\n\nfor (const item of $input.all()) {\n  const cfg = item.json.config;\n  const b = item.json.body || {};\n  const p = b.preorder || {};\n  const pay = b.payment || {};\n  const stats = b.stats || {};\n  const links = b.links || {};\n  if (!b.event || !p.id || !p.email) continue; // payload invalide : on ignore\n\n  const prenom = esc(firstName(p));\n  let client = null;\n  let admin = null;\n  let whatsapp = null;\n\n  const adminRows = [\n    row('Référence', esc(p.reference)),\n    row('Client', esc(p.full_name)),\n    row('E-mail', esc(p.email)),\n    row('Téléphone', esc(p.phone)),\n    row('Nom sur la carte', esc(p.card_name)),\n    row('Quantité', esc(p.quantity)),\n    row('Montant', esc(fcfa(p.total_amount))),\n  ];\n  const lot = stats.batch_threshold ? `${stats.paid_count || 0}/${stats.batch_threshold}` : String(stats.paid_count || 0);\n\n  switch (b.event) {\n    case 'preorder.created': {\n      const subject = `Précommande ${p.reference} reçue – finalisez votre paiement Wave`;\n      client = { subject, html: layout(cfg, {\n        preheader: `Payez ${fcfa(p.total_amount)} avec Wave pour réserver votre carte NFC.`,\n        title: `Merci ${prenom}, votre précommande est enregistrée`,\n        body: para('Votre carte NFC Portefolia est presque réservée. Il ne reste qu\\'une étape : le paiement Wave.')\n          + recap(p) + waveBlock(p, pay)\n          + para('<span style=\"color:#6b7280;font-size:13px\">Sans paiement sous 72 h, la précommande est annulée automatiquement. Vous pourrez en refaire une à tout moment.</span>'),\n        cta: { label: 'Déclarer mon paiement Wave', url: links.tracking_url },\n      }) };\n      admin = {\n        subject: `🆕 Précommande ${p.reference} — ${fcfa(p.total_amount)}`,\n        html: layout(cfg, { title: 'Nouvelle précommande NFC', body: table([...adminRows, row('Précommandes payées', esc(lot))]) + para('Statut : en attente du paiement Wave.'), cta: { label: 'Ouvrir dans l\\'admin', url: links.admin_url } }),\n        text: `🆕 <b>Nouvelle précommande ${esc(p.reference)}</b>\\n${esc(p.full_name)} — ${esc(p.phone)}\\n${esc(p.quantity)} carte(s) — ${esc(fcfa(p.total_amount))}\\nPayées : ${esc(lot)}`,\n      };\n      if (cfg.whatsapp.enabled && cfg.whatsapp.templates.created) {\n        whatsapp = { template: cfg.whatsapp.templates.created, params: [firstName(p), p.reference, fcfa(p.total_amount)] };\n      }\n      break;\n    }\n\n    case 'preorder.payment_submitted': {\n      client = { subject: `Paiement Wave reçu pour ${p.reference} – vérification en cours`, html: layout(cfg, {\n        preheader: 'Nous vérifions votre transaction Wave.',\n        title: `Merci ${prenom}, nous vérifions votre paiement`,\n        body: para('Nous avons bien reçu votre déclaration de paiement. Nous la vérifions et vous confirmons sous 24 h ouvrées.')\n          + recap(p, [row('Transaction Wave', esc(p.wave_transaction_id))]),\n        cta: { label: 'Suivre ma précommande', url: links.tracking_url },\n      }) };\n      admin = {\n        subject: `⏳ Paiement Wave à valider — ${p.reference}`,\n        html: layout(cfg, { title: 'Paiement Wave à vérifier', body:\n          para('Vérifiez la transaction dans Wave Business, puis validez ou refusez dans l\\'admin.')\n          + table([...adminRows, row('ID transaction Wave', esc(p.wave_transaction_id)), row('Numéro Wave payeur', esc(p.wave_sender_phone || '—'))]),\n          cta: { label: 'Valider le paiement', url: links.admin_url } }),\n        text: `⏳ <b>Paiement à valider ${esc(p.reference)}</b>\\n${esc(p.full_name)} — ${esc(fcfa(p.total_amount))}\\nTransaction : <code>${esc(p.wave_transaction_id)}</code>`,\n      };\n      break;\n    }\n\n    case 'preorder.paid': {\n      client = { subject: '✅ Paiement confirmé – votre carte NFC Portefolia est réservée', html: layout(cfg, {\n        preheader: `Précommande ${p.reference} confirmée.`,\n        title: `C'est confirmé, ${prenom} !`,\n        body: para('Nous avons validé votre paiement Wave. Votre carte NFC Portefolia est réservée.')\n          + recap(p)\n          + para('<strong>La suite :</strong> nous lançons la fabrication par lots et vous informons à chaque étape, jusqu\\'à la livraison.')\n          + para('En attendant, préparez votre portfolio : c\\'est lui qui s\\'affichera quand quelqu\\'un approchera son téléphone de votre carte.'),\n        cta: { label: 'Préparer mon portfolio', url: links.portfolio_url || cfg.frontUrl },\n      }) };\n      if (whatsappEnabled(cfg, 'paid')) {\n        whatsapp = { template: cfg.whatsapp.templates.paid, params: [firstName(p), p.reference] };\n      }\n      // Alerte admin à chaque lot complet (10, 20, 30… précommandes payées)\n      if (stats.batch_threshold && Number(stats.paid_count) > 0 && Number(stats.paid_count) % Number(stats.batch_threshold) === 0) {\n        admin = {\n          subject: `🎯 ${stats.paid_count} précommandes payées — seuil du lot atteint`,\n          html: layout(cfg, { title: 'Un lot est complet', body: para(`Vous avez atteint <strong>${esc(stats.paid_count)}</strong> précommandes payées. Vous pouvez lancer la commande groupée chez le fabricant.`), cta: { label: 'Voir les précommandes', url: links.admin_list_url || links.admin_url } }),\n          text: `🎯 <b>Seuil atteint : ${esc(stats.paid_count)} précommandes payées.</b> Lancer la commande groupée.`,\n        };\n      }\n      break;\n    }\n\n    case 'preorder.rejected': {\n      client = { subject: `Paiement non confirmé pour la précommande ${p.reference}`, html: layout(cfg, {\n        preheader: 'Nous n\\'avons pas pu confirmer votre paiement Wave.',\n        title: `${prenom}, nous n'avons pas pu confirmer votre paiement`,\n        body: para(`Motif : <strong>${esc(p.rejection_reason || 'transaction introuvable ou montant différent')}</strong>.`)\n          + para('Votre précommande reste ouverte. Vérifiez la transaction puis déclarez-la à nouveau, ou répondez à cet e-mail si vous pensez qu\\'il s\\'agit d\\'une erreur.')\n          + waveBlock(p, pay),\n        cta: { label: 'Déclarer à nouveau mon paiement', url: links.tracking_url },\n      }) };\n      break;\n    }\n\n    case 'preorder.expired':\n    case 'preorder.cancelled': {\n      const expired = b.event === 'preorder.expired';\n      client = { subject: `Précommande ${p.reference} annulée${expired ? ' (paiement non reçu)' : ''}`, html: layout(cfg, {\n        title: `${prenom}, votre précommande a été annulée`,\n        body: para(expired\n          ? 'Nous n\\'avons pas reçu de paiement Wave dans les 72 h, la précommande a donc été annulée.'\n          : `Votre précommande ${esc(p.reference)} a été annulée${p.rejection_reason ? ` (motif : ${esc(p.rejection_reason)})` : ''}.`)\n          + para('Vous pouvez refaire une précommande à tout moment.'),\n        cta: { label: 'Refaire une précommande', url: links.preorder_url || cfg.frontUrl + '/nfc-types' },\n      }) };\n      break;\n    }\n\n    default:\n      continue; // événement inconnu : rien à envoyer\n  }\n\n  // Renvoi du lien de suivi demandé par le client : pas d'alerte admin\n  if (b.audience === 'client') admin = null;\n\n  out.push({ json: {\n    event_id: b.event_id || null,\n    event: b.event,\n    preorder_id: p.id,\n    reference: p.reference,\n    apiUrl: cfg.apiUrl,\n    from: cfg.fromEmail,\n    replyTo: cfg.replyTo,\n    client: client ? { to: p.email, ...client } : null,\n    admin: admin ? { to: cfg.adminEmail, ...admin } : null,\n    telegram: admin && cfg.telegram.enabled ? { chatId: cfg.telegram.chatId } : null,\n    whatsapp: whatsapp ? { to: String(p.phone || '').replace(/\\D/g, ''), phoneNumberId: cfg.whatsapp.phoneNumberId, ...whatsapp } : null,\n  } });\n}\n\nfunction whatsappEnabled(cfg, key) { return cfg.whatsapp.enabled && !!cfg.whatsapp.templates[key]; }\n\nreturn out;\n"
+        "jsCode": "// ---------- Helpers (échappement, format, gabarit e-mail) ----------\nconst esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst fcfa = (n) => String(Math.round(Number(n) || 0)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' ') + ' F CFA';\nconst firstName = (p) => (p.first_name || String(p.full_name || '').trim().split(/\\s+/)[0] || '').trim();\nconst para = (html) => `<p style=\"font-size:15px;line-height:1.6;margin:0 0 12px\">${html}</p>`;\nconst row = (k, v) => `<tr><td style=\"padding:7px 0;color:#6b7280;width:45%;vertical-align:top\">${esc(k)}</td><td style=\"padding:7px 0;font-weight:600\">${v}</td></tr>`;\nconst table = (rows) => `<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-size:14px;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin:16px 0\">${rows.join('')}</table>`;\nconst hoursSince = (iso) => (iso ? Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 36e5)) : null);\n\nfunction layout(cfg, { preheader = '', title, body, cta }) {\n  const button = cta && cta.url\n    ? `<p style=\"margin:28px 0 8px;text-align:center\"><a href=\"${esc(cta.url)}\" style=\"background:${cfg.colors.accent};color:#ffffff;text-decoration:none;padding:14px 26px;border-radius:8px;font-weight:600;display:inline-block\">${esc(cta.label)}</a></p>`\n    : '';\n  return `<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>${esc(title)}</title></head>\n<body style=\"margin:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2937\">\n<span style=\"display:none;max-height:0;overflow:hidden;opacity:0\">${esc(preheader)}</span>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f4f5f7;padding:24px 12px\"><tr><td align=\"center\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden\">\n<tr><td style=\"background:${cfg.colors.primary};padding:22px 28px;color:#ffffff;font-size:20px;font-weight:700\">${esc(cfg.brand)}<div style=\"font-size:12px;font-weight:400;opacity:.85;margin-top:4px\">${esc(cfg.tagline)}</div></td></tr>\n<tr><td style=\"padding:28px\">\n<h1 style=\"font-size:20px;line-height:1.3;margin:0 0 16px\">${esc(title)}</h1>\n${body}\n${button}\n</td></tr>\n<tr><td style=\"padding:18px 28px;background:#f9fafb;font-size:12px;line-height:1.5;color:#6b7280\">Vous recevez cet e-mail suite à votre précommande sur ${esc(cfg.domain)}. Une question ? Répondez à cet e-mail ou écrivez-nous sur WhatsApp au ${esc(cfg.supportWhatsapp)}.</td></tr>\n</table></td></tr></table></body></html>`;\n}\n\nfunction waveBlock(p, pay) {\n  return `<div style=\"background:#eef6ff;border-radius:10px;padding:16px 18px;margin:16px 0;font-size:14px;line-height:1.7\">\n<strong>Comment payer avec Wave</strong><br>\n1. Envoyez <strong>${esc(fcfa(p.total_amount))}</strong> au <strong>${esc(pay.wave_number)}</strong>${pay.wave_link ? ` ou passez par <a href=\"${esc(pay.wave_link)}\">ce lien de paiement Wave</a>` : ''}.<br>\n2. Mettez la référence <strong>${esc(p.reference)}</strong> en note du transfert.<br>\n3. Cliquez sur le bouton ci-dessous et saisissez l'identifiant de la transaction Wave (visible dans l'historique de l'application).\n</div>`;\n}\n\nfunction recap(p, extra = []) {\n  return table([\n    row('Référence', esc(p.reference)),\n    row('Offre', esc('Carte ' + (p.offer_name || 'Standard'))),\n    row('Nom imprimé sur la carte', esc(p.card_name)),\n    row('Quantité', esc(p.quantity)),\n    row('Montant total', esc(fcfa(p.total_amount))),\n    ...extra,\n  ]);\n}\n\n// ---------- Construction des messages selon l'événement ----------\nconst out = [];\n\nfor (const item of $input.all()) {\n  const cfg = item.json.config;\n  const b = item.json.body || {};\n  const p = b.preorder || {};\n  const pay = b.payment || {};\n  const stats = b.stats || {};\n  const links = b.links || {};\n  // Événements sans précommande : stock, lot d'impression, carte perdue, devis Entreprise\n  const generic = genericMessage(cfg, b);\n  if (generic) { out.push({ json: generic }); continue; }\n  if (!b.event || !p.id || !p.email) continue; // payload invalide : on ignore\n\n  const prenom = esc(firstName(p));\n  let client = null;\n  let admin = null;\n  let whatsapp = null;\n\n  const adminRows = [\n    row('Référence', esc(p.reference)),\n    row('Offre', esc('Carte ' + (p.offer_name || 'Standard'))),\n    row('Client', esc(p.full_name)),\n    row('E-mail', esc(p.email)),\n    row('Téléphone', esc(p.phone)),\n    row('Nom sur la carte', esc(p.card_name)),\n    row('Quantité', esc(p.quantity)),\n    row('Montant', esc(fcfa(p.total_amount))),\n  ];\n  const lot = stats.batch_threshold ? `${stats.paid_count || 0}/${stats.batch_threshold}` : String(stats.paid_count || 0);\n\n  switch (b.event) {\n    case 'preorder.created': {\n      const subject = `Commande ${p.reference} (carte ${p.offer_name || 'Standard'}) reçue – finalisez votre paiement Wave`;\n      client = { subject, html: layout(cfg, {\n        preheader: `Payez ${fcfa(p.total_amount)} avec Wave pour réserver votre carte NFC.`,\n        title: `Merci ${prenom}, votre commande est enregistrée`,\n        body: para('Votre carte NFC Portefolia est presque réservée. Il ne reste qu\\'une étape : le paiement Wave.')\n          + recap(p) + waveBlock(p, pay)\n          + para('<span style=\"color:#6b7280;font-size:13px\">Sans paiement sous 72 h, la précommande est annulée automatiquement. Vous pourrez en refaire une à tout moment.</span>'),\n        cta: { label: 'Déclarer mon paiement Wave', url: links.tracking_url },\n      }) };\n      admin = {\n        subject: `🆕 Commande ${p.reference} — carte ${p.offer_name || 'Standard'} — ${fcfa(p.total_amount)}`,\n        html: layout(cfg, { title: 'Nouvelle commande de carte NFC', body: table(adminRows) + para('Statut : en attente du paiement Wave.'), cta: { label: 'Ouvrir dans l\\'admin', url: links.admin_url } }),\n        text: `🆕 <b>Nouvelle commande ${esc(p.reference)}</b> — carte ${esc(p.offer_name || 'Standard')}\\n${esc(p.full_name)} — ${esc(p.phone)}\\n${esc(p.quantity)} carte(s) — ${esc(fcfa(p.total_amount))}`,\n      };\n      if (cfg.whatsapp.enabled && cfg.whatsapp.templates.created) {\n        whatsapp = { template: cfg.whatsapp.templates.created, params: [firstName(p), p.reference, fcfa(p.total_amount)] };\n      }\n      break;\n    }\n\n    case 'preorder.payment_submitted': {\n      client = { subject: `Paiement Wave reçu pour ${p.reference} – vérification en cours`, html: layout(cfg, {\n        preheader: 'Nous vérifions votre transaction Wave.',\n        title: `Merci ${prenom}, nous vérifions votre paiement`,\n        body: para('Nous avons bien reçu votre déclaration de paiement. Nous la vérifions et vous confirmons sous 24 h ouvrées.')\n          + recap(p, [row('Transaction Wave', esc(p.wave_transaction_id))]),\n        cta: { label: 'Suivre ma précommande', url: links.tracking_url },\n      }) };\n      admin = {\n        subject: `⏳ Paiement Wave à valider — ${p.reference}`,\n        html: layout(cfg, { title: 'Paiement Wave à vérifier', body:\n          para('Vérifiez la transaction dans Wave Business, puis validez ou refusez dans l\\'admin.')\n          + table([...adminRows, row('ID transaction Wave', esc(p.wave_transaction_id)), row('Numéro Wave payeur', esc(p.wave_sender_phone || '—'))]),\n          cta: { label: 'Valider le paiement', url: links.admin_url } }),\n        text: `⏳ <b>Paiement à valider ${esc(p.reference)}</b>\\n${esc(p.full_name)} — ${esc(fcfa(p.total_amount))}\\nTransaction : <code>${esc(p.wave_transaction_id)}</code>`,\n      };\n      break;\n    }\n\n    case 'preorder.paid': {\n      client = { subject: '✅ Paiement confirmé – votre carte NFC Portefolia est lancée', html: layout(cfg, {\n        preheader: `Commande ${p.reference} confirmée.`,\n        title: `C'est confirmé, ${prenom} !`,\n        body: para('Nous avons validé votre paiement Wave.')\n          + recap(p)\n          + para('<strong>La suite :</strong> vous recevez le bon à tirer (BAT) de votre carte, à valider en ligne avant l\\'impression à Dakar. Nous vous prévenons ensuite à chaque étape, jusqu\\'à la remise de la carte.')\n          + para('En attendant, préparez votre portfolio : c\\'est lui qui s\\'affichera quand quelqu\\'un approchera son téléphone de votre carte.'),\n        cta: { label: 'Suivre ma commande', url: links.tracking_url },\n      }) };\n      if (whatsappEnabled(cfg, 'paid')) {\n        whatsapp = { template: cfg.whatsapp.templates.paid, params: [firstName(p), p.reference] };\n      }\n      break;\n    }\n\n    case 'preorder.rejected': {\n      client = { subject: `Paiement non confirmé pour la précommande ${p.reference}`, html: layout(cfg, {\n        preheader: 'Nous n\\'avons pas pu confirmer votre paiement Wave.',\n        title: `${prenom}, nous n'avons pas pu confirmer votre paiement`,\n        body: para(`Motif : <strong>${esc(p.rejection_reason || 'transaction introuvable ou montant différent')}</strong>.`)\n          + para('Votre précommande reste ouverte. Vérifiez la transaction puis déclarez-la à nouveau, ou répondez à cet e-mail si vous pensez qu\\'il s\\'agit d\\'une erreur.')\n          + waveBlock(p, pay),\n        cta: { label: 'Déclarer à nouveau mon paiement', url: links.tracking_url },\n      }) };\n      break;\n    }\n\n    case 'preorder.expired':\n    case 'preorder.cancelled': {\n      const expired = b.event === 'preorder.expired';\n      client = { subject: `Précommande ${p.reference} annulée${expired ? ' (paiement non reçu)' : ''}`, html: layout(cfg, {\n        title: `${prenom}, votre précommande a été annulée`,\n        body: para(expired\n          ? 'Nous n\\'avons pas reçu de paiement Wave dans les 72 h, la précommande a donc été annulée.'\n          : `Votre précommande ${esc(p.reference)} a été annulée${p.rejection_reason ? ` (motif : ${esc(p.rejection_reason)})` : ''}.`)\n          + para('Vous pouvez refaire une précommande à tout moment.'),\n        cta: { label: 'Refaire une précommande', url: links.preorder_url || cfg.frontUrl + '/nfc-types' },\n      }) };\n      break;\n    }\n\n    case 'order.design_started': {\n      client = { subject: `Votre carte ${p.reference} est entre les mains de notre designer`, html: layout(cfg, {\n        title: `${prenom}, nous préparons votre carte`,\n        body: para(p.bat_comment\n          ? `Nous appliquons votre demande de correction : « ${esc(p.bat_comment)} ». Vous recevez un nouveau bon à tirer très vite.`\n          : 'Notre équipe prépare le visuel de votre carte. Vous recevrez un bon à tirer (BAT) à valider avant l\\'impression, généralement sous 48 h ouvrées.')\n          + recap(p),\n        cta: { label: 'Suivre ma commande', url: links.tracking_url },\n      }) };\n      break;\n    }\n\n    case 'bat.sent': {\n      const bat = b.bat || {};\n      const imgs = [bat.front_url, bat.back_url].filter(Boolean)\n        .map((u) => `<img src=\"${esc(u)}\" alt=\"Bon à tirer\" width=\"504\" style=\"display:block;width:100%;max-width:504px;border-radius:10px;margin:0 0 10px;border:1px solid #e5e7eb\">`).join('');\n      client = { subject: `🖨️ Votre bon à tirer est prêt – carte ${p.reference}`, html: layout(cfg, {\n        preheader: 'Vérifiez et validez le visuel de votre carte avant impression.',\n        title: `${prenom}, validez votre bon à tirer`,\n        body: para('Voici le visuel final de votre carte. Vérifiez attentivement l\\'orthographe, le numéro de téléphone et les couleurs : la carte sera imprimée exactement ainsi.')\n          + imgs\n          + para('Validez-le, ou demandez une correction, depuis votre page de suivi.'),\n        cta: { label: 'Valider mon bon à tirer', url: links.tracking_url },\n      }) };\n      break;\n    }\n\n    case 'bat.changes_requested': {\n      admin = {\n        subject: `✏️ Correction demandée sur le BAT — ${p.reference}`,\n        html: layout(cfg, { title: 'Correction de BAT demandée', body: para(`« ${esc(p.bat_comment || '')} »`) + table(adminRows), cta: { label: 'Ouvrir la commande', url: links.admin_url } }),\n        text: `✏️ <b>Correction BAT ${esc(p.reference)}</b>\\n${esc(p.bat_comment || '')}`,\n      };\n      break;\n    }\n\n    case 'order.printing': {\n      client = { subject: `Votre carte ${p.reference} est en impression`, html: layout(cfg, {\n        title: `${prenom}, votre carte est en impression`,\n        body: para('Votre bon à tirer est validé et votre carte est en cours d\\'impression à Dakar. Nous vous prévenons dès qu\\'elle est prête.') + recap(p),\n        cta: { label: 'Suivre ma commande', url: links.tracking_url },\n      }) };\n      break;\n    }\n\n    case 'order.ready': {\n      client = { subject: `🎉 Votre carte NFC ${p.reference} est prête`, html: layout(cfg, {\n        preheader: 'Votre carte est prête et déjà active.',\n        title: `${prenom}, votre carte est prête !`,\n        body: para('Bonne nouvelle : votre carte NFC Portefolia est imprimée. Elle est déjà active : approchez un téléphone pour ouvrir votre portfolio.')\n          + para(`Nous vous contactons sur WhatsApp pour la remise. Une question ? Écrivez-nous au ${esc(cfg.supportWhatsapp)}.`)\n          + recap(p),\n        cta: { label: 'Suivre ma commande', url: links.tracking_url },\n      }) };\n      break;\n    }\n\n    case 'order.delivered': {\n      client = { subject: `Carte NFC ${p.reference} livrée – bonne utilisation !`, html: layout(cfg, {\n        title: `Merci ${prenom} !`,\n        body: para('Votre carte NFC Portefolia vous a été remise. Depuis votre espace, vous pouvez choisir le portfolio qu\\'elle ouvre (sans la réimprimer), voir le nombre de taps, ou la désactiver en cas de perte.'),\n        cta: { label: 'Gérer mes cartes', url: cfg.frontUrl + '/dashboard/nfc-cards' },\n      }) };\n      break;\n    }\n\n    default:\n      continue; // événement inconnu (ou sans e-mail, ex. bat.approved) : rien à envoyer\n  }\n  \nif (b.audience === 'client') admin = null;\n\n  out.push({ json: {\n    event_id: b.event_id || null,\n    event: b.event,\n    preorder_id: p.id,\n    reference: p.reference,\n    apiUrl: cfg.apiUrl,\n    from: cfg.fromEmail,\n    replyTo: cfg.replyTo,\n    client: client ? { to: p.email, ...client } : null,\n    admin: admin ? { to: cfg.adminEmail, ...admin } : null,\n    telegram: admin && cfg.telegram.enabled ? { chatId: cfg.telegram.chatId } : null,\n    whatsapp: whatsapp ? { to: String(p.phone || '').replace(/\\D/g, ''), phoneNumberId: cfg.whatsapp.phoneNumberId, ...whatsapp } : null,\n  } });\n}\n\nfunction whatsappEnabled(cfg, key) { return cfg.whatsapp.enabled && !!cfg.whatsapp.templates[key]; }\n\n// Événements sans précommande : un objet de sortie, ou null si l'événement n'est pas de ce type\nfunction genericMessage(cfg, b) {\n  const L = b.links || {};\n  let admin = null;\n  let client = null;\n  let clientTo = null;\n  let reference = null;\n\n  switch (b.event) {\n    case 'stock.low': {\n      const s = b.stock || {};\n      admin = {\n        subject: `📦 Stock bas : cartes « ${s.label} » (${s.available} restante(s))`,\n        html: layout(cfg, { title: 'Stock de cartes sous le seuil', body:\n          para(`Il reste <strong>${esc(s.available)}</strong> carte(s) « ${esc(s.label)} » en stock (seuil d'alerte : ${esc(s.threshold)}).`)\n          + para('Pensez à commander un nouveau lot : générez les codes depuis « Stock & codes NFC » et envoyez le fichier au fournisseur.'),\n          cta: { label: 'Voir le stock', url: L.admin_stock_url } }),\n        text: `📦 <b>Stock bas</b> : ${esc(s.label)} — ${esc(s.available)} restante(s)`,\n      };\n      break;\n    }\n    case 'print_batch.ready': {\n      const pr = b.print || {};\n      admin = {\n        subject: `🖨️ Lot d'impression prêt : ${pr.cards} carte(s) au BAT validé`,\n        html: layout(cfg, { title: 'Lot d\\'impression prêt', body:\n          para(`<strong>${esc(pr.cards)}</strong> carte(s) ont un bon à tirer validé (seuil : ${esc(pr.threshold)}).`)\n          + para('Téléchargez le PDF imprimeur depuis l\\'admin, puis lancez l\\'impression à Dakar.'),\n          cta: { label: 'Ouvrir la file d\\'impression', url: L.admin_production_url } }),\n        text: `🖨️ <b>Lot d'impression prêt</b> : ${esc(pr.cards)} carte(s)`,\n      };\n      break;\n    }\n    case 'card.reported_lost': {\n      const cd = b.card || {};\n      admin = {\n        subject: `🚫 Carte ${cd.code} déclarée perdue`,\n        html: layout(cfg, { title: 'Carte déclarée perdue', body:\n          para(`La carte <strong>${esc(cd.code)}</strong> a été désactivée par son titulaire (${esc(cd.reason || 'perte ou vol')}).`)\n          + para('Proposez-lui une carte de remplacement si besoin.'),\n          cta: { label: 'Voir la carte', url: L.admin_stock_url } }),\n        text: `🚫 Carte ${esc(cd.code)} déclarée perdue`,\n      };\n      break;\n    }\n    case 'quote.requested':\n    case 'quote.sent':\n    case 'quote.accepted':\n    case 'quote.declined': {\n      const q = b.quote || {};\n      reference = q.reference || null;\n      const rows = table([\n        row('Devis', esc(q.reference)),\n        row('Entreprise', esc(q.company)),\n        row('Contact', esc(q.contact_name)),\n        row('E-mail', esc(q.email)),\n        row('Téléphone', esc(q.phone)),\n        row('Nombre de cartes', esc(q.quantity)),\n        ...(q.total_amount ? [row('Prix par carte', esc(fcfa(q.price_per_card))), row('Total', esc(fcfa(q.total_amount)))] : []),\n      ]);\n      if (b.event === 'quote.requested') {\n        admin = {\n          subject: `🏢 Demande de devis Entreprise — ${q.company} (${q.quantity} cartes)`,\n          html: layout(cfg, { title: 'Nouvelle demande de devis', body: rows + (q.message ? para(`« ${esc(q.message)} »`) : ''), cta: { label: 'Chiffrer le devis', url: L.admin_quote_url } }),\n          text: `🏢 <b>Devis demandé</b> : ${esc(q.company)} — ${esc(q.quantity)} cartes`,\n        };\n      } else if (b.event === 'quote.sent') {\n        clientTo = q.email;\n        client = { subject: `Votre devis Portefolia ${q.reference} — ${q.quantity} cartes NFC`, html: layout(cfg, {\n          preheader: `Devis de ${fcfa(q.total_amount)} pour ${q.quantity} cartes NFC.`,\n          title: `Bonjour ${esc(String(q.contact_name || '').split(' ')[0])}, voici votre devis`,\n          body: para(`Merci pour votre intérêt pour les cartes NFC Portefolia pour ${esc(q.company)}.`)\n            + rows\n            + (q.admin_message ? para(esc(q.admin_message)) : '')\n            + (q.valid_until ? para(`<span style=\"color:#6b7280;font-size:13px\">Devis valable jusqu'au ${esc(new Date(q.valid_until).toLocaleDateString('fr-FR'))}.</span>`) : ''),\n          cta: { label: 'Consulter et accepter le devis', url: L.quote_url },\n        }) };\n      } else {\n        const ok = b.event === 'quote.accepted';\n        admin = {\n          subject: `${ok ? '✅ Devis accepté' : '❌ Devis refusé'} — ${q.company} (${q.reference})`,\n          html: layout(cfg, { title: ok ? 'Devis accepté' : 'Devis refusé', body: rows + (ok ? para('La commande est créée : le client va payer par Wave. Préparez ensuite le design des cartes de l\\'équipe.') : (q.message ? para(`Motif : « ${esc(q.message)} »`) : '')), cta: { label: 'Ouvrir le devis', url: L.admin_quote_url } }),\n          text: `${ok ? '✅' : '❌'} Devis ${esc(q.reference)} ${ok ? 'accepté' : 'refusé'} — ${esc(q.company)}`,\n        };\n      }\n      break;\n    }\n    default:\n      return null;\n  }\n\n  return {\n    event_id: b.event_id || null,\n    event: b.event,\n    preorder_id: null,\n    reference,\n    apiUrl: cfg.apiUrl,\n    from: cfg.fromEmail,\n    replyTo: cfg.replyTo,\n    client: client && clientTo ? { to: clientTo, ...client } : null,\n    admin: admin ? { to: cfg.adminEmail, ...admin } : null,\n    telegram: admin && cfg.telegram.enabled ? { chatId: cfg.telegram.chatId } : null,\n    whatsapp: null,\n  };\n}\n\nreturn out;\n"
       },
-      "id": "36edec4b-99f3-4c98-a766-c73907790ef6",
+      "id": "2c319be5-c7b0-4e1d-a413-9efcf486795e",
       "name": "Préparer les messages",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        660,
-        300
+        1504,
+        480
       ]
     },
     {
@@ -86,13 +91,13 @@
         },
         "options": {}
       },
-      "id": "d601e4d6-73fd-42a3-992b-3728cc010e5d",
+      "id": "931e839e-bdfa-4484-bf05-da8ad3f5022d",
       "name": "Email client ?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        900,
-        100
+        1744,
+        272
       ]
     },
     {
@@ -100,21 +105,27 @@
         "fromEmail": "={{ $json.from }}",
         "toEmail": "={{ $json.client.to }}",
         "subject": "={{ $json.client.subject }}",
-        "emailFormat": "html",
         "html": "={{ $json.client.html }}",
         "options": {
           "appendAttribution": false,
           "replyTo": "={{ $json.replyTo }}"
         }
       },
-      "id": "e6ff93e4-b344-47f7-8036-c49f0b7f64a3",
+      "id": "a5388bfe-7449-44e0-a1c9-d22701d70a88",
       "name": "Email client",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        1120,
-        80
+        1968,
+        256
       ],
+      "webhookId": "5ade2946-e76d-47c0-8dfa-06e7054f1ae5",
+      "credentials": {
+        "smtp": {
+          "id": "6PAGlKsomq8gO8go",
+          "name": "SMTP Portefolia"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
@@ -130,14 +141,20 @@
           "timeout": 15000
         }
       },
-      "id": "b2bad346-f60a-406d-8c26-669975ef53ca",
+      "id": "dcb353b3-ad1f-4a18-a08e-2b14ac875d13",
       "name": "Journal – client",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1340,
-        80
+        2208,
+        192
       ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "rSdolVBDNxAEq6Aw",
+          "name": "Meta WhatsApp Cloud API"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
@@ -146,7 +163,8 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "strict",
+            "version": 1
           },
           "conditions": [
             {
@@ -164,13 +182,13 @@
         },
         "options": {}
       },
-      "id": "6dccb61a-9626-4b97-8607-7aab0d23154d",
+      "id": "ea870f88-8c6f-4327-8af9-e47c241e8cc9",
       "name": "Notif admin ?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        900,
-        320
+        1744,
+        496
       ]
     },
     {
@@ -178,21 +196,27 @@
         "fromEmail": "={{ $json.from }}",
         "toEmail": "={{ $json.admin.to }}",
         "subject": "={{ $json.admin.subject }}",
-        "emailFormat": "html",
         "html": "={{ $json.admin.html }}",
         "options": {
           "appendAttribution": false,
           "replyTo": "={{ $json.replyTo }}"
         }
       },
-      "id": "a9a2b46b-6caa-4b3e-a4f2-b738535fc23a",
+      "id": "40f2a30f-fbba-4418-b66e-e983a8e4591e",
       "name": "Email admin",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        1120,
-        300
+        1968,
+        480
       ],
+      "webhookId": "300f9a8b-66f7-41f4-ac9f-62786554fbab",
+      "credentials": {
+        "smtp": {
+          "id": "Wwq0tFpuOZF5nJaJ",
+          "name": "SMTP Admin Portfolia"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
@@ -208,14 +232,20 @@
           "timeout": 15000
         }
       },
-      "id": "6927b527-7a13-459d-af9d-0e2f3dde56de",
+      "id": "a862bbd5-dea7-42bd-af50-a449e90ae534",
       "name": "Journal – admin",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1340,
-        300
+        2176,
+        480
       ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "rSdolVBDNxAEq6Aw",
+          "name": "Meta WhatsApp Cloud API"
+        }
+      },
       "onError": "continueRegularOutput"
     },
     {
@@ -227,14 +257,15 @@
           "parse_mode": "HTML"
         }
       },
-      "id": "983b5ab7-cd11-41c2-88fd-97f1afef6133",
+      "id": "37421d76-1563-4b2f-80c0-db154a82be19",
       "name": "Telegram admin (optionnel)",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1120,
-        480
+        1968,
+        656
       ],
+      "webhookId": "edb9d5e7-99a3-4dbd-b48c-6cda2c5b9b46",
       "disabled": true,
       "onError": "continueRegularOutput"
     },
@@ -262,13 +293,13 @@
         },
         "options": {}
       },
-      "id": "e07c712a-171a-4fbe-b0de-45b15be42e27",
+      "id": "db22c7c9-1a00-4154-b32f-d9b8320987e5",
       "name": "WhatsApp client ?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        900,
-        560
+        1744,
+        736
       ]
     },
     {
@@ -284,30 +315,30 @@
           "timeout": 15000
         }
       },
-      "id": "01665720-c8d9-446e-9481-e61661ab148c",
+      "id": "15195bb3-9d20-4ef7-a2ec-f64e3481813a",
       "name": "WhatsApp client (optionnel)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1120,
-        640
+        1968,
+        816
       ],
       "disabled": true,
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "content": "## Précommandes NFC — événements\nReçoit les événements du backend Portefolia (`preorder.created`, `payment_submitted`, `paid`, `rejected`, `expired`, `cancelled`), envoie les e-mails client/admin et journalise chaque envoi via `/api/internal/nfc/notifications`.\n\n1. Renseigner le node **Config**\n2. Credentials : Header Auth (webhook), SMTP, Header Auth (API interne)\n3. Telegram / WhatsApp : désactivés par défaut",
+        "content": "## Commandes de cartes NFC — événements\nReçoit les événements du backend Portefolia et envoie les e-mails client / admin, puis journalise chaque envoi (`/api/internal/nfc/notifications`).\n\nClient : commande, paiement déclaré / confirmé / refusé, design, **BAT à valider**, impression, **carte prête**, **carte livrée**, annulation, devis.\nAdmin : nouvelle commande, paiement à valider, correction de BAT, **stock bas**, **lot d'impression prêt**, carte perdue, devis demandé / accepté / refusé.\n\nTelegram / WhatsApp : désactivés par défaut.",
         "height": 220,
         "width": 620
       },
-      "id": "338e2ed7-ff7e-4cbc-bfe1-a8d987fa5eee",
+      "id": "82ebfefd-a376-4120-9955-8204495e4ca2",
       "name": "Note",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        -20,
-        -120
+        816,
+        48
       ]
     }
   ],
@@ -427,13 +458,9 @@
       ]
     }
   },
-  "settings": {
-    "executionOrder": "v1",
-    "timezone": "Africa/Dakar",
-    "saveDataErrorExecution": "all",
-    "saveDataSuccessExecution": "all"
-  },
   "pinData": {},
-  "active": false,
-  "tags": []
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "915e32914f81ccfd57b182e801f5741b5d3cf32b786354a1ad1a34c6c276aa1d"
+  }
 }

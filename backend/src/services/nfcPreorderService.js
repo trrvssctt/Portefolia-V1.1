@@ -19,7 +19,12 @@ class PreorderError extends Error {
 
 // ── Statuts ───────────────────────────────────────────────────────────────────
 
-const STATUSES = ['pending_payment', 'payment_submitted', 'paid', 'rejected', 'expired', 'cancelled', 'converted'];
+const { ORDER_STATUSES } = require('../models/nfcProductionModel');
+
+const STATUSES = ORDER_STATUSES;
+
+// Statuts « payée » : paiement validé, quelle que soit l'étape de fabrication
+const PAID_STATUSES = ['paid', 'converted', 'design_en_cours', 'bat_envoye', 'bat_valide', 'en_impression', 'prete', 'livree'];
 
 // statut cible → statuts de départ autorisés
 const TRANSITIONS = {
@@ -28,7 +33,13 @@ const TRANSITIONS = {
   rejected: ['payment_submitted'],
   expired: ['pending_payment', 'rejected'],
   cancelled: ['pending_payment', 'payment_submitted', 'rejected'],
-  converted: ['paid'],
+  // Production
+  design_en_cours: ['paid', 'bat_envoye'],   // designer au travail, ou correction demandée sur le BAT
+  bat_envoye: ['paid', 'design_en_cours'],
+  bat_valide: ['bat_envoye'],
+  en_impression: ['bat_valide'],
+  prete: ['en_impression'],
+  livree: ['prete'],
 };
 
 const STATUS_LABELS = {
@@ -38,7 +49,13 @@ const STATUS_LABELS = {
   rejected: 'paiement refusé',
   expired: 'expirée',
   cancelled: 'annulée',
-  converted: 'convertie en commande',
+  converted: 'en fabrication',
+  design_en_cours: 'en cours de design',
+  bat_envoye: 'en attente de validation du BAT',
+  bat_valide: 'BAT validé',
+  en_impression: 'en impression',
+  prete: 'prête',
+  livree: 'livrée',
 };
 
 function assertTransition(preorder, toStatus) {
@@ -281,6 +298,8 @@ async function validatePayment(id, ctx) {
     // le dashboard admin et l'historique de paiement du client
     const accounting = await recordPaidPreorder(conn, await lockById(conn, p.id));
     events.push(await notifier.emit(conn, p.id, 'preorder.paid'));
+    // Étape suivante : designer (Premium, Entreprise) ou BAT = visuel validé à la commande
+    await require('./nfcProductionService').afterPayment(conn, p.id, events);
     await logAdmin(conn, ctx, 'NFC_PREORDER_VALIDATE', {
       id: p.id, reference: p.reference, wave_transaction_id: p.wave_transaction_id, ...accounting,
     });
@@ -378,33 +397,10 @@ async function recordPaidPreorder(conn, p) {
   return { commande_id: cmd.insertId, paiement_id: pay.insertId, numero_commande: numero, guest_created: guestCreated };
 }
 
-// Lancement de la fabrication : la commande (créée à la validation du paiement) passe « En traitement »
-async function convertToCommande(id, ctx) {
-  return withTransaction(async (conn) => {
-    let p = await lockById(conn, id);
-    assertTransition(p, 'converted');
-    const accounting = await recordPaidPreorder(conn, p); // précommandes validées avant cette version
-    p = await lockById(conn, id);
-    await conn.query(
-      "UPDATE commandes SET statut = 'En_traitement' WHERE id = ? AND statut = 'En_attente'",
-      [p.commande_id]
-    );
-    await conn.query("UPDATE nfc_preorders SET status = 'converted' WHERE id = ?", [p.id]);
-    const [[cmd]] = await conn.query('SELECT numero_commande FROM commandes WHERE id = ?', [p.commande_id]);
-    await logAdmin(conn, ctx, 'NFC_PREORDER_CONVERT', { id: p.id, reference: p.reference, commande_id: p.commande_id });
-    return {
-      preorder: await getById(p.id, conn),
-      commande_id: p.commande_id,
-      numero_commande: cmd ? cmd.numero_commande : null,
-      guest_created: !!accounting.guest_created,
-    };
-  });
-}
-
 // Rattrapage : précommandes payées sans commande ni paiement (validées avant cette version)
 async function backfillPaidPreorders() {
   const [rows] = await pool.query(
-    "SELECT id FROM nfc_preorders WHERE status IN ('paid','converted') AND commande_id IS NULL"
+    "SELECT id FROM nfc_preorders WHERE status IN (?) AND commande_id IS NULL", [PAID_STATUSES]
   );
   const done = [];
   for (const { id } of rows) {
@@ -438,7 +434,8 @@ async function getDetail(id) {
     'SELECT id, event_id, channel, audience, template, recipient, status, error, created_at FROM nfc_preorder_notifications WHERE preorder_id = ? ORDER BY created_at DESC',
     [id]
   );
-  return { preorder: toAdmin(p), events, notifications };
+  const items = await require('./nfcOrderService').orderItems(id);
+  return { preorder: toAdmin(p), items, events, notifications };
 }
 
 function toAdmin(p) {
@@ -482,10 +479,17 @@ async function getStats() {
   const by_status = Object.fromEntries(STATUSES.map((s) => [s, 0]));
   for (const r of rows) by_status[r.status] = Number(r.n);
   const [[sum]] = await pool.query(
-    "SELECT COALESCE(SUM(quantity),0) AS cards, COALESCE(SUM(total_amount),0) AS amount FROM nfc_preorders WHERE status IN ('paid','converted')"
+    'SELECT COALESCE(SUM(quantity),0) AS cards, COALESCE(SUM(total_amount),0) AS amount FROM nfc_preorders WHERE status IN (?)',
+    [PAID_STATUSES]
+  );
+  // File d'impression : cartes dont le BAT est validé
+  const [[queue]] = await pool.query(
+    "SELECT COUNT(*) AS n FROM nfc_order_items i JOIN nfc_preorders p ON p.id = i.order_id WHERE p.status = 'bat_valide'"
   );
   return {
-    paid_count: by_status.paid + by_status.converted,
+    paid_count: PAID_STATUSES.reduce((n, st) => n + (by_status[st] || 0), 0),
+    print_queue: Number(queue.n),
+    print_batch_threshold: cfg.print_batch_threshold,
     batch_threshold: cfg.batch_threshold,
     paid_cards: Number(sum.cards),
     paid_amount: Number(sum.amount),
@@ -547,10 +551,19 @@ async function claimReminders() {
          AND (last_admin_reminder_at IS NULL OR last_admin_reminder_at <= NOW() - INTERVAL 4 HOUR)
        ORDER BY payment_submitted_at ASC LIMIT 100 FOR UPDATE`
     );
+    // BAT envoyé et non validé : rappel à 48 h puis 96 h
+    const [bats] = await conn.query(
+      `SELECT * FROM nfc_preorders
+       WHERE status = 'bat_envoye' AND bat_reminder_count < 2
+         AND bat_sent_at <= NOW() - INTERVAL (48 * (bat_reminder_count + 1)) HOUR
+         AND (last_bat_reminder_at IS NULL OR last_bat_reminder_at <= NOW() - INTERVAL 20 HOUR)
+       ORDER BY bat_sent_at ASC LIMIT 100 FOR UPDATE`
+    );
 
     // Le payload reflète l'état AVANT réservation : n8n en déduit le numéro du rappel (count + 1)
     const result = {
       client_payment_reminders: clients.map((p) => buildPreorderPayload(p, cfg)),
+      client_bat_reminders: bats.map((p) => buildPreorderPayload(p, cfg)),
       admin_validation_pending: admins.map((p) => buildPreorderPayload(p, cfg)),
       admin_list_url: `${frontendUrl()}/admin/nfc-preorders`,
     };
@@ -564,6 +577,12 @@ async function claimReminders() {
     }
     if (admins.length) {
       await conn.query('UPDATE nfc_preorders SET last_admin_reminder_at = NOW() WHERE id IN (?)', [admins.map((p) => p.id)]);
+    }
+    if (bats.length) {
+      await conn.query(
+        'UPDATE nfc_preorders SET bat_reminder_count = bat_reminder_count + 1, last_bat_reminder_at = NOW() WHERE id IN (?)',
+        [bats.map((p) => p.id)]
+      );
     }
     return result;
   });
@@ -582,10 +601,12 @@ async function recordNotification(body = {}) {
   const recipient = cleanText(body.recipient, 190);
   const eventId = body.event_id && UUID_RE.test(String(body.event_id)) ? String(body.event_id) : null;
 
-  if (!ids.length || !NOTIF_CHANNELS.includes(channel) || !NOTIF_AUDIENCES.includes(audience) ||
+  if (!NOTIF_CHANNELS.includes(channel) || !NOTIF_AUDIENCES.includes(audience) ||
       !NOTIF_STATUSES.includes(status) || !template || !recipient) {
     throw new PreorderError(422, 'Corps de notification invalide.');
   }
+  // Alertes sans précommande (stock, devis…) : rien à rattacher dans le journal
+  if (!ids.length) return { ok: true, skipped: true };
   const error = body.error ? cleanText(body.error, 500) : null;
 
   // Les ids inexistants sont ignorés silencieusement
@@ -600,7 +621,13 @@ async function recordNotification(body = {}) {
 module.exports = {
   PreorderError,
   STATUSES,
+  PAID_STATUSES,
+  STATUS_LABELS,
   TRANSITIONS,
+  lockById,
+  logAdmin,
+  getById,
+  recordPaidPreorder,
   assertTransition,
   normalizePhone,
   normalizeWaveTx,
@@ -620,7 +647,6 @@ module.exports = {
   validatePayment,
   rejectPayment,
   cancelPreorder,
-  convertToCommande,
   backfillPaidPreorders,
   resendLastNotification,
   getDetail,

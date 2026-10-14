@@ -180,7 +180,7 @@ async function getKpiPlateforme() {
        (SELECT COUNT(*) FROM commandes
          WHERE (statut_paiement = 'PAID' OR paiement_statut = 'payé')
            AND statut NOT IN ('Livrée', 'Annulée')) AS nfc_en_cours,
-       (SELECT COUNT(*) FROM nfc_preorders WHERE status IN ('paid', 'converted')) AS nfc_precommandes_payees,
+       (SELECT COUNT(*) FROM nfc_preorders WHERE status IN ('paid','converted','design_en_cours','bat_envoye','bat_valide','en_impression','prete','livree')) AS nfc_precommandes_payees,
        (SELECT COUNT(*) FROM nfc_preorders WHERE status = 'payment_submitted') AS nfc_precommandes_a_valider,
        (SELECT COUNT(*) FROM commandes WHERE statut_paiement = 'PAID'
          AND date_commande >= DATE_SUB(NOW(), INTERVAL 30 DAY)) AS nfc_livrees_mois,

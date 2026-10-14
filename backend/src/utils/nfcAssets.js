@@ -39,6 +39,7 @@ const KINDS = {
   photo: { mimes: ['image/jpeg', 'image/png', 'image/webp'], label: 'une photo JPG, PNG ou WebP' },
   logo: { mimes: ['image/png', 'image/svg+xml'], label: 'un logo PNG ou SVG' },
   visual: { mimes: ['image/png'], label: 'une image PNG' },
+  bat: { mimes: ['image/png', 'image/jpeg'], label: 'une image PNG ou JPG (600 dpi, 3 mm de fond perdu)' },
 };
 
 function validateAsset(file, kind) {
@@ -99,6 +100,10 @@ const VISUAL_FIELDS = ['preview_front', 'preview_back', 'print_front', 'print_ba
 const orderVisuals = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_BYTES, files: 4 } })
   .fields(VISUAL_FIELDS.map((name) => ({ name, maxCount: 1 })));
 
+// Multer : BAT déposé par l'admin (recto et/ou verso)
+const batFiles = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_BYTES, files: 2 } })
+  .fields([{ name: 'front', maxCount: 1 }, { name: 'back', maxCount: 1 }]);
+
 function wrap(mw) {
   return (req, res, next) => mw(req, res, (err) => {
     if (err) {
@@ -112,4 +117,5 @@ module.exports = {
   validateAsset, uploadAsset, isOwnAssetUrl, pngSize, detectMime, VISUAL_FIELDS,
   receiveAsset: wrap(singleAsset),
   receiveOrderVisuals: wrap(orderVisuals),
+  receiveBatFiles: wrap(batFiles),
 };

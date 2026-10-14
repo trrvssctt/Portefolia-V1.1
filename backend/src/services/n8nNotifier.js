@@ -13,7 +13,7 @@ const TIMEOUT_MS = 5000;
 async function computeStats(conn) {
   const cfg = await getNfcConfig();
   const [[row]] = await conn.query(
-    "SELECT COUNT(*) AS n FROM nfc_preorders WHERE status IN ('paid','converted')"
+    "SELECT COUNT(*) AS n FROM nfc_preorders WHERE status IN ('paid','converted','design_en_cours','bat_envoye','bat_valide','en_impression','prete','livree')"
   );
   return { paid_count: Number(row.n), batch_threshold: cfg.batch_threshold };
 }
@@ -33,6 +33,14 @@ async function emit(conn, preorderId, event, options = {}) {
     audience: options.clientOnly ? 'client' : 'all',
     ...buildPreorderPayload(preorder, cfg, stats),
   };
+  // Aperçu du BAT (première carte) pour les e-mails
+  const [[item]] = await conn.query(
+    'SELECT preview_front_url, preview_back_url, COUNT(*) OVER () AS n FROM nfc_order_items WHERE order_id = ? ORDER BY position LIMIT 1',
+    [preorderId]
+  ).catch(() => [[null]]);
+  payload.bat = item
+    ? { front_url: item.preview_front_url || null, back_url: item.preview_back_url || null, cards: Number(item.n) }
+    : null;
   await conn.query(
     'INSERT INTO nfc_preorder_events (id, preorder_id, event, payload) VALUES (?, ?, ?, ?)',
     [eventId, preorderId, event, JSON.stringify(payload)]
