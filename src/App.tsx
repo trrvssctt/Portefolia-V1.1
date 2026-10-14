@@ -52,6 +52,9 @@ import NfcPreorderTracking from "./pages/NfcPreorderTracking";
 import NfcStockPage from "./pages/admin/NfcStockPage";
 import NfcOffersPage from "./pages/admin/NfcOffersPage";
 import NfcOrderPage from "./pages/NfcOrderPage";
+import NfcQuoteRequestPage from "./pages/NfcQuoteRequestPage";
+import NfcQuotePage from "./pages/NfcQuotePage";
+import NfcQuotesPage from "./pages/admin/NfcQuotesPage";
 import NfcCardRedirect from "./pages/NfcCardRedirect";
 import NfcCardStatus from "./pages/NfcCardStatus";
 import AdminPaiements from "./pages/admin/Paiements";
@@ -153,6 +156,8 @@ function App() {
                     <Route path="/nfc/precommande/:reference" element={<NfcPreorderTracking />} />
                     <Route path="/c/:code" element={<NfcCardRedirect />} />
                     <Route path="/nfc/commander/:offer" element={<NfcOrderPage />} />
+                    <Route path="/nfc/devis" element={<NfcQuoteRequestPage />} />
+                    <Route path="/nfc/devis/:reference" element={<NfcQuotePage />} />
                     <Route path="/carte/:etat" element={<NfcCardStatus />} />
                     <Route path="/carte-3d" element={<CarteNFC3D />} />
                     <Route path="/upgrade" element={<UpgradePlan />} />
@@ -180,6 +185,7 @@ function App() {
                       <Route path="/admin/nfc-preorders" element={<NfcPreordersPage />} />
                       <Route path="/admin/nfc-stock" element={<NfcStockPage />} />
                       <Route path="/admin/nfc-offers" element={<NfcOffersPage />} />
+                      <Route path="/admin/nfc-quotes" element={<NfcQuotesPage />} />
                       <Route path="/admin/paiements" element={<AdminPaiements />} />
                       <Route path="/admin/wave-payments" element={<WavePayments />} />
                       <Route path="/admin/wave-validation" element={<WaveValidation />} />

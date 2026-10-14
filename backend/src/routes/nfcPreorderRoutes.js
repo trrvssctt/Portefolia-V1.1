@@ -44,6 +44,7 @@ publicRouter.post('/:reference/proof', paymentLimiter, receiveProof, ctrl.submit
 publicRouter.post('/:reference/payment', paymentLimiter, ctrl.submitPayment);
 publicRouter.post('/:reference/bat/approve', paymentLimiter, ctrl.approveBat);
 publicRouter.post('/:reference/bat/changes', paymentLimiter, ctrl.requestBatChanges);
+publicRouter.put('/:reference/team/:itemId', checkLimiter, ctrl.updateTeamItem);
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 const adminRouter = express.Router();

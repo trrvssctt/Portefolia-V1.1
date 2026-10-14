@@ -85,3 +85,13 @@ test('images de commande : PNG, SVG et taille minimale du logo', () => {
   assert.throws(() => validateAsset({ buffer: Buffer.from('<svg></svg>') }, 'photo'), (e) => e.status === 422);
   assert.throws(() => validateAsset({ buffer: Buffer.from('<html><script></script></html>') }, 'logo'), (e) => e.status === 422);
 });
+
+test('devis : dates SQL et expiration', () => {
+  const q = require('../src/services/nfcQuoteService');
+  assert.equal(q.dateOnly(new Date(2026, 10, 13)), '2026-11-13');
+  assert.equal(q.dateOnly('2026-11-13'), '2026-11-13');
+  assert.equal(q.dateOnly('n importe quoi'), null);
+  assert.equal(q.isExpired(new Date(2020, 0, 1)), true);
+  assert.equal(q.isExpired(new Date(Date.now() + 86400000)), false);
+  assert.equal(q.isExpired(null), false);
+});

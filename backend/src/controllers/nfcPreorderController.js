@@ -64,6 +64,7 @@ async function getPublic(req, res) {
       previews: await previewsFor(p.id),
       bat_comment: p.bat_comment || null,
       bat_revision: Number(p.bat_revision || 0),
+      team: await require('../services/nfcQuoteService').teamFor(p).catch(() => null),
       wave_transaction_id: p.wave_transaction_id,
       has_proof: !!p.payment_proof_url,
       rejection_reason: p.rejection_reason,
@@ -182,6 +183,15 @@ async function internalNotification(req, res) {
   catch (err) { return handleError(res, err, 'internalNotification'); }
 }
 
+// ── Cartes de l'équipe (commande Entreprise) ──────────────────────────────────
+
+async function updateTeamItem(req, res) {
+  try {
+    const body = req.body || {};
+    return res.json(await require('../services/nfcQuoteService').updateTeamItem(req.params.reference, body.token, req.params.itemId, body));
+  } catch (err) { return handleError(res, err, 'updateTeamItem'); }
+}
+
 // ── Production ────────────────────────────────────────────────────────────────
 
 const prod = () => require('../services/nfcProductionService');
@@ -261,7 +271,7 @@ async function adminStartPrintBatch(req, res) {
 }
 
 module.exports = {
-  approveBat, requestBatChanges,
+  approveBat, requestBatChanges, updateTeamItem,
   adminStartDesign, adminUploadBat, adminSendBat, adminApproveBat, adminAdvance,
   adminPrintQueue, adminPrintSheet, adminStartPrintBatch,
   getPublicConfig, getPublic, submitPayment, submitProof, checkContact, resendLink,

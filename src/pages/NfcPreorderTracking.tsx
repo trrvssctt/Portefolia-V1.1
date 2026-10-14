@@ -22,13 +22,94 @@ interface PublicPreorder {
   previews?: { front: string | null; back: string | null } | null;
   bat_comment?: string | null;
   bat_revision?: number;
+  team?: TeamData | null;
   rejection_reason: string | null;
   created_at: string;
   expiry_hours: number;
   payment: { wave_number: string; wave_link: string | null };
 }
 
+interface TeamInfo { name?: string; title?: string; phone?: string; email?: string }
+interface TeamData {
+  editable: boolean;
+  items: { id: number; position: number; holder_user_id: number | null; info: TeamInfo }[];
+  members: { user_id: number; name: string; email: string; poste: string }[];
+}
+
 const SUPPORT_WHATSAPP = '221781311371';
+
+// Commande Entreprise : une carte par membre, modifiable jusqu'à l'envoi du bon à tirer
+function TeamEditor({ reference, token, team, onSaved }: { reference: string; token: string; team: TeamData; onSaved: () => void }) {
+  const [rows, setRows] = useState(() => team.items.map((i) => ({ ...i, info: { name: '', title: '', phone: '', email: '', ...i.info } })));
+  const [saving, setSaving] = useState<number | null>(null);
+  const [msg, setMsg] = useState<{ id: number; ok: boolean; text: string } | null>(null);
+  const filled = rows.filter((r) => (r.info.name || '').trim().length >= 2).length;
+
+  const update = (id: number, patch: Partial<(typeof rows)[number]>) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const pickMember = (id: number, userId: string) => {
+    const m = team.members.find((x) => String(x.user_id) === userId);
+    update(id, { holder_user_id: m ? m.user_id : null, info: m ? { ...rows.find((r) => r.id === id)!.info, name: m.name, title: m.poste, email: m.email } : rows.find((r) => r.id === id)!.info });
+  };
+  const save = async (id: number) => {
+    const r = rows.find((x) => x.id === id)!;
+    setSaving(id);
+    setMsg(null);
+    try {
+      const res = await fetch(`${NFC_API_BASE}/api/nfc/preorders/${encodeURIComponent(reference)}/team/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, member_user_id: r.holder_user_id ?? null, info: r.info }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setMsg({ id, ok: false, text: d?.error || 'Enregistrement impossible.' }); return; }
+      setMsg({ id, ok: true, text: 'Enregistré' });
+      onSaved();
+    } catch {
+      setMsg({ id, ok: false, text: 'Connexion impossible.' });
+    } finally {
+      setSaving(null);
+    }
+  };
+  const field = 'h-9 px-3 rounded-lg border border-gray-200 bg-[#FAFAFA] text-sm outline-none focus:border-[#2E7D32] w-full';
+
+  return (
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+      <div className="flex items-baseline justify-between">
+        <p className="text-sm font-bold text-gray-900">Cartes de l'équipe</p>
+        <p className="text-xs text-gray-500">{filled}/{rows.length} renseignée{filled > 1 ? 's' : ''}</p>
+      </div>
+      <p className="text-xs text-gray-500">{team.editable ? 'Choisissez le membre et vérifiez les infos imprimées de chaque carte. Modifiables jusqu\'à l\'envoi du bon à tirer.' : 'Les infos sont figées : le bon à tirer est en cours.'}</p>
+      {rows.map((r) => (
+        <div key={r.id} className="rounded-xl border border-gray-100 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-gray-700">Carte {r.position}</span>
+            {team.members.length > 0 && (
+              <select disabled={!team.editable} value={r.holder_user_id ?? ''} onChange={(e) => pickMember(r.id, e.target.value)} className="h-8 px-2 rounded-lg border border-gray-200 text-xs max-w-[220px]">
+                <option value="">Personne hors compte</option>
+                {team.members.map((m) => <option key={m.user_id} value={m.user_id}>{m.name || m.email}</option>)}
+              </select>
+            )}
+          </div>
+          <div className="grid sm:grid-cols-2 gap-2">
+            {(['name', 'title', 'phone', 'email'] as const).map((k) => (
+              <input key={k} disabled={!team.editable} className={field} value={r.info[k] || ''}
+                placeholder={{ name: 'Nom à imprimer', title: 'Poste', phone: 'Téléphone', email: 'E-mail' }[k]}
+                onChange={(e) => update(r.id, { info: { ...r.info, [k]: e.target.value } })} />
+            ))}
+          </div>
+          {team.editable && (
+            <div className="flex items-center justify-end gap-2">
+              {msg && msg.id === r.id && <span className={`text-xs ${msg.ok ? 'text-[#2E7D32]' : 'text-red-600'}`}>{msg.text}</span>}
+              <button onClick={() => save(r.id)} disabled={saving === r.id} className="h-8 px-3 rounded-lg border border-gray-200 text-xs font-semibold">
+                {saving === r.id ? <Loader2 size={12} className="animate-spin" /> : 'Enregistrer'}
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+    </section>
+  );
+}
 
 function waSupportLink(reference?: string) {
   const text = reference ? `Bonjour, je vous contacte au sujet de ma précommande ${reference}.` : 'Bonjour, une question sur la carte NFC Portefolia.';
@@ -305,6 +386,8 @@ export default function NfcPreorderTracking() {
                 </div>
               )}
             </section>
+
+            {p.team && <TeamEditor reference={p.reference} token={token} team={p.team} onSaved={() => qc.invalidateQueries({ queryKey })} />}
 
             {p.status === 'rejected' && (
               <div className="rounded-2xl border border-red-100 bg-red-50 p-4 flex gap-3">
