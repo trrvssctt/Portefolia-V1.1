@@ -40,6 +40,18 @@ async function emit(conn, preorderId, event, options = {}) {
   return eventId;
 }
 
+// Événement qui ne concerne pas une précommande (stock, devis…). Retourne l'event_id.
+// `data` est fusionné dans le payload : { stock: {...} }, { quote: {...} }, { links: {...} }
+async function emitGeneric(conn, event, data = {}, { preorderId = null } = {}) {
+  const eventId = crypto.randomUUID();
+  const payload = { event_id: eventId, event, occurred_at: new Date().toISOString(), audience: 'admin', ...data };
+  await conn.query(
+    'INSERT INTO nfc_preorder_events (id, preorder_id, event, payload) VALUES (?, ?, ?, ?)',
+    [eventId, preorderId, event, JSON.stringify(payload)]
+  );
+  return eventId;
+}
+
 async function deliver(eventId) {
   const [[row]] = await pool.query('SELECT * FROM nfc_preorder_events WHERE id = ?', [eventId]);
   if (!row || row.delivered_at) return;
@@ -125,4 +137,4 @@ async function resendLast(preorderId, options = {}) {
   return { event: last.event, event_id: eventId };
 }
 
-module.exports = { emit, deliver, flush, retryPending, start, resendLast, computeStats };
+module.exports = { emit, emitGeneric, deliver, flush, retryPending, start, resendLast, computeStats };

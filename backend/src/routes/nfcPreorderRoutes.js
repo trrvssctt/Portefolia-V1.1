@@ -8,6 +8,7 @@ const adminAuth = require('../middlewares/adminAuth');
 const optionalAuth = require('../middlewares/optionalAuth');
 const internalAuth = require('../middlewares/internalAuth');
 const { receiveProof } = require('../utils/paymentProof');
+const { requirePermission } = require('../middlewares/rbac');
 
 // Le backend tourne derrière un proxy : on limite par IP réelle du client
 function clientKey(req) {
@@ -45,17 +46,21 @@ publicRouter.post('/:reference/payment', paymentLimiter, ctrl.submitPayment);
 // ── Admin ─────────────────────────────────────────────────────────────────────
 const adminRouter = express.Router();
 adminRouter.use(auth, adminAuth);
-adminRouter.get('/', ctrl.adminList);
-adminRouter.get('/stats', ctrl.adminStats);
-adminRouter.get('/export.csv', ctrl.adminExport);
-adminRouter.get('/settings', ctrl.adminGetSettings);
-adminRouter.put('/settings', ctrl.adminUpdateSettings);
-adminRouter.get('/:id', ctrl.adminDetail);
-adminRouter.put('/:id/validate', ctrl.adminValidate);
-adminRouter.put('/:id/reject', ctrl.adminReject);
-adminRouter.put('/:id/cancel', ctrl.adminCancel);
-adminRouter.post('/:id/convert', ctrl.adminConvert);
-adminRouter.post('/:id/resend', ctrl.adminResend);
+// Lecture et production : nfc:read / nfc:write ; validation des paiements : payments:write ; prix : nfc:pricing
+const nfcRead = requirePermission('nfc:read');
+const nfcWrite = requirePermission('nfc:write');
+const payWrite = requirePermission('payments:write');
+adminRouter.get('/', nfcRead, ctrl.adminList);
+adminRouter.get('/stats', nfcRead, ctrl.adminStats);
+adminRouter.get('/export.csv', nfcRead, ctrl.adminExport);
+adminRouter.get('/settings', nfcRead, ctrl.adminGetSettings);
+adminRouter.put('/settings', requirePermission('nfc:pricing'), ctrl.adminUpdateSettings);
+adminRouter.get('/:id', nfcRead, ctrl.adminDetail);
+adminRouter.put('/:id/validate', payWrite, ctrl.adminValidate);
+adminRouter.put('/:id/reject', payWrite, ctrl.adminReject);
+adminRouter.put('/:id/cancel', nfcWrite, ctrl.adminCancel);
+adminRouter.post('/:id/convert', nfcWrite, ctrl.adminConvert);
+adminRouter.post('/:id/resend', nfcWrite, ctrl.adminResend);
 
 // ── Interne (n8n) ─────────────────────────────────────────────────────────────
 const internalRouter = express.Router();

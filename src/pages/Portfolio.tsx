@@ -35,7 +35,11 @@ const Portfolio = () => {
   const loadPortfolio = async () => {
     try {
       // Load portfolio from backend public endpoint
-      const res = await fetch(`${API_BASE}/api/p/${slug}`);
+      // Tap de carte NFC (/c/:code → ?src=nfc&card=CODE) : transmis pour les statistiques
+      const qs = new URLSearchParams(window.location.search);
+      const nfc = qs.get('src') === 'nfc' && qs.get('card')
+        ? `?src=nfc&card=${encodeURIComponent(qs.get('card') as string)}` : '';
+      const res = await fetch(`${API_BASE}/api/p/${slug}${nfc}`);
       if (!res.ok) {
         setError('Portfolio non trouvé ou privé');
         setLoading(false);

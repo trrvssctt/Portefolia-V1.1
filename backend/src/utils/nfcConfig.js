@@ -8,14 +8,17 @@ let cache = null;
 let cachedAt = 0;
 
 // Clés modifiables depuis l'admin et leur type
+// (les prix se modifient désormais par offre, dans nfc_offers)
 const EDITABLE = {
-  unit_price: 'int',
   max_quantity: 'int',
   batch_threshold: 'int',
   expiry_hours: 'int',
   wave_number: 'string',
   wave_link: 'string',
   wave_link_supports_amount: 'bool',
+  stock_alert_logo_printed: 'int',
+  stock_alert_blank: 'int',
+  print_batch_threshold: 'int',
 };
 
 function frontendUrl() {
@@ -27,12 +30,15 @@ function parse(raw) {
   return {
     unit_price: Number(s.unit_price) || Number(DEFAULT_SETTINGS.unit_price),
     currency: s.currency || 'XOF',
-    max_quantity: Number(s.max_quantity) || 10,
+    max_quantity: Number(s.max_quantity) || 5,
     batch_threshold: Number(s.batch_threshold) || 10,
     expiry_hours: Number(s.expiry_hours) || 72,
     wave_number: s.wave_number || DEFAULT_SETTINGS.wave_number,
     wave_link: s.wave_link || '',
     wave_link_supports_amount: s.wave_link_supports_amount === '1' || s.wave_link_supports_amount === 'true',
+    stock_alert_logo_printed: Number(s.stock_alert_logo_printed) || 20,
+    stock_alert_blank: Number(s.stock_alert_blank) || 3,
+    print_batch_threshold: Number(s.print_batch_threshold) || 10,
   };
 }
 
@@ -42,6 +48,11 @@ async function getNfcConfig({ fresh = false } = {}) {
     const [rows] = await pool.query('SELECT cle, valeur FROM nfc_settings');
     const raw = {};
     for (const r of rows) raw[r.cle] = r.valeur;
+    // Le prix de référence est celui de l'offre Standard (table nfc_offers) quand elle existe
+    try {
+      const [[std]] = await pool.query("SELECT price FROM nfc_offers WHERE code = 'standard' AND price IS NOT NULL");
+      if (std) raw.unit_price = String(std.price);
+    } catch { /* table pas encore créée */ }
     cache = parse(raw);
   } catch (err) {
     console.warn('nfcConfig: lecture nfc_settings impossible, valeurs par défaut', err.message);

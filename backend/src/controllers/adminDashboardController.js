@@ -66,6 +66,23 @@ async function getAlertes() {
     }
   } catch (e) { /* table absente */ }
 
+  // Stock de cartes NFC sous le seuil d'alerte
+  try {
+    const { getStock } = require('../services/nfcCardService');
+    const stock = await getStock();
+    for (const t of stock.types.filter((x) => x.low && x.total > 0)) {
+      alertes.push({
+        type: 'NFC_STOCK_LOW',
+        niveau: t.available === 0 ? 'CRITIQUE' : 'ATTENTION',
+        message: `Stock cartes « ${t.label} » : ${t.available} disponible(s)`,
+        detail: `seuil d'alerte : ${t.threshold}`,
+        action_label: 'Voir le stock',
+        action_url: '/admin/nfc-stock',
+        count: t.available,
+      });
+    }
+  } catch (e) { /* tables absentes */ }
+
   const [[expirantAujourdhui]] = await pool.query(
     `SELECT COUNT(*) AS total FROM abonnements
      WHERE statut_v2 = 'ACTIVE' AND DATE(COALESCE(date_echeance, end_date)) = CURDATE()`

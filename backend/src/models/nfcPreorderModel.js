@@ -4,12 +4,15 @@ const { pool } = require('../db');
 const DEFAULT_SETTINGS = {
   unit_price: '12500',
   currency: 'XOF',
-  max_quantity: '10',
+  max_quantity: '5',
   batch_threshold: '10',
   expiry_hours: '72',
   wave_number: '+221 78 131 13 71',
   wave_link: '',
   wave_link_supports_amount: '0',
+  stock_alert_logo_printed: '20',
+  stock_alert_blank: '3',
+  print_batch_threshold: '10',
 };
 
 async function init() {

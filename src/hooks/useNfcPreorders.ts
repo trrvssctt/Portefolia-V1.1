@@ -48,6 +48,9 @@ export interface NfcSettings {
   wave_number: string;
   wave_link: string;
   wave_link_supports_amount: boolean;
+  stock_alert_logo_printed?: number;
+  stock_alert_blank?: number;
+  print_batch_threshold?: number;
 }
 
 export const STATUS_META: Record<PreorderStatus, { label: string; color: string; bg: string }> = {

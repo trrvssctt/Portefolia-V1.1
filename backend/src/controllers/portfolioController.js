@@ -703,7 +703,13 @@ async function getPublicBySlug(req, res) {
       const ua = req.headers['user-agent'] || '';
       const referer = req.headers['referer'] || req.headers['referrer'] || '';
       const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown';
-      await visiteModel.create({ portfolio_id: portfolio.id, adresse_ip: ip, user_agent: ua, referer });
+      // Visite venant d'un tap de carte NFC (/c/:code → ?src=nfc&card=CODE) : vérifiée côté serveur
+      let nfc = {};
+      if (req.query.src === 'nfc' && req.query.card) {
+        const cardId = await require('../services/nfcCardService').cardIdForPortfolio(req.query.card, portfolio.id).catch(() => null);
+        if (cardId) nfc = { source: 'nfc', card_id: cardId };
+      }
+      await visiteModel.create({ portfolio_id: portfolio.id, adresse_ip: ip, user_agent: ua, referer, ...nfc });
     } catch (visitErr) {
       console.warn('Could not record visit:', visitErr.message);
     }
