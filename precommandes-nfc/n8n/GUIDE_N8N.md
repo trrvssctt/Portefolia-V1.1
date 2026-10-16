@@ -14,6 +14,18 @@
 > WF2 ajoute un rappel au client quand son BAT n'est pas validé (48 h puis 96 h) et son expéditeur repasse à
 > `support@portefolia.tech` (l'adresse du compte SMTP : `no-reply@` est refusé par le serveur mail).
 
+> **Mise à jour (16 oct. 2026) — notifications de la plateforme** : deux nouveaux workflows.
+>
+> | Fichier | Rôle | Déclencheur |
+> |---|---|---|
+> | `WF3_notifications_admin.json` | Vous prévient par e-mail (diankaseydou52@gmail.com) : inscription, compte Business, paiement Wave à valider, paiement reçu / refusé / remboursé, changement de formule, abonnement expiré, message de contact | Webhook `portefolia-platform-event` |
+> | `WF4_relances_et_recap.json` | 10 h : relance les comptes expirés (J+3, J+10, J+30, dernier rappel J+60, lien de désinscription) · 20 h : récapitulatif de la journée | Planifié (heure de Dakar) |
+>
+> Après import : 1) dans WF4 (et dans les nodes « Journal » de WF1 / « Expirer », « Récupérer », « Journaliser » de WF2),
+> sélectionnez l'identifiant **INTERNAL_API_KEY** (en-tête `X-Internal-Key`) — ces nodes utilisaient par erreur
+> « Meta WhatsApp Cloud API », d'où un journal des envois vide ; 2) copiez la **Production URL** du webhook de WF3 dans
+> `N8N_PLATFORM_WEBHOOK_URL` du backend (VPS) ; 3) activez WF3 et WF4.
+
 Deux workflows à importer :
 
 | Fichier | Rôle | Déclencheur |

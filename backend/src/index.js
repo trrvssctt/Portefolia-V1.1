@@ -142,6 +142,10 @@ app.use('/api/nfc/preorders', nfcPreorderRoutes.publicRouter);
 // Cartes NFC : redirection https://portefolia.tech/c/{CODE} (Nginx : location /c/) + résolution de secours
 app.use('/c', nfcCardRoutes.redirectRouter);
 app.use('/api/nfc/cards', nfcCardRoutes.publicRouter);
+// Notifications plateforme via n8n : routes internes et désinscription des relances
+const platformRoutes = require('./routes/platformRoutes');
+app.use('/api/internal/platform', platformRoutes.internalRouter);
+app.use('/api/platform', platformRoutes.publicRouter);
 // Offres, commandes par offre et cartes du client ; devis Entreprise
 app.use('/api/nfc/quotes', nfcQuoteRoutes.publicRouter);
 app.use('/api/nfc', nfcOrderRoutes.router);
@@ -205,6 +209,7 @@ app.post('/webhooks/payment', (req, res) => adminController.paymentWebhook(req, 
     await require('./models/nfcProductionModel').init();
     await require('./models/nfcQuoteModel').init();
     await require('./models/nfcCardModel').init();
+    await require('./models/platformModel').init();
     // Précommandes payées avant l'enregistrement automatique commande + paiement
     try {
       const fixed = await require('./services/nfcPreorderService').backfillPaidPreorders();
@@ -230,6 +235,9 @@ app.post('/webhooks/payment', (req, res) => adminController.paymentWebhook(req, 
     startCronJobs();
     // Renvoi des événements de précommande NFC non reçus par n8n
     require('./services/n8nNotifier').start();
+    // Notifications admin (n8n) : surveillance des inscriptions, paiements… et renvoi des échecs
+    require('./services/platformNotifier').start();
+    require('./services/platformWatcher').start();
   } catch (err) {
     console.error('Failed to start server:', err);
     process.exit(1);

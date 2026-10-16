@@ -1,0 +1,358 @@
+{
+  "name": "Portefolia — WF4 Relances comptes expirés et récap quotidien",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * *"
+            }
+          ]
+        }
+      },
+      "id": "d1581074-481d-4ef5-8ad7-0fc1175f08f6",
+      "name": "Chaque jour à 10 h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n//  CONFIGURATION\n// ============================================================\nconst CONFIG = {\n  brand: 'Portefolia',\n  tagline: 'Expose ton futur.',\n  frontUrl: 'https://portefolia.tech',\n  apiUrl: 'https://portefolia.tech/api',          // ou http://localhost:<port>/api si n8n tourne sur le même VPS\n  fromEmail: 'Portefolia <support@portefolia.tech>', // doit être l'adresse du compte SMTP\n  replyTo: 'support@portefolia.tech',\n  adminEmail: 'diankaseydou52@gmail.com',             // reçoit toutes les notifications de la plateforme\n  supportWhatsapp: '+221 78 131 13 71',\n  colors: { primary: '#1B5E20', accent: '#2E7D32' },\n};\nreturn $input.all().map((i) => ({ json: { ...i.json, config: CONFIG } }));\n"
+      },
+      "id": "a4325314-a8cf-45d5-b555-ca012e9e06b0",
+      "name": "Config (relances)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.config.apiUrl }}/internal/platform/expired-reminders",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "7457cd90-303a-4ed9-952d-ac5926235ee9",
+      "name": "Récupérer les relances du jour",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "INTERNAL_API_KEY"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst fcfa = (n) => String(Math.round(Number(n) || 0)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' ') + ' F CFA';\nconst para = (html) => `<p style=\"font-size:15px;line-height:1.6;margin:0 0 12px\">${html}</p>`;\nconst table = (rows) => `<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-size:14px;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin:16px 0\">${rows\n  .filter((r) => r && r[1] !== undefined && r[1] !== null && r[1] !== '')\n  .map(([k, v, raw]) => `<tr><td style=\"padding:7px 0;color:#6b7280;width:42%;vertical-align:top\">${esc(k)}</td><td style=\"padding:7px 0;font-weight:600\">${raw ? v : esc(v)}</td></tr>`).join('')}</table>`;\nconst dateFr = (d) => { if (!d) return ''; const x = new Date(d); return Number.isNaN(x.getTime()) ? String(d) : x.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); };\n\nfunction layout(cfg, { preheader = '', title, body, cta, footer }) {\n  const button = cta && cta.url\n    ? `<p style=\"margin:28px 0 8px;text-align:center\"><a href=\"${esc(cta.url)}\" style=\"background:${cfg.colors.accent};color:#ffffff;text-decoration:none;padding:14px 26px;border-radius:8px;font-weight:600;display:inline-block\">${esc(cta.label)}</a></p>`\n    : '';\n  return `<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>${esc(title)}</title></head>\n<body style=\"margin:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2937\">\n<span style=\"display:none;max-height:0;overflow:hidden;opacity:0\">${esc(preheader)}</span>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f4f5f7;padding:24px 12px\"><tr><td align=\"center\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden\">\n<tr><td style=\"background:${cfg.colors.primary};padding:22px 28px;color:#ffffff;font-size:20px;font-weight:700\">${esc(cfg.brand)}<div style=\"font-size:12px;font-weight:400;opacity:.85;margin-top:4px\">${esc(cfg.tagline)}</div></td></tr>\n<tr><td style=\"padding:28px\">\n<h1 style=\"font-size:20px;line-height:1.3;margin:0 0 16px\">${esc(title)}</h1>\n${body}\n${button}\n</td></tr>\n<tr><td style=\"padding:18px 28px;background:#f9fafb;font-size:12px;line-height:1.5;color:#6b7280\">${footer || 'Notification automatique de la plateforme Portefolia.'}</td></tr>\n</table></td></tr></table></body></html>`;\n}\n\n// ---------- Relances des comptes expirés (J+3, J+10, J+30, J+60) ----------\nconst cfg = $('Config (relances)').first().json.config;\nconst data = $input.first().json || {};\nconst out = [];\n\nfor (const r of (data.reminders || [])) {\n  const u = r.user || {};\n  if (!u.email) continue;\n  const prenom = esc(u.first_name || '');\n  const plan = (r.plan && r.plan.name) || 'Portefolia';\n  const visits = Number((r.stats || {}).visits_30d) || 0;\n  const hello = prenom ? `${prenom}, ` : '';\n  const since = r.expired_on ? `le ${esc(dateFr(r.expired_on))}` : 'récemment';\n  const lost = para('Votre portfolio reste en ligne, mais l\\'accès à votre espace est suspendu : vous ne pouvez plus le modifier, ajouter vos nouveaux projets ni consulter vos statistiques.');\n  const visitLine = visits > 0\n    ? para(`Votre portfolio a encore reçu <strong>${visits}</strong> visite${visits > 1 ? 's' : ''} ces 30 derniers jours : vos visiteurs voient un profil qui n'évolue plus.`)\n    : '';\n  const kept = para('Tout votre contenu est conservé : projets, compétences, expériences. En renouvelant, vous reprenez exactement là où vous en étiez.');\n  const howTo = para('Le renouvellement prend 2 minutes et se paie par Wave.');\n\n  let subject;\n  let title;\n  let body;\n  switch (r.step) {\n    case 'J+3':\n      subject = `${hello}votre abonnement Portefolia a expiré`;\n      title = `Votre abonnement ${plan} a expiré`;\n      body = para(`Votre abonnement <strong>${esc(plan)}</strong> a pris fin ${since}.`) + lost + visitLine + howTo;\n      break;\n    case 'J+10':\n      subject = `${hello}votre portfolio n'est plus à jour depuis ${r.days_expired} jours`;\n      title = 'Votre portfolio vous attend';\n      body = para(`Cela fait ${esc(r.days_expired)} jours que votre abonnement ${esc(plan)} a expiré.`) + visitLine + lost + kept + howTo;\n      break;\n    case 'J+30':\n      subject = `${hello}on garde votre portfolio au chaud`;\n      title = 'Votre contenu est toujours là';\n      body = para('Votre compte Portefolia est en pause depuis un mois.') + kept + visitLine + howTo;\n      break;\n    default:\n      subject = `Dernier rappel : réactivez votre compte Portefolia`;\n      title = `${prenom ? prenom + ', d' : 'D'}ernier rappel`;\n      body = para(`Votre abonnement ${esc(plan)} a expiré ${since}. C'est notre dernier rappel : nous ne vous écrirons plus à ce sujet.`) + kept + howTo\n        + para(`Une question ou un souci de paiement ? Écrivez-nous sur WhatsApp au ${esc(cfg.supportWhatsapp)}.`);\n  }\n\n  const footer = `Vous recevez cet e-mail car votre abonnement Portefolia a expiré. <a href=\"${esc((r.links || {}).unsubscribe_url)}\" style=\"color:#6b7280\">Ne plus recevoir ces rappels</a>.`;\n  out.push({ json: {\n    relance_id: r.relance_id,\n    step: r.step,\n    to: u.email,\n    from: cfg.fromEmail,\n    replyTo: cfg.replyTo,\n    subject,\n    html: layout(cfg, { preheader: subject, title, body, cta: { label: 'Réactiver mon compte', url: (r.links || {}).renew_url || cfg.frontUrl + '/renouveler' }, footer }),\n  } });\n}\nreturn out;\n"
+      },
+      "id": "8587f156-c6e2-40bc-ad80-fad3345ddfcd",
+      "name": "Préparer les relances",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.from }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $json.replyTo }}"
+        }
+      },
+      "id": "5fa46cb3-290f-4eb6-977b-e5193dc5dff5",
+      "name": "Email relance",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        960,
+        200
+      ],
+      "webhookId": "c07eb91f-6764-44c2-91c9-17901bd7bd37",
+      "credentials": {
+        "smtp": {
+          "id": "6PAGlKsomq8gO8go",
+          "name": "SMTP Portefolia"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config (relances)').first().json.config.apiUrl }}/internal/platform/relances/{{ $('Préparer les relances').item.json.relance_id }}/result",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: $json.error ? 'failed' : 'sent', error: $json.error ? String($json.error.message || $json.error).slice(0, 480) : null }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "6721ea94-41d2-4872-a3a5-8bcf8ec504df",
+      "name": "Journaliser la relance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "INTERNAL_API_KEY"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 20 * * *"
+            }
+          ]
+        }
+      },
+      "id": "439e664f-ef1c-4760-b52e-61a004ea6531",
+      "name": "Chaque soir à 20 h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n//  CONFIGURATION\n// ============================================================\nconst CONFIG = {\n  brand: 'Portefolia',\n  tagline: 'Expose ton futur.',\n  frontUrl: 'https://portefolia.tech',\n  apiUrl: 'https://portefolia.tech/api',          // ou http://localhost:<port>/api si n8n tourne sur le même VPS\n  fromEmail: 'Portefolia <support@portefolia.tech>', // doit être l'adresse du compte SMTP\n  replyTo: 'support@portefolia.tech',\n  adminEmail: 'diankaseydou52@gmail.com',             // reçoit toutes les notifications de la plateforme\n  supportWhatsapp: '+221 78 131 13 71',\n  colors: { primary: '#1B5E20', accent: '#2E7D32' },\n};\nreturn $input.all().map((i) => ({ json: { ...i.json, config: CONFIG } }));\n"
+      },
+      "id": "16134123-63ba-4548-b0bb-9c8930a4402e",
+      "name": "Config (récap)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.config.apiUrl }}/internal/platform/daily-digest",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "dcc70ee4-7ed9-4dbd-b02f-8b4f47553139",
+      "name": "Récupérer le récap du jour",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        520
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "INTERNAL_API_KEY"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst fcfa = (n) => String(Math.round(Number(n) || 0)).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' ') + ' F CFA';\nconst para = (html) => `<p style=\"font-size:15px;line-height:1.6;margin:0 0 12px\">${html}</p>`;\nconst table = (rows) => `<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"font-size:14px;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;margin:16px 0\">${rows\n  .filter((r) => r && r[1] !== undefined && r[1] !== null && r[1] !== '')\n  .map(([k, v, raw]) => `<tr><td style=\"padding:7px 0;color:#6b7280;width:42%;vertical-align:top\">${esc(k)}</td><td style=\"padding:7px 0;font-weight:600\">${raw ? v : esc(v)}</td></tr>`).join('')}</table>`;\nconst dateFr = (d) => { if (!d) return ''; const x = new Date(d); return Number.isNaN(x.getTime()) ? String(d) : x.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); };\n\nfunction layout(cfg, { preheader = '', title, body, cta, footer }) {\n  const button = cta && cta.url\n    ? `<p style=\"margin:28px 0 8px;text-align:center\"><a href=\"${esc(cta.url)}\" style=\"background:${cfg.colors.accent};color:#ffffff;text-decoration:none;padding:14px 26px;border-radius:8px;font-weight:600;display:inline-block\">${esc(cta.label)}</a></p>`\n    : '';\n  return `<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>${esc(title)}</title></head>\n<body style=\"margin:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;color:#1f2937\">\n<span style=\"display:none;max-height:0;overflow:hidden;opacity:0\">${esc(preheader)}</span>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f4f5f7;padding:24px 12px\"><tr><td align=\"center\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden\">\n<tr><td style=\"background:${cfg.colors.primary};padding:22px 28px;color:#ffffff;font-size:20px;font-weight:700\">${esc(cfg.brand)}<div style=\"font-size:12px;font-weight:400;opacity:.85;margin-top:4px\">${esc(cfg.tagline)}</div></td></tr>\n<tr><td style=\"padding:28px\">\n<h1 style=\"font-size:20px;line-height:1.3;margin:0 0 16px\">${esc(title)}</h1>\n${body}\n${button}\n</td></tr>\n<tr><td style=\"padding:18px 28px;background:#f9fafb;font-size:12px;line-height:1.5;color:#6b7280\">${footer || 'Notification automatique de la plateforme Portefolia.'}</td></tr>\n</table></td></tr></table></body></html>`;\n}\n\n// ---------- Récapitulatif quotidien pour l'administrateur ----------\nconst cfg = $('Config (récap)').first().json.config;\nconst d = $input.first().json || {};\nconst U = d.users || {}; const R = d.revenue || {}; const S = d.subscriptions || {}; const N = d.nfc || {}; const L = d.links || {};\nconst FLUX = { ABONNEMENT: 'Abonnements', REABONNEMENT: 'Réabonnements', UPGRADE: 'Changements de formule', NFC: 'Cartes NFC', AUTRE: 'Autres' };\n\nconst todo = [];\nif (S.pending_wave) todo.push(`${S.pending_wave} paiement(s) Wave d'abonnement à valider`);\nif (N.to_validate) todo.push(`${N.to_validate} paiement(s) de carte NFC à valider`);\nif (N.ready_to_print) todo.push(`${N.ready_to_print} carte(s) NFC prête(s) à imprimer`);\nif (S.expiring_7d) todo.push(`${S.expiring_7d} abonnement(s) expirent dans les 7 jours`);\n\nconst body =\n  table([\n    ['Inscriptions du jour', `${U.today || 0} (total : ${U.total || 0})`],\n    ['Encaissé aujourd\\'hui', fcfa(R.today)],\n    ['Encaissé ce mois-ci', fcfa(R.month)],\n    ['Abonnements actifs', S.active || 0],\n    ['Expirés aujourd\\'hui', S.expired_today || 0],\n    ['Relances envoyées', d.relances_sent_today || 0],\n    ['Commandes de cartes NFC', N.orders_today || 0],\n    ['Messages de contact', d.contacts_today || 0],\n  ])\n  + ((R.by_type || []).length ? para('<strong>Encaissements du jour</strong><br>' + R.by_type.map((t) => `${esc(FLUX[t.type] || t.type)} : ${esc(t.count)} · ${esc(fcfa(t.total))}`).join('<br>')) : '')\n  + ((U.latest || []).length ? para('<strong>Nouveaux comptes</strong><br>' + U.latest.map((x) => `${esc(x.name || x.email)} — ${esc(x.email)}`).join('<br>')) : '')\n  + (todo.length ? para('<strong>À traiter</strong><br>' + todo.map((t) => '• ' + esc(t)).join('<br>')) : para('Rien en attente de votre côté. 👍'));\n\nconst subject = `📊 Portefolia — ${dateFr(d.date)} : ${U.today || 0} inscription(s), ${fcfa(R.today)} encaissés`;\nreturn [{ json: { to: cfg.adminEmail, from: cfg.fromEmail, replyTo: cfg.replyTo, subject,\n  html: layout(cfg, { preheader: subject, title: `Récapitulatif du ${dateFr(d.date)}`, body, cta: { label: 'Ouvrir le tableau de bord', url: L.dashboard_url || cfg.frontUrl + '/admin/dashboard' } }) } }];\n"
+      },
+      "id": "16bc01b4-8657-4989-b417-e2fdf920728e",
+      "name": "Préparer le récap",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.from }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $json.replyTo }}"
+        }
+      },
+      "id": "45f98474-e458-4f0b-a1bb-489d3ea085c5",
+      "name": "Email récap",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        960,
+        520
+      ],
+      "webhookId": "ed67241b-c65d-455f-8fab-8bec2956db9c",
+      "credentials": {
+        "smtp": {
+          "id": "6PAGlKsomq8gO8go",
+          "name": "SMTP Portefolia"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "## Relances et récapitulatif (heure de Dakar)\n**10 h** — relance les clients dont l'abonnement a expiré : J+3, J+10, J+30, puis dernier rappel J+60 (une seule fois chacune, lien de désinscription inclus). Chaque envoi est journalisé.\n**20 h** — vous envoie le récapitulatif de la journée (inscriptions, encaissements, abonnements, cartes NFC, à traiter).\n\nNodes HTTP : identifiant **INTERNAL_API_KEY** (en-tête X-Internal-Key).",
+        "height": 280,
+        "width": 620
+      },
+      "id": "69a152b6-6143-4ee6-a583-f609d7777af9",
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -120
+      ]
+    }
+  ],
+  "connections": {
+    "Chaque jour à 10 h": {
+      "main": [
+        [
+          {
+            "node": "Config (relances)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config (relances)": {
+      "main": [
+        [
+          {
+            "node": "Récupérer les relances du jour",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Récupérer les relances du jour": {
+      "main": [
+        [
+          {
+            "node": "Préparer les relances",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer les relances": {
+      "main": [
+        [
+          {
+            "node": "Email relance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email relance": {
+      "main": [
+        [
+          {
+            "node": "Journaliser la relance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chaque soir à 20 h": {
+      "main": [
+        [
+          {
+            "node": "Config (récap)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config (récap)": {
+      "main": [
+        [
+          {
+            "node": "Récupérer le récap du jour",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Récupérer le récap du jour": {
+      "main": [
+        [
+          {
+            "node": "Préparer le récap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer le récap": {
+      "main": [
+        [
+          {
+            "node": "Email récap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Dakar",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "pinData": {}
+}
