@@ -26,8 +26,9 @@ async function deliver(id) {
   if (!row || row.delivered_at) return;
   const url = process.env.N8N_PLATFORM_WEBHOOK_URL;
   if (!url) {
+    // Configuration manquante : l'événement attend (sans consommer ses tentatives) que l'URL soit renseignée
     await pool.query(
-      "UPDATE platform_events SET attempts = attempts + 1, last_error = 'n8n non configuré (N8N_PLATFORM_WEBHOOK_URL)' WHERE id = ?", [id]
+      "UPDATE platform_events SET last_error = 'n8n non configuré (N8N_PLATFORM_WEBHOOK_URL)' WHERE id = ?", [id]
     );
     return;
   }
@@ -61,7 +62,8 @@ async function retryPending() {
   try {
     const [rows] = await pool.query(
       `SELECT id FROM platform_events WHERE delivered_at IS NULL AND attempts < ?
-       AND created_at <= NOW() - INTERVAL 1 MINUTE ORDER BY created_at ASC LIMIT 50`, [MAX_ATTEMPTS]
+       AND created_at <= NOW() - INTERVAL 1 MINUTE AND created_at > NOW() - INTERVAL 3 DAY
+       ORDER BY created_at ASC LIMIT 50`, [MAX_ATTEMPTS]
     );
     for (const r of rows) await deliver(r.id);
   } catch (err) {

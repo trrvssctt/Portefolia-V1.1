@@ -75,7 +75,7 @@ async function scan() {
   // Nouveaux comptes
   const users = await newRows('users.last_id',
     `SELECT u.id, u.prenom, u.nom, u.email, u.phone, u.role, u.verified,
-            COALESCE(u.created_at, u.date_inscription) AS created_at, ba.company_name
+            COALESCE(u.date_inscription, NULLIF(u.created_at, '0000-00-00 00:00:00')) AS created_at, ba.company_name
      FROM utilisateurs u LEFT JOIN business_accounts ba ON ba.id = u.business_account_id
      WHERE u.id > ? ORDER BY u.id ASC LIMIT ?`);
   for (const u of users) {

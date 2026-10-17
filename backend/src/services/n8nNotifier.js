@@ -68,7 +68,8 @@ async function deliver(eventId) {
   if (!url) {
     console.log(`[n8n] non configuré — événement ${row.event} (${eventId}) non envoyé`);
     await pool.query(
-      "UPDATE nfc_preorder_events SET attempts = attempts + 1, last_error = 'n8n non configuré' WHERE id = ?",
+      // Configuration manquante : l'événement attend l'URL sans consommer ses tentatives
+      "UPDATE nfc_preorder_events SET last_error = 'n8n non configuré' WHERE id = ?",
       [eventId]
     );
     return;
@@ -111,6 +112,7 @@ async function retryPending() {
     const [rows] = await pool.query(
       `SELECT id FROM nfc_preorder_events
        WHERE delivered_at IS NULL AND attempts < ? AND created_at <= NOW() - INTERVAL 1 MINUTE
+         AND created_at > NOW() - INTERVAL 3 DAY
        ORDER BY created_at ASC LIMIT 50`,
       [MAX_ATTEMPTS]
     );

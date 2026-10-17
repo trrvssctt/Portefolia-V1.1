@@ -129,9 +129,9 @@ async function dailyDigest() {
   const one = async (sql, params = []) => { const [[r]] = await pool.query(sql, params); return r; };
   const [newUsers] = await pool.query(
     `SELECT u.id, u.prenom, u.nom, u.email, u.role FROM utilisateurs u
-     WHERE DATE(COALESCE(u.created_at, u.date_inscription)) = CURDATE() ORDER BY u.id DESC LIMIT 20`
+     WHERE DATE(COALESCE(u.date_inscription, NULLIF(u.created_at, '0000-00-00 00:00:00'))) = CURDATE() ORDER BY u.id DESC LIMIT 20`
   );
-  const usersToday = await one('SELECT COUNT(*) AS n FROM utilisateurs WHERE DATE(COALESCE(created_at, date_inscription)) = CURDATE()');
+  const usersToday = await one('SELECT COUNT(*) AS n FROM utilisateurs WHERE DATE(COALESCE(date_inscription, NULLIF(created_at, 0))) = CURDATE()');
   const usersTotal = await one("SELECT COUNT(*) AS n FROM utilisateurs WHERE deleted_at IS NULL OR deleted_at = '0000-00-00 00:00:00'");
   const [paidByType] = await pool.query(
     `SELECT COALESCE(type_flux, 'AUTRE') AS type, COUNT(*) AS n, COALESCE(SUM(montant), 0) AS total
