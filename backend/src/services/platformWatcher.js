@@ -153,7 +153,7 @@ async function scan() {
     const flux = String(p.type_flux || '').toUpperCase();
     ids.push(await notifier.emit(null, `payment.${kind}`, {
       payment: {
-        id: p.id, amount: Number(p.montant) || 0, status: p.statut, method: p.moyen_paiement || 'wave',
+        id: p.id, amount: Number(p.montant) || 0, status: p.statut, method: p.moyen_paiement || (String(p.reference_transaction || '').startsWith('pi_') ? 'stripe' : 'wave'),
         reference: p.reference_transaction || null,
         type: FLUX_LABELS[flux] || (p.type_paiement === 'commande_nfc' ? 'Carte NFC' : 'Paiement'),
         plan: p.plan_name || (p.type_paiement === 'commande_nfc' ? 'Carte NFC Portefolia' : null),
@@ -167,7 +167,13 @@ async function scan() {
   // Paiements Wave d'abonnement déclarés (à valider) et abonnements expirés
   const [subs] = await pool.query(
     `SELECT a.id, a.statut_v2, a.montant, a.montant_paye, a.duree_mois, a.reference_wave, a.preuve_paiement, a.motif_refus,
-            a.date_echeance, u.id AS user_id, u.prenom, u.nom, u.email, u.role, p.name AS plan_name
+            a.date_echeance, u.id AS user_id, u.prenom, u.nom, u.email, u.role, p.name AS plan_name,
+            (SELECT pa.montant FROM paiements pa LEFT JOIN checkouts ck ON ck.paiement_id = pa.id
+             WHERE pa.abonnement_id = a.id OR ck.abonnement_id = a.id ORDER BY pa.id DESC LIMIT 1) AS paiement_montant,
+            (SELECT NULLIF(pa.moyen_paiement, '') FROM paiements pa LEFT JOIN checkouts ck ON ck.paiement_id = pa.id
+             WHERE pa.abonnement_id = a.id OR ck.abonnement_id = a.id ORDER BY pa.id DESC LIMIT 1) AS paiement_moyen,
+            (SELECT NULLIF(pa.image_paiement, '') FROM paiements pa LEFT JOIN checkouts ck ON ck.paiement_id = pa.id
+             WHERE pa.abonnement_id = a.id OR ck.abonnement_id = a.id ORDER BY pa.id DESC LIMIT 1) AS paiement_preuve
      FROM abonnements a JOIN utilisateurs u ON u.id = a.utilisateur_id LEFT JOIN plans p ON p.id = a.plan_id
      WHERE GREATEST(a.created_at, COALESCE(a.updated_at, a.created_at)) >= ?
      ORDER BY a.id ASC LIMIT 200`, [since]
@@ -177,8 +183,11 @@ async function scan() {
     if (a.statut_v2 === 'PENDING_PAYMENT' && a.reference_wave && await markOnce('abonnement', a.id, 'submitted')) {
       ids.push(await notifier.emit(null, 'payment.submitted', {
         payment: {
-          id: a.id, amount: Number(a.montant_paye || a.montant) || 0, method: 'wave', reference: a.reference_wave,
-          type: 'Abonnement', plan: a.plan_name || null, months: a.duree_mois || null, proof_url: a.preuve_paiement || null, customer,
+          // montant_paye vaut 0 tant que le paiement n'est pas validé : montant du paiement, sinon de l'abonnement
+          id: a.id, amount: Number(a.montant_paye) > 0 ? Number(a.montant_paye) : (Number(a.paiement_montant) || Number(a.montant) || 0),
+          method: a.paiement_moyen || 'wave', reference: a.reference_wave,
+          type: 'Abonnement', plan: a.plan_name || null, months: a.duree_mois || null,
+          proof_url: a.preuve_paiement || a.paiement_preuve || null, customer,
         },
         links: { admin_url: `${front()}/admin/wave-validation` },
       }));

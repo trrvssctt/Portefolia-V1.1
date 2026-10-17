@@ -57,6 +57,33 @@ async function init() {
     if (!existing.includes('motif_remboursement')) {
       try { await pool.query(`ALTER TABLE paiements ADD COLUMN motif_remboursement VARCHAR(1024) DEFAULT NULL`); } catch (e) { console.warn('Could not add motif_remboursement column', e.message || e); }
     }
+    // statut et moyen_paiement étaient des ENUM qui n'acceptaient ni « wave » ni « pending_admin » :
+    // en mode SQL non strict, ces valeurs étaient enregistrées vides. On passe en texte libre.
+    try {
+      const [enumCols] = await pool.query(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'paiements'
+           AND COLUMN_NAME IN ('statut', 'moyen_paiement') AND DATA_TYPE = 'enum'`
+      );
+      const names = (enumCols || []).map((c) => c.COLUMN_NAME);
+      if (names.includes('statut')) {
+        await pool.query("ALTER TABLE paiements MODIFY statut VARCHAR(30) NULL DEFAULT 'En_attente'");
+      }
+      if (names.includes('moyen_paiement')) {
+        await pool.query("ALTER TABLE paiements MODIFY moyen_paiement VARCHAR(30) NULL DEFAULT NULL");
+      }
+      // Lignes enregistrées vides : moyen déduit de la référence, statut déduit du checkout
+      await pool.query(
+        `UPDATE paiements SET moyen_paiement = CASE WHEN reference_transaction LIKE 'pi\\_%' THEN 'stripe' ELSE 'wave' END
+         WHERE (moyen_paiement IS NULL OR moyen_paiement = '') AND reference_transaction IS NOT NULL AND reference_transaction <> ''`
+      );
+      await pool.query(
+        `UPDATE paiements p JOIN checkouts c ON c.paiement_id = p.id
+         SET p.statut = c.status WHERE (p.statut IS NULL OR p.statut = '') AND c.status IS NOT NULL AND c.status <> ''`
+      );
+      await pool.query("UPDATE paiements SET statut = 'En_attente' WHERE statut IS NULL OR statut = ''");
+    } catch (e) { console.warn('paiementModel: migration statut / moyen_paiement', e.message || e); }
+
     // Colonne type_paiement : abonnement | reabonnement | upgrade | commande_nfc
     try {
       const [tpCols] = await pool.query(
