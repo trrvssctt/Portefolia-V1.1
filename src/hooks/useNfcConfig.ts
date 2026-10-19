@@ -16,9 +16,9 @@ export interface NfcConfig {
 
 // Valeurs affichées le temps que le serveur réponde (la source de vérité est la table nfc_settings)
 export const NFC_CONFIG_FALLBACK: NfcConfig = {
-  unit_price: 12500,
+  unit_price: 5000,
   currency: 'XOF',
-  max_quantity: 10,
+  max_quantity: 5,
   wave_number: '+221 78 131 13 71',
   wave_link_available: false,
   expiry_hours: 72,

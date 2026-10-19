@@ -14,7 +14,7 @@ const { pool } = require('../db');
 //   features          arguments affichés sur la page de comparaison
 const DEFAULT_OFFERS = [
   {
-    code: 'standard', name: 'Standard', price: 12500, stock_type: 'logo_printed', is_quote: 0, sort_order: 1,
+    code: 'standard', name: 'Standard', price: 5000, stock_type: 'logo_printed', is_quote: 0, sort_order: 1,
     tagline: 'L\'essentiel, prêt en quelques jours',
     description: 'Logo Portefolia imprimé en usine, face infos au modèle Portefolia.',
     options: {
@@ -24,7 +24,7 @@ const DEFAULT_OFFERS = [
     },
   },
   {
-    code: 'personnalisee', name: 'Personnalisée', price: 20000, stock_type: 'logo_printed', is_quote: 0, sort_order: 2,
+    code: 'personnalisee', name: 'Personnalisée', price: 6500, stock_type: 'logo_printed', is_quote: 0, sort_order: 2,
     tagline: 'Votre style, vos couleurs',
     description: 'Logo Portefolia imprimé en usine, face infos personnalisée : gabarit, couleurs et photo.',
     options: {
@@ -34,7 +34,7 @@ const DEFAULT_OFFERS = [
     },
   },
   {
-    code: 'premium', name: 'Premium', price: 30000, stock_type: 'blank', is_quote: 0, sort_order: 3,
+    code: 'premium', name: 'Premium', price: 12500, stock_type: 'blank', is_quote: 0, sort_order: 3,
     tagline: 'Votre marque, sur les deux faces',
     description: 'Votre logo et un design sur mesure, imprimés sur une carte vierge.',
     options: {

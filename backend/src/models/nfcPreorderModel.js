@@ -2,7 +2,7 @@ const { pool } = require('../db');
 
 // Valeurs initiales des réglages NFC (modifiables ensuite depuis l'admin)
 const DEFAULT_SETTINGS = {
-  unit_price: '12500',
+  unit_price: '5000',
   currency: 'XOF',
   max_quantity: '5',
   batch_threshold: '10',

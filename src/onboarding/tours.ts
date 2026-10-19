@@ -77,7 +77,7 @@ const nfcSteps = (fromRoute: string, nfcRoute: string): TourStep[] => [
     route: nfcRoute,
     target: 'nfc-order',
     title: 'Commander une carte',
-    content: "Choisissez votre offre (à partir de 12 500 F CFA), le portfolio relié à la carte et la quantité, puis payez par Wave. À réception, vous activerez la carte depuis cette page. Il faut au moins un portfolio pour commander.",
+    content: "Choisissez votre offre (à partir de 5 000 F CFA), le portfolio relié à la carte et la quantité, puis payez par Wave. À réception, vous activerez la carte depuis cette page. Il faut au moins un portfolio pour commander.",
   },
   {
     id: 'go-waitlist',

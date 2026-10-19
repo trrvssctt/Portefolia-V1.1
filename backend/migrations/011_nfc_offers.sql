@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS nfc_offers (
   UNIQUE KEY uq_offer_code (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Les 4 offres (Standard 12 500, Personnalisée 20 000, Premium 30 000, Entreprise sur devis)
+-- Les 4 offres (Standard 5 000, Personnalisée 6 500, Premium 12 500, Entreprise sur devis — prix du 19/10/2026)
 -- sont insérées par nfcOfferModel.init() avec leurs options.
 
 ALTER TABLE nfc_preorders ADD COLUMN IF NOT EXISTS offer_id INT NULL AFTER user_id;
@@ -55,3 +55,8 @@ CREATE TABLE IF NOT EXISTS nfc_order_items (
 
 -- Quantité maximale par commande : 5 cartes identiques
 UPDATE nfc_settings SET valeur = '5' WHERE cle = 'max_quantity';
+
+-- 19/10/2026 : nouveaux prix
+UPDATE nfc_offers SET price = 5000  WHERE code = 'standard';
+UPDATE nfc_offers SET price = 6500  WHERE code = 'personnalisee';
+UPDATE nfc_offers SET price = 12500 WHERE code = 'premium';
